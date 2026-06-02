@@ -1,7 +1,7 @@
 // boost.js - เวอร์ชันขี้เกียจ พร้อมใช้ 2024
 (async function(b,d){
   let api="https://script.google.com/macros/s/xxxxxxxxxx/exec"; // ใส่ API Apps Script ของมึงตรงนี้
-  let cdn="https://USERNAME.github.io/REPO/plugins/"; // เปลี่ยน USERNAME กับ REPO เป็นของมึง
+  let cdn="https://thanakitphot-beep.github.io/supreme-boost/plugins/";
   
   try {
     let r=await fetch(api+"?domain="+b.location.hostname);
