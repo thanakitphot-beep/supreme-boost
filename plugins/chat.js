@@ -1,4 +1,4 @@
-export function init(app, apiKey) {
+export function init(app, apiKey, shopPrompt) {
     const chat = document.createElement("div");
     chat.style.position = "fixed";
     chat.style.left = "20px";
@@ -30,34 +30,46 @@ export function init(app, apiKey) {
     const input = chat.querySelector("#input");
     const messages = chat.querySelector("#messages");
 
-    // ฟังก์ชันเชื่อมต่อคุยกับสมอง Gemini API
     async function askGemini(prompt) {
         if (!apiKey) {
             return "❌ ไม่สามารถคุยกับ AI ได้: ตรวจไม่พบ API Key บนหน้านี้";
         }
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        
+        // 🧠 สร้างโครงสร้างคำสั่งส่งหา Google
+        const requestBody = {
+            contents: [{ parts: [{ text: prompt }] }]
+        };
+
+        // 🔒 ถ้าหน้านั้นมีคำสั่งร้านค้า ให้ส่งเข้าไปล็อกสมอง AI ไว้เลย
+        if (shopPrompt) {
+            // เราแอบใส่กฎเหล็กเพิ่มเข้าไปด้วยว่าให้ตอบสั้นๆ และห้ามตอบนอกเรื่องร้านค้าเด็ดขาด
+            const strictRules = `${shopPrompt} (กฎเหล็ก: ให้ตอบคำถามแบบกระชับ สั้น สรุปเนื้อหาเน้นๆ ไม่เอาน้ำ ย่อหน้าให้สั้นที่สุด และปฏิเสธการตอบคำถามที่ไม่เกี่ยวข้องกับร้านค้าหรือสินค้าชิ้นนี้อย่างสุภาพ ห้ามตอบเรื่องอื่นเด็ดขาด)`;
+            
+            requestBody.systemInstruction = {
+                parts: [{ text: strictRules }]
+            };
+        }
         
         try {
             const response = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }]
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();
             
-            // ดึงข้อความคำตอบออกมาแสดง
             if (data.candidates && data.candidates[0].content.parts[0].text) {
                 return data.candidates[0].content.parts[0].text;
+            } else if (data.error) {
+                return `🚨 Google แจ้งปัญหา: ${data.error.message}`;
             } else {
-                return "🤖 ขออภัยครับ คีย์นี้อาจจะใช้งานไม่ได้ หรือยอดใช้งานฟรีของวันนี้น่าจะเต็มแล้ว";
+                return "🤖 ขออภัยครับ เกิดข้อผิดพลาดที่ไม่รู้จัก";
             }
         } catch (error) {
-            console.error("Error:", error);
-            return "❌ เชื่อมต่อกับสมอง AI ล้มเหลว กรุณาลองใหม่อีกครั้ง";
+            return "❌ เชื่อมต่อกับสมอง AI ล้มเหลว";
         }
     }
 
@@ -69,19 +81,15 @@ export function init(app, apiKey) {
             input.value = "";
             messages.scrollTop = messages.scrollHeight;
 
-            // สร้างข้อความจำลอง "กำลังคิด..." รอไว้ก่อน
             const tempId = "loading-" + Date.now();
             messages.innerHTML += `<div id="${tempId}" style="margin-top:8px; color:#2563eb;">🤖 กำลังคิด...</div>`;
             messages.scrollTop = messages.scrollHeight;
 
-            // วิ่งไปขอคำตอบจริงจาก Gemini
             const aiReply = await askGemini(text);
 
-            // เมื่อได้คำตอบจริง ให้เอาไปสลับแทนที่คำว่า "กำลังคิด..."
             const loadingDiv = messages.querySelector(`#${tempId}`);
             if (loadingDiv) {
                 loadingDiv.style.color = "#000000";
-                // แทนที่การเว้นบรรทัด \n ให้แสดงผลใน HTML ได้สวยงาม
                 loadingDiv.innerHTML = `🤖 ${aiReply.replace(/\n/g, '<br>')}`;
             }
             messages.scrollTop = messages.scrollHeight;

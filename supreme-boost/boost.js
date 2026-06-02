@@ -5,12 +5,13 @@ console.log("🚀 Supreme Boost Core: กำลังเริ่มต้นร
 function initCore() {
     const app = document.body;
 
-    // ค้นหาแท็กสคริปต์ของตัวเองเพื่อดึง API Key ออกมา
     const scriptTag = document.querySelector('script[src*="boost.js"]');
     const apiKey = scriptTag ? scriptTag.getAttribute('data-gemini-key') : null;
+    // ➕ ดึงคำสั่งตั้งค่าร้านค้าเพิ่มเข้ามา
+    const shopPrompt = scriptTag ? scriptTag.getAttribute('data-shop-prompt') : '';
 
-    // ส่งแอป และ คีย์ ต่อไปให้ตัวจัดการปลั๊กอิน
-    loadPlugins(app, apiKey);
+    // ส่งค่าทั้งหมดต่อไปให้ manager
+    loadPlugins(app, apiKey, shopPrompt);
 }
 
 if (document.readyState === 'loading') {
