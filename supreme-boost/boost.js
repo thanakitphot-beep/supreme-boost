@@ -9,6 +9,8 @@
     const DEFAULT_PRIMARY = "#2563eb";
     const MAX_PAGE_CHARS = 6000;
     const MAX_HISTORY = 8;
+    const PAGE_TEXT_CLASS = "supreme-boost-large-text";
+    const PAGE_SMALL_TEXT_CLASS = "supreme-boost-small-text";
 
     if (window.__SUPREME_BOOST_READY__) {
         return;
@@ -158,6 +160,7 @@
         async function sendMessage(rawText) {
             const text = String(rawText || "").trim();
             if (!text || state.busy) return;
+            const localAction = applyLocalPageCommand(text);
 
             setOpen(true);
             root.classList.remove("sb-nudge");
@@ -168,19 +171,20 @@
             form.classList.add("sb-busy");
             addMessage(messages, "user", text);
             pushHistory(state, "user", text);
-            const loading = addMessage(messages, "assistant", "กำลังคิด...", true);
+            const loading = addMessage(messages, "assistant", localAction ? `${localAction.reply}\nกำลังถาม AI เพิ่มเติม...` : "กำลังคิด...", true);
 
             try {
                 const data = await askBackend(config, state, text);
-                updateMessage(loading, data.reply || "ขออภัยครับ ระบบยังตอบไม่ได้ในตอนนี้");
-                pushHistory(state, "assistant", data.reply || "");
+                const reply = mergeLocalReply(localAction, data.reply || "");
+                updateMessage(loading, reply || "ขออภัยครับ ระบบยังตอบไม่ได้ในตอนนี้");
+                pushHistory(state, "assistant", reply || "");
 
                 if (isSafeCss(data.cssCommand)) {
                     adaptiveStyle.textContent += `\n/* Supreme AI adaptive update */\n${data.cssCommand.trim()}\n`;
                 }
             } catch (error) {
                 console.error("Supreme Boost chat error:", error);
-                updateMessage(loading, "เชื่อมต่อระบบ AI ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+                updateMessage(loading, localAction ? localAction.reply : "เชื่อมต่อระบบ AI ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
             } finally {
                 state.busy = false;
                 form.classList.remove("sb-busy");
@@ -395,6 +399,20 @@
                 background: #0f172a !important;
                 color: #e5e7eb !important;
             }
+            html.supreme-boost-large-text body > :not(#${WIDGET_ID}) {
+                font-size: 118% !important;
+                line-height: 1.75 !important;
+            }
+            html.supreme-boost-large-text body > :not(#${WIDGET_ID}) :where(h1, h2, h3, h4, h5, h6, p, li, a, label, button, input, textarea, select, td, th, span, small, strong, em) {
+                font-size: 118% !important;
+                line-height: 1.75 !important;
+            }
+            html.supreme-boost-small-text body > :not(#${WIDGET_ID}) {
+                font-size: 94% !important;
+            }
+            html.supreme-boost-small-text body > :not(#${WIDGET_ID}) :where(h1, h2, h3, h4, h5, h6, p, li, a, label, button, input, textarea, select, td, th, span, small, strong, em) {
+                font-size: 94% !important;
+            }
             @keyframes sbPulse {
                 0%, 100% { transform: translateY(0); }
                 50% { transform: translateY(-5px); }
@@ -485,6 +503,49 @@
 
     function togglePageTheme() {
         document.documentElement.classList.toggle("supreme-boost-dark-page");
+    }
+
+    function applyLocalPageCommand(text) {
+        const value = String(text || "").toLowerCase();
+        const html = document.documentElement;
+
+        if (/(reset|รีเซ็ต|คืนค่า|กลับปกติ|ขนาดปกติ|ตัวอักษรปกติ)/i.test(value)) {
+            html.classList.remove(PAGE_TEXT_CLASS, PAGE_SMALL_TEXT_CLASS, "supreme-boost-dark-page");
+            return { type: "reset", reply: "ปรับหน้าเว็บกลับเป็นค่าเดิมให้แล้วครับ" };
+        }
+
+        if (/(ขยาย|ตัวใหญ่|ใหญ่ขึ้น|เพิ่มขนาด|อ่านง่าย|อ่านชัด|font\s*size|bigger|large|zoom in)/i.test(value)) {
+            html.classList.add(PAGE_TEXT_CLASS);
+            html.classList.remove(PAGE_SMALL_TEXT_CLASS);
+            return { type: "large-text", reply: "ขยายตัวอักษรบนหน้าเว็บให้แล้วครับ" };
+        }
+
+        if (/(ลดขนาด|ตัวเล็ก|เล็กลง|ย่อ|smaller|small|zoom out)/i.test(value)) {
+            html.classList.add(PAGE_SMALL_TEXT_CLASS);
+            html.classList.remove(PAGE_TEXT_CLASS);
+            return { type: "small-text", reply: "ลดขนาดตัวอักษรบนหน้าเว็บให้แล้วครับ" };
+        }
+
+        if (/(ธีมเข้ม|โหมดมืด|สีเข้ม|dark mode|dark theme)/i.test(value)) {
+            html.classList.add("supreme-boost-dark-page");
+            return { type: "dark", reply: "เปิดธีมเข้มให้แล้วครับ" };
+        }
+
+        if (/(ธีมสว่าง|โหมดสว่าง|สีสว่าง|light mode|light theme)/i.test(value)) {
+            html.classList.remove("supreme-boost-dark-page");
+            return { type: "light", reply: "เปลี่ยนกลับเป็นธีมสว่างให้แล้วครับ" };
+        }
+
+        return null;
+    }
+
+    function mergeLocalReply(localAction, aiReply) {
+        const reply = String(aiReply || "").trim();
+        if (!localAction) return reply;
+        if (!reply) return localAction.reply;
+
+        const alreadyConfirmed = /(ปรับ|ขยาย|ลด|เปิด|เปลี่ยน|เรียบร้อย|done|updated)/i.test(reply);
+        return alreadyConfirmed ? reply : `${localAction.reply}\n\n${reply}`;
     }
 
     async function askBackend(config, state, prompt) {

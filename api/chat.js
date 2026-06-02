@@ -151,6 +151,8 @@ function buildSystemPrompt(payload) {
         "ถ้าผู้ใช้ถามเรื่องนอกบริบทเว็บไซต์ ให้ปฏิเสธอย่างสุภาพและชวนกลับมาถามเรื่องร้านหรือหน้าเว็บ",
         "คุณสามารถส่ง CSS เพื่อปรับหน้าเว็บตามคำขอได้เฉพาะเมื่อผู้ใช้ขอให้ปรับหน้าตา/ธีม/การอ่านเท่านั้น",
         "CSS ต้องเป็น CSS ล้วน ห้ามใช้ @import, url(), javascript:, expression() หรือ HTML",
+        'ห้ามปรับ CSS ของ widget แชทโดยตรง เลี่ยง selector "#supreme-boost-root" และลูกทั้งหมด',
+        'ถ้าผู้ใช้ขอขยายตัวอักษร ให้นิยมใช้ selector นี้: body > :not(#supreme-boost-root), body > :not(#supreme-boost-root) :where(h1,h2,h3,h4,h5,h6,p,li,a,label,button,input,textarea,td,th,span) { font-size: 118% !important; line-height: 1.75 !important; }',
         "ต้องตอบกลับเป็น JSON เท่านั้นในรูปแบบนี้:",
         '{"reply":"ข้อความตอบผู้ใช้","cssCommand":"CSS ล้วน หรือ string ว่างถ้าไม่ต้องปรับหน้าเว็บ"}',
         payload.shopPrompt ? `คำสั่งเพิ่มเติมจากเจ้าของร้าน: ${payload.shopPrompt}` : "",

@@ -117,6 +117,20 @@ export function init(app, _clientApiKey, shopPrompt = "", backendUrl = "") {
                 }
                 #supreme-plugin-chat .sp-panel { width: auto; }
             }
+            html.supreme-plugin-large-text body > :not(#supreme-plugin-chat) {
+                font-size: 118% !important;
+                line-height: 1.75 !important;
+            }
+            html.supreme-plugin-large-text body > :not(#supreme-plugin-chat) :where(h1, h2, h3, h4, h5, h6, p, li, a, label, button, input, textarea, select, td, th, span, small, strong, em) {
+                font-size: 118% !important;
+                line-height: 1.75 !important;
+            }
+            html.supreme-plugin-small-text body > :not(#supreme-plugin-chat) {
+                font-size: 94% !important;
+            }
+            html.supreme-plugin-small-text body > :not(#supreme-plugin-chat) :where(h1, h2, h3, h4, h5, h6, p, li, a, label, button, input, textarea, select, td, th, span, small, strong, em) {
+                font-size: 94% !important;
+            }
         </style>
         <section class="sp-panel" aria-label="Supreme AI Chat">
             <div class="sp-header">
@@ -152,13 +166,14 @@ export function init(app, _clientApiKey, shopPrompt = "", backendUrl = "") {
 
         const text = input.value.trim();
         if (!text) return;
+        const localAction = applyLocalPageCommand(text);
 
         input.value = "";
         addMessage(messages, "user", text);
-        const loading = addMessage(messages, "ai", "กำลังคิด...");
+        const loading = addMessage(messages, "ai", localAction ? `${localAction.reply}\nกำลังถาม AI เพิ่มเติม...` : "กำลังคิด...");
 
         const aiData = await askThroughBackend(apiUrl, text, shopPrompt);
-        loading.textContent = aiData.reply;
+        loading.textContent = mergeLocalReply(localAction, aiData.reply);
 
         if (isSafeCss(aiData.cssCommand)) {
             adaptiveStyle.textContent += `\n/* Supreme AI adaptive update */\n${aiData.cssCommand.trim()}\n`;
@@ -217,6 +232,39 @@ function addMessage(container, role, text) {
     container.appendChild(item);
     container.scrollTop = container.scrollHeight;
     return item;
+}
+
+function applyLocalPageCommand(text) {
+    const value = String(text || "").toLowerCase();
+    const html = document.documentElement;
+
+    if (/(reset|รีเซ็ต|คืนค่า|กลับปกติ|ขนาดปกติ|ตัวอักษรปกติ)/i.test(value)) {
+        html.classList.remove("supreme-plugin-large-text", "supreme-plugin-small-text");
+        return { reply: "ปรับหน้าเว็บกลับเป็นค่าเดิมให้แล้วครับ" };
+    }
+
+    if (/(ขยาย|ตัวใหญ่|ใหญ่ขึ้น|เพิ่มขนาด|อ่านง่าย|อ่านชัด|font\s*size|bigger|large|zoom in)/i.test(value)) {
+        html.classList.add("supreme-plugin-large-text");
+        html.classList.remove("supreme-plugin-small-text");
+        return { reply: "ขยายตัวอักษรบนหน้าเว็บให้แล้วครับ" };
+    }
+
+    if (/(ลดขนาด|ตัวเล็ก|เล็กลง|ย่อ|smaller|small|zoom out)/i.test(value)) {
+        html.classList.add("supreme-plugin-small-text");
+        html.classList.remove("supreme-plugin-large-text");
+        return { reply: "ลดขนาดตัวอักษรบนหน้าเว็บให้แล้วครับ" };
+    }
+
+    return null;
+}
+
+function mergeLocalReply(localAction, aiReply) {
+    const reply = String(aiReply || "").trim();
+    if (!localAction) return reply || "ขออภัยครับ ระบบยังตอบไม่ได้ในตอนนี้";
+    if (!reply) return localAction.reply;
+
+    const alreadyConfirmed = /(ปรับ|ขยาย|ลด|เรียบร้อย|done|updated)/i.test(reply);
+    return alreadyConfirmed ? reply : `${localAction.reply}\n\n${reply}`;
 }
 
 function isSafeCss(css) {
