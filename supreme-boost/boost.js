@@ -1,26 +1,16 @@
-(function () {
-const btn = document.createElement("button");
+// ดึงตัวจัดการปลั๊กอินเข้ามาทำงาน (ถอยหลัง 1 ก้าวออกไปหาโฟลเดอร์ plugins)
+import { loadPlugins } from '../plugins/manager.js';
 
-btn.textContent = "🌙";
+console.log("🚀 Supreme Boost Core: กำลังเริ่มต้นระบบ...");
 
-btn.style.position = "fixed";
-btn.style.bottom = "20px";
-btn.style.right = "20px";
-btn.style.zIndex = "999999";
-btn.style.padding = "10px";
+function initCore() {
+    const app = document.body;
+    loadPlugins(app);
+}
 
-btn.onclick = () => {
-document.body.classList.toggle("dark");
-};
-
-const style = document.createElement("style");
-
-style.textContent = `     .dark {
-      background:#111;
-      color:white;
-    }
-  `;
-
-document.head.appendChild(style);
-document.body.appendChild(btn);
-})();
+// รอให้หน้าเว็บโหลดโครงสร้างเสร็จแล้วลุยเลย
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCore);
+} else {
+    initCore();
+}

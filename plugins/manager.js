@@ -1,65 +1,23 @@
-export function init(app) {
-const panel = document.createElement("div");
+// นำเข้าปลั๊กอินต่างๆ ที่อยู่ในโฟลเดอร์เดียวกัน
+import { init as initDarkMode } from './darkmode.js';
+import { init as initChat } from './chat.js';
 
-panel.innerHTML = ` <div id="sb-toggle">⚡ Supreme Boost</div>
+export function loadPlugins(app) {
+    console.log("📦 Plugin Manager: กำลังเปิดใช้งานปลั๊กอินทั้งหมด...");
 
-```
-<div id="sb-panel">
-  <h3>Supreme Boost</h3>
-  <div>Version 1.0</div>
-  <hr>
-  <div>✓ Dark Mode</div>
-  <div>✓ Chat</div>
-</div>
-```
+    // สั่งรัน Dark Mode
+    try {
+        initDarkMode(app);
+        console.log("✅ ปลั๊กอิน Dark Mode พร้อมใช้งาน");
+    } catch (error) {
+        console.error("❌ โหลด Dark Mode ล้มเหลว:", error);
+    }
 
-`;
-
-const style = document.createElement("style");
-
-style.textContent = `
-#sb-toggle{
-position:fixed;
-top:20px;
-right:20px;
-background:#111;
-color:#fff;
-padding:10px 15px;
-border-radius:8px;
-cursor:pointer;
-z-index:999999;
-font-family:sans-serif;
-}
-
-```
-#sb-panel{
-  display:none;
-  position:fixed;
-  top:60px;
-  right:20px;
-  width:260px;
-  background:white;
-  border:1px solid #ddd;
-  border-radius:10px;
-  padding:15px;
-  box-shadow:0 0 20px rgba(0,0,0,.15);
-  z-index:999999;
-  font-family:sans-serif;
-}
-```
-
-`;
-
-panel.appendChild(style);
-app.appendChild(panel);
-
-const toggle = panel.querySelector("#sb-toggle");
-const menu = panel.querySelector("#sb-panel");
-
-toggle.addEventListener("click", () => {
-menu.style.display =
-menu.style.display === "block"
-? "none"
-: "block";
-});
+    // สั่งรัน แชท AI
+    try {
+        initChat(app);
+        console.log("✅ ปลั๊กอิน Chat AI พร้อมใช้งาน");
+    } catch (error) {
+        console.error("❌ โหลด Chat AI ล้มเหลว:", error);
+    }
 }
