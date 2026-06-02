@@ -74,19 +74,24 @@ export function init(app, clientApiKey, shopPrompt, backendUrl) {
 
             const data = await response.json();
 
-            // คืนค่าคำตอบที่ได้กลับมาจากเซิร์ฟเวอร์ตัวกลาง
+            // คืนค่าออบเจ็กต์ที่มีทั้งคำตอบและคำสั่ง CSS
             if (data.reply) {
-                return data.reply;
+                return { reply: data.reply, cssCommand: data.cssCommand || "" };
             } else if (data.error) {
-                return `🚨 ${data.error}`;
+                return { reply: `🚨 ${data.error}`, cssCommand: "" };
             } else {
-                return "🤖 ขออภัยครับ เซิร์ฟเวอร์ส่งข้อมูลกลับมาไม่ถูกต้อง";
+                return { reply: "🤖 ขออภัยครับ เซิร์ฟเวอร์ส่งข้อมูลกลับมาไม่ถูกต้อง", cssCommand: "" };
             }
         } catch (error) {
             console.error("Backend connection error:", error);
-            return "❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง";
+            return { reply: "❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง", cssCommand: "" };
         }
     }
+
+    // สร้าง style tag สำหรับ Adaptive UI
+    const adaptiveStyle = document.createElement("style");
+    adaptiveStyle.id = "supreme-adaptive-style";
+    document.head.appendChild(adaptiveStyle);
 
     // 3. ระบบส่งข้อความเมื่อกด Enter
     input.addEventListener("keydown", async (e) => {
@@ -104,13 +109,18 @@ export function init(app, clientApiKey, shopPrompt, backendUrl) {
             messages.scrollTop = messages.scrollHeight;
 
             // เรียกทำงานผ่านระบบ Backend ตัวกลาง
-            const aiReply = await askThroughBackend(text);
+            const aiData = await askThroughBackend(text);
+
+            // นำ CSS ที่ได้จาก AI ไปใส่ในหน้าเว็บทันที
+            if (aiData.cssCommand && aiData.cssCommand.trim() !== "") {
+                adaptiveStyle.innerHTML += `\n/* AI Adaptive Update */\n${aiData.cssCommand}`;
+            }
 
             // แสดงผลคำตอบจริงลงหน้าต่างแชท
             const loadingDiv = messages.querySelector(`#${tempId}`);
             if (loadingDiv) {
                 loadingDiv.style.color = "#000000";
-                loadingDiv.innerHTML = `🤖 ${aiReply.replace(/\n/g, '<br>')}`;
+                loadingDiv.innerHTML = `🤖 ${aiData.reply.replace(/\n/g, '<br>')}`;
             }
             messages.scrollTop = messages.scrollHeight;
         }

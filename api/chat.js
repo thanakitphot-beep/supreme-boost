@@ -54,7 +54,8 @@ module.exports = async function handler(req, res) {
                 generationConfig: {
                     temperature: 0.7,
                     maxOutputTokens: 1024,
-                    topP: 0.9
+                    topP: 0.9,
+                    responseMimeType: "application/json",
                 }
             })
         });
@@ -76,10 +77,17 @@ module.exports = async function handler(req, res) {
         const data = await geminiResponse.json();
 
         // ดึงคำตอบจาก response
-        const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-        if (reply) {
-            return res.status(200).json({ reply: reply });
+        if (replyText) {
+            try {
+                // พยายามแปลงข้อความที่ได้ให้เป็น JSON object
+                const parsedReply = JSON.parse(replyText);
+                return res.status(200).json(parsedReply);
+            } catch (e) {
+                // กรณี AI ส่งมาไม่ใช่ JSON ที่สมบูรณ์ ให้คืนค่าเป็น text ธรรมดา
+                return res.status(200).json({ reply: replyText });
+            }
         } else {
             console.error("❌ Gemini response ไม่มี text:", JSON.stringify(data));
             return res.status(500).json({ error: "AI ไม่สามารถสร้างคำตอบได้ กรุณาลองถามใหม่" });
@@ -103,7 +111,14 @@ function buildSystemPrompt(pageContent, shopPrompt) {
 กฎเหล็กที่ต้องปฏิบัติตามอย่างเคร่งครัด:
 1. ห้ามตอบคำถามหรือพูดคุยในหัวข้อที่ไม่เกี่ยวข้องกับร้านค้า สินค้า หรือเนื้อหาบนหน้าเว็บนี้เด็ดขาด
 2. หากผู้ใช้ถามเรื่องทั่วไป (เช่น สภาพอากาศ, การเมือง, เขียนโค้ด, เล่นมุกตลก) ให้ปฏิเสธอย่างสุภาพ เช่น "ขออภัยครับ ผมเป็นผู้ช่วยดูแลร้านค้า สามารถให้ข้อมูลเกี่ยวกับร้านและสินค้าของเราได้เท่านั้นครับ"
-3. ห้ามแต่งข้อมูลสินค้าหรือราคาที่ไม่มีอยู่จริง ถ้าไม่แน่ใจให้บอกว่า "ขออภัยครับ ข้อมูลนี้ไม่ได้ระบุไว้บนหน้าเว็บ"`;
+3. ห้ามแต่งข้อมูลสินค้าหรือราคาที่ไม่มีอยู่จริง ถ้าไม่แน่ใจให้บอกว่า "ขออภัยครับ ข้อมูลนี้ไม่ได้ระบุไว้บนหน้าเว็บ"
+4. คุณมีพลังในการควบคุมหน้าเว็บด้วยคำสั่ง CSS! หากผู้ใช้มีความต้องการพิเศษ (เช่น อยากให้ตัวหนังสือใหญ่ขึ้น, เปลี่ยนเว็บเป็นสีชมพู, ใช้ธีมสีเข้ม) คุณสามารถสร้างคำสั่ง CSS เพื่อตอบสนองความต้องการนั้นได้
+
+รูปแบบการตอบกลับ (ต้องเป็น JSON เท่านั้น):
+{
+  "reply": "ข้อความที่ต้องการตอบผู้ใช้ (ปฏิบัติตามกฎ 3 ข้อแรกอย่างเคร่งครัด)",
+  "cssCommand": "คำสั่ง CSS เพียวๆ ที่ใช้ปรับหน้าเว็บตามที่ผู้ใช้ขอ (เช่น 'body { background-color: pink !important; }') ถ้าผู้ใช้ไม่ได้ขอปรับแต่งหน้าเว็บ ให้ใส่ค่าเป็น string ว่าง ('')"
+}`;
 
     // เพิ่มคำสั่งเฉพาะของร้านค้า (ถ้ามี)
     if (shopPrompt && shopPrompt.trim() !== "") {
