@@ -1,7 +1,8 @@
 // boost.js - เวอร์ชันขี้เกียจ พร้อมใช้ 2024
 (async function(b,d){
-  let api="https://script.google.com/macros/s/xxxxxxxxxx/exec"; // ใส่ API Apps Script ของมึงตรงนี้
-  let cdn="https://thanakitphot-beep.github.io/supreme-boost/plugins/";
+let api="https://script.google.com/macros/s/AKfycbyojt3DGQYr6P1-ZwDu2EHPWNwvd3EvmfZwdVcsjD9LZ8Psrz1lMBITvD3Cll6cjeSI/exec";
+
+let cdn="https://thanakitphot-beep.github.io/supreme-boost/plugins/";
   
   try {
     let r=await fetch(api+"?domain="+b.location.hostname);
