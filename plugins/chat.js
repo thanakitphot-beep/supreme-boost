@@ -13,6 +13,7 @@ chat.style.zIndex = "999999";
 chat.style.boxShadow = "0 0 10px rgba(0,0,0,.2)";
 chat.style.display = "flex";
 chat.style.flexDirection = "column";
+chat.style.fontFamily = "Arial, sans-serif";
 
 chat.innerHTML = ` <div style="
    background:#2563eb;
