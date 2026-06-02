@@ -1,98 +1,117 @@
-export function init(app, apiKey, shopPrompt) {
-    const chat = document.createElement("div");
-    chat.style.position = "fixed";
-    chat.style.left = "20px";
-    chat.style.bottom = "20px";
-    chat.style.width = "320px";
-    chat.style.height = "400px";
-    chat.style.background = "#ffffff";
-    chat.style.border = "1px solid #ccc";
-    chat.style.borderRadius = "10px";
-    chat.style.zIndex = "999999";
-    chat.style.boxShadow = "0 0 10px rgba(0,0,0,.2)";
-    chat.style.display = "flex";
-    chat.style.flexDirection = "column";
-    chat.style.fontFamily = "Arial, sans-serif";
-    chat.style.color = "#000000";
+// plugins/chat.js
 
-    chat.innerHTML = `
-        <div style="background:#2563eb; color:white; padding:10px; border-radius:10px 10px 0 0; font-weight:bold;">
-            Supreme AI Chat (Gemini)
-        </div>
-        <div id="messages" style="flex:1; padding:10px; overflow:auto; background:#ffffff;">
-            <div style="margin-top:4px;">🤖 สวัสดีครับ มีอะไรให้ผมช่วยไหมครับ?</div>
-        </div>
-        <input id="input" placeholder="พิมพ์ข้อความ..." style="border:none; border-top:1px solid #ddd; padding:10px; outline:none; background:#ffffff; color:#000000;">
-    `;
+document.addEventListener("DOMContentLoaded", () => {
+    // 1. ดึงองค์ประกอบต่างๆ ของหน้าต่างแชทมาเตรียมไว้
+    const chatWidget = document.getElementById("supreme-chat-widget");
+    if (!chatWidget) return;
 
-    app.appendChild(chat);
+    const messagesContainer = chatWidget.querySelector(".chat-messages");
+    const inputField = chatWidget.querySelector(".chat-input-field");
+    const sendButton = chatWidget.querySelector(".chat-send-btn");
+    const scriptTag = document.querySelector("script[src*='boost.js']");
 
-    const input = chat.querySelector("#input");
-    const messages = chat.querySelector("#messages");
+    // 2. อ่านค่า API Key และคำสั่งร้านค้า (Prompt) จากแท็ก Script
+    const apiKey = scriptTag ? scriptTag.getAttribute("data-gemini-key") : null; 
+    // หมายเหตุ: ถึงแม้ชื่อ Attribute จะเป็น data-gemini-key แต่เราเอามาใส่คีย์ OpenAI (sk-...) แทนได้เลยครับ
+    const shopPrompt = scriptTag ? scriptTag.getAttribute("data-shop-prompt") : "";
 
-    async function askGemini(prompt) {
-        if (!apiKey) {
-            return "❌ ไม่สามารถคุยกับ AI ได้: ตรวจไม่พบ API Key บนหน้านี้";
+    // 3. ฟังก์ชันสำหรับเพิ่มกล่องข้อความลงในหน้าแชท
+    function appendMessage(sender, text) {
+        const messageDiv = document.createElement("div");
+        messageDiv.classList.add("chat-message", sender === "user" ? "user-message" : "bot-message");
+        
+        // กำหนดไอคอนตามผู้ส่ง
+        const icon = sender === "user" ? "👤" : "🤖";
+        messageDiv.innerHTML = `<span class="message-icon">${icon}</span> <span class="message-text">${text}</span>`;
+        
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight; // เลื่อนหน้าจอลงล่างสุดอัตโนมัติ
+    }
+
+    // 4. ฟังก์ชันส่งคำขอไปหาสมอง OpenAI (ChatGPT) รุ่น gpt-4o-mini
+    async function askOpenAI(userPrompt) {
+        if (!apiKey || apiKey.trim() === "" || apiKey.includes("คีย์ของคุณ")) {
+            return "❌ ไม่สามารถเชื่อมต่อ AI ได้: ตรวจไม่พบ OpenAI API Key (คีย์ต้องขึ้นต้นด้วย sk-...)";
         }
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
+        // ลิงก์ API Endpoint ของ OpenAI
+        const url = "https://api.openai.com/v1/chat/completions";
         
-        // 🧠 สร้างโครงสร้างคำสั่งส่งหา Google
-        const requestBody = {
-            contents: [{ parts: [{ text: prompt }] }]
-        };
-
-        // 🔒 ถ้าหน้านั้นมีคำสั่งร้านค้า ให้ส่งเข้าไปล็อกสมอง AI ไว้เลย
-        if (shopPrompt) {
-            // เราแอบใส่กฎเหล็กเพิ่มเข้าไปด้วยว่าให้ตอบสั้นๆ และห้ามตอบนอกเรื่องร้านค้าเด็ดขาด
-            const strictRules = `${shopPrompt} (กฎเหล็ก: ให้ตอบคำถามแบบกระชับ สั้น สรุปเนื้อหาเน้นๆ ไม่เอาน้ำ ย่อหน้าให้สั้นที่สุด และปฏิเสธการตอบคำถามที่ไม่เกี่ยวข้องกับร้านค้าหรือสินค้าชิ้นนี้อย่างสุภาพ ห้ามตอบเรื่องอื่นเด็ดขาด)`;
-            
-            requestBody.systemInstruction = {
-                parts: [{ text: strictRules }]
-            };
+        // จัดโครงสร้างกล่องข้อความ (Messages Array)
+        const messages = [];
+        
+        // ถ้าผู้ใช้ใส่รายละเอียดร้านค้าไว้ ให้ล็อกสมอง AI ด้วยบทบาท System
+        if (shopPrompt && shopPrompt.trim() !== "") {
+            const strictRules = `${shopPrompt} (กฎเหล็ก: คุณต้องสวมบทบาทเป็นแอดมินร้านนี้เท่านั้น ตอบคำถามอย่างสุภาพ กระชับ มั่นใจ ย่อหน้าให้สั้นอ่านง่าย และต้องปฏิเสธการตอบคำถามที่ไม่เกี่ยวข้องกับสินค้าหรือบริการของร้านค้าอย่างสุภาพ ห้ามคุยเรื่องอื่นนอกเหนือจากนี้เด็ดขาด)`;
+            messages.push({ role: "system", content: strictRules });
         }
         
+        // ใส่ข้อความล่าสุดที่ลูกค้าพิมพ์ถามเข้ามา
+        messages.push({ role: "user", content: userPrompt });
+
         try {
             const response = await fetch(url, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(requestBody)
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${apiKey}` // ส่งคีย์ไปยืนยันตัวตน
+                },
+                body: JSON.stringify({
+                    model: "gpt-4o-mini", // เลือกใช้รุ่นมินิที่ฉลาด เสถียร และประหยัดค่าใช้จ่าย
+                    messages: messages,
+                    temperature: 0.5 // ตั้งค่าให้ AI ตอบอยู่ในกรอบความจริง ไม่คิดคำตอบเพ้อฝันเกินไป
+                })
             });
 
             const data = await response.json();
-            
-            if (data.candidates && data.candidates[0].content.parts[0].text) {
-                return data.candidates[0].content.parts[0].text;
-            } else if (data.error) {
-                return `🚨 Google แจ้งปัญหา: ${data.error.message}`;
+
+            // ส่งคำตอบกลับไปแสดงผลถ้าทำรายการสำเร็จ
+            if (data.choices && data.choices[0] && data.choices[0].message) {
+                return data.choices[0].message.content;
+            } 
+            // ดักจับกรณีที่ OpenAI ส่ง Error แจ้งปัญหากลับมา
+            else if (data.error) {
+                console.error("OpenAI Error:", data.error);
+                return `🚨 OpenAI แจ้งปัญหา: <br><span style="color:#d93025; font-size:12px; display:block; margin-top:4px;">${data.error.message}</span>`;
             } else {
-                return "🤖 ขออภัยครับ เกิดข้อผิดพลาดที่ไม่รู้จัก";
+                return "🤖 ขออภัยครับ ระบบส่งข้อมูลกลับมาในรูปแบบที่ไม่ถูกต้อง";
             }
+
         } catch (error) {
-            return "❌ เชื่อมต่อกับสมอง AI ล้มเหลว";
+            console.error("Fetch API Error:", error);
+            return "❌ การเชื่อมต่อล้มเหลว: ไม่สามารถส่งข้อมูลไปยังเซิร์ฟเวอร์ OpenAI ได้";
         }
     }
 
-    input.addEventListener("keydown", async (e) => {
-        if (e.key === "Enter" && input.value.trim()) {
-            const text = input.value.trim();
-            
-            messages.innerHTML += `<div style="margin-top:8px; color:#555;">👤 ${text}</div>`;
-            input.value = "";
-            messages.scrollTop = messages.scrollHeight;
+    // 5. ฟังก์ชันหลักเมื่อผู้ใช้กดส่งข้อความ
+    async function handleSendMessage() {
+        const text = inputField.value.trim();
+        if (!text) return; // ถ้าช่องว่างเปล่า ไม่ต้องส่ง
 
-            const tempId = "loading-" + Date.now();
-            messages.innerHTML += `<div id="${tempId}" style="margin-top:8px; color:#2563eb;">🤖 กำลังคิด...</div>`;
-            messages.scrollTop = messages.scrollHeight;
+        // แสดงข้อความฝั่งผู้ใช้ขึ้นจอ และล้างช่องกรอกข้อมูล
+        appendMessage("user", text);
+        inputField.value = "";
 
-            const aiReply = await askGemini(text);
+        // แสดงสถานะว่าบอทกำลังคิดพิมพ์อยู่
+        const typingDiv = document.createElement("div");
+        typingDiv.classList.add("chat-message", "bot-message", "typing-indicator");
+        typingDiv.innerHTML = `<span class="message-icon">🤖</span> <span class="message-text">กำลังคิด...</span>`;
+        messagesContainer.appendChild(typingDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-            const loadingDiv = messages.querySelector(`#${tempId}`);
-            if (loadingDiv) {
-                loadingDiv.style.color = "#000000";
-                loadingDiv.innerHTML = `🤖 ${aiReply.replace(/\n/g, '<br>')}`;
-            }
-            messages.scrollTop = messages.scrollHeight;
+        // เรียกใช้งานฟังก์ชันถาม OpenAI
+        const aiResponse = await askOpenAI(text);
+
+        // เอาสถานะ "กำลังคิด..." ออก แล้วแสดงคำตอบจริงจาก OpenAI
+        typingDiv.remove();
+        appendMessage("bot", aiResponse);
+    }
+
+    // 6. ตรวจจับการคลิกปุ่มส่ง และการกดปุ่ม Enter
+    sendButton.addEventListener("click", handleSendMessage);
+    inputField.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            handleSendMessage();
         }
     });
-}
+});
