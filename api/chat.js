@@ -1,136 +1,231 @@
-// api/chat.js — Vercel Serverless Function สำหรับ Supreme AI Chat
-// ซ่อน API Key ไว้บนเซิร์ฟเวอร์ ไม่ให้คนดูหน้าเว็บเห็น
+// Vercel Serverless Function for Supreme AI Chat.
+// Keep GEMINI_API_KEY on the server only. Never put it in the embed script.
+
+const DEFAULT_MODEL = "gemini-2.5-flash";
+const MAX_PROMPT_CHARS = 1200;
+const MAX_PAGE_CHARS = 6000;
+const MAX_SHOP_PROMPT_CHARS = 2500;
+const MAX_SELECTED_CHARS = 1200;
+const MAX_HISTORY_ITEMS = 8;
 
 module.exports = async function handler(req, res) {
-    // ✅ รองรับ CORS ให้เว็บไหนก็เรียกใช้ได้
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    setCorsHeaders(res);
 
-    // รองรับ preflight request (OPTIONS)
     if (req.method === "OPTIONS") {
         return res.status(200).end();
     }
 
-    // อนุญาตเฉพาะ POST เท่านั้น
     if (req.method !== "POST") {
         return res.status(405).json({ error: "Method not allowed" });
     }
 
     try {
-        const { prompt, pageContent, shopPrompt } = req.body;
+        const body = parseBody(req.body);
+        const prompt = cleanText(body.prompt, MAX_PROMPT_CHARS);
 
-        // ตรวจสอบว่ามีข้อความส่งมาไหม
-        if (!prompt || prompt.trim() === "") {
+        if (!prompt) {
             return res.status(400).json({ error: "กรุณาพิมพ์ข้อความก่อนส่ง" });
         }
 
-        // ดึง API Key จาก Environment Variable บน Vercel
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
-            console.error("❌ GEMINI_API_KEY ไม่ได้ตั้งค่าบน Vercel Environment Variables");
+            console.error("GEMINI_API_KEY is not configured.");
             return res.status(500).json({ error: "ระบบยังไม่ได้ตั้งค่า API Key กรุณาแจ้งผู้ดูแลระบบ" });
         }
 
-        // สร้าง System Prompt ที่รวมข้อมูลหน้าเว็บ + คำสั่งร้านค้า
-        const systemInstruction = buildSystemPrompt(pageContent, shopPrompt);
+        const payload = {
+            prompt,
+            shopPrompt: cleanText(body.shopPrompt, MAX_SHOP_PROMPT_CHARS),
+            pageContent: cleanText(body.pageContent, MAX_PAGE_CHARS),
+            selectedText: cleanText(body.selectedText, MAX_SELECTED_CHARS),
+            history: normalizeHistory(body.history),
+            url: cleanText(body.url, 500),
+            title: cleanText(body.title, 200)
+        };
 
-        // เรียก Gemini API
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const aiData = await askGemini(apiKey, payload);
+        return res.status(200).json(aiData);
+    } catch (error) {
+        console.error("Supreme AI server error:", error);
+        const status = Number.isInteger(error.statusCode) ? error.statusCode : 500;
+        return res.status(status).json({
+            error: error.publicMessage || "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง"
+        });
+    }
+};
 
-        const geminiResponse = await fetch(geminiUrl, {
+function setCorsHeaders(res) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+function parseBody(body) {
+    if (!body) return {};
+    if (typeof body === "string") {
+        try {
+            return JSON.parse(body);
+        } catch {
+            return {};
+        }
+    }
+    return body;
+}
+
+function cleanText(value, maxLength) {
+    if (typeof value !== "string") return "";
+    return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function normalizeHistory(history) {
+    if (!Array.isArray(history)) return [];
+
+    return history
+        .slice(-MAX_HISTORY_ITEMS)
+        .map((item) => ({
+            role: item && item.role === "assistant" ? "assistant" : "user",
+            text: cleanText(item && item.text, 1000)
+        }))
+        .filter((item) => item.text);
+}
+
+async function askGemini(apiKey, payload) {
+    const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    try {
+        const response = await fetch(url, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": apiKey
+            },
             body: JSON.stringify({
                 system_instruction: {
-                    parts: [{ text: systemInstruction }]
+                    parts: [{ text: buildSystemPrompt(payload) }]
                 },
                 contents: [
                     {
                         role: "user",
-                        parts: [{ text: prompt }]
+                        parts: [{ text: buildUserMessage(payload) }]
                     }
                 ],
                 generationConfig: {
-                    temperature: 0.7,
-                    maxOutputTokens: 1024,
+                    temperature: 0.45,
                     topP: 0.9,
-                    responseMimeType: "application/json",
+                    maxOutputTokens: 900,
+                    responseMimeType: "application/json"
                 }
-            })
+            }),
+            signal: controller.signal
         });
 
-        // ตรวจสอบ HTTP status จาก Gemini
-        if (!geminiResponse.ok) {
-            const errorBody = await geminiResponse.text();
-            console.error("❌ Gemini API Error:", geminiResponse.status, errorBody);
+        const rawText = await response.text();
 
-            if (geminiResponse.status === 400) {
-                return res.status(500).json({ error: "คำถามนี้ไม่สามารถตอบได้ กรุณาลองถามใหม่" });
-            }
-            if (geminiResponse.status === 429) {
-                return res.status(500).json({ error: "ขณะนี้มีคนใช้งานเยอะ กรุณารอสักครู่แล้วลองใหม่" });
-            }
-            return res.status(500).json({ error: "เกิดข้อผิดพลาดจาก AI กรุณาลองใหม่อีกครั้ง" });
+        if (!response.ok) {
+            console.error("Gemini API error:", response.status, rawText);
+            throw toPublicGeminiError(response.status);
         }
 
-        const data = await geminiResponse.json();
+        const geminiData = safeJson(rawText);
+        const replyText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const parsed = parseAiReply(replyText);
 
-        // ดึงคำตอบจาก response
-        const replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-        if (replyText) {
-            try {
-                // พยายามแปลงข้อความที่ได้ให้เป็น JSON object
-                const parsedReply = JSON.parse(replyText);
-                return res.status(200).json(parsedReply);
-            } catch (e) {
-                // กรณี AI ส่งมาไม่ใช่ JSON ที่สมบูรณ์ ให้คืนค่าเป็น text ธรรมดา
-                return res.status(200).json({ reply: replyText });
-            }
-        } else {
-            console.error("❌ Gemini response ไม่มี text:", JSON.stringify(data));
-            return res.status(500).json({ error: "AI ไม่สามารถสร้างคำตอบได้ กรุณาลองถามใหม่" });
-        }
-
-    } catch (error) {
-        console.error("❌ Server Error:", error);
-        return res.status(500).json({ error: "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง" });
+        return {
+            reply: cleanReply(parsed.reply),
+            cssCommand: sanitizeCss(parsed.cssCommand)
+        };
+    } finally {
+        clearTimeout(timeout);
     }
 }
 
-/**
- * สร้าง System Prompt ที่รวมข้อมูลหน้าเว็บและคำสั่งร้านค้า
- */
-function buildSystemPrompt(pageContent, shopPrompt) {
-    let systemPrompt = `คุณคือผู้ช่วย AI ประจำเว็บไซต์นี้ ชื่อ "Supreme AI"
-หน้าที่ของคุณคือตอบคำถามเกี่ยวกับร้านค้า สินค้า และบริการของเว็บไซต์นี้เท่านั้น
-คุณต้องตอบคำถามเป็นภาษาไทยเสมอ ยกเว้นผู้ใช้ถามเป็นภาษาอื่น
-ตอบให้กระชับ ตรงประเด็น เข้าใจง่าย ใช้น้ำเสียงเป็นมิตร
+function buildSystemPrompt(payload) {
+    return [
+        'คุณคือผู้ช่วย AI ประจำเว็บไซต์ ชื่อ "Supreme AI"',
+        "หน้าที่คือช่วยตอบคำถามเกี่ยวกับร้านค้า สินค้า บริการ โปรโมชัน และเนื้อหาที่มีอยู่บนหน้าเว็บนี้เท่านั้น",
+        "ตอบเป็นภาษาเดียวกับผู้ใช้ ถ้าผู้ใช้ใช้ภาษาไทยให้ตอบภาษาไทยแบบสุภาพ กระชับ และเป็นมิตร",
+        "ห้ามแต่งข้อมูลสินค้า ราคา สต็อก หรือเงื่อนไขที่ไม่ได้อยู่ในข้อมูลที่ได้รับ ถ้าไม่ทราบให้บอกตรง ๆ ว่ายังไม่มีข้อมูลบนหน้าเว็บ",
+        "ถ้าผู้ใช้ถามเรื่องนอกบริบทเว็บไซต์ ให้ปฏิเสธอย่างสุภาพและชวนกลับมาถามเรื่องร้านหรือหน้าเว็บ",
+        "คุณสามารถส่ง CSS เพื่อปรับหน้าเว็บตามคำขอได้เฉพาะเมื่อผู้ใช้ขอให้ปรับหน้าตา/ธีม/การอ่านเท่านั้น",
+        "CSS ต้องเป็น CSS ล้วน ห้ามใช้ @import, url(), javascript:, expression() หรือ HTML",
+        "ต้องตอบกลับเป็น JSON เท่านั้นในรูปแบบนี้:",
+        '{"reply":"ข้อความตอบผู้ใช้","cssCommand":"CSS ล้วน หรือ string ว่างถ้าไม่ต้องปรับหน้าเว็บ"}',
+        payload.shopPrompt ? `คำสั่งเพิ่มเติมจากเจ้าของร้าน: ${payload.shopPrompt}` : "",
+        payload.title ? `ชื่อหน้าเว็บ: ${payload.title}` : "",
+        payload.url ? `URL หน้าเว็บ: ${payload.url}` : "",
+        payload.pageContent ? `ข้อมูลบนหน้าเว็บปัจจุบัน: ${payload.pageContent}` : "",
+        payload.selectedText ? `ข้อความที่ผู้ใช้เลือกบนหน้าเว็บ: ${payload.selectedText}` : ""
+    ].filter(Boolean).join("\n\n");
+}
 
-กฎเหล็กที่ต้องปฏิบัติตามอย่างเคร่งครัด:
-1. ห้ามตอบคำถามหรือพูดคุยในหัวข้อที่ไม่เกี่ยวข้องกับร้านค้า สินค้า หรือเนื้อหาบนหน้าเว็บนี้เด็ดขาด
-2. หากผู้ใช้ถามเรื่องทั่วไป (เช่น สภาพอากาศ, การเมือง, เขียนโค้ด, เล่นมุกตลก) ให้ปฏิเสธอย่างสุภาพ เช่น "ขออภัยครับ ผมเป็นผู้ช่วยดูแลร้านค้า สามารถให้ข้อมูลเกี่ยวกับร้านและสินค้าของเราได้เท่านั้นครับ"
-3. ห้ามแต่งข้อมูลสินค้าหรือราคาที่ไม่มีอยู่จริง ถ้าไม่แน่ใจให้บอกว่า "ขออภัยครับ ข้อมูลนี้ไม่ได้ระบุไว้บนหน้าเว็บ"
-4. คุณมีพลังในการควบคุมหน้าเว็บด้วยคำสั่ง CSS! หากผู้ใช้มีความต้องการพิเศษ (เช่น อยากให้ตัวหนังสือใหญ่ขึ้น, เปลี่ยนเว็บเป็นสีชมพู, ใช้ธีมสีเข้ม) คุณสามารถสร้างคำสั่ง CSS เพื่อตอบสนองความต้องการนั้นได้
+function buildUserMessage(payload) {
+    const history = payload.history.length
+        ? payload.history.map((item) => `${item.role === "assistant" ? "AI" : "User"}: ${item.text}`).join("\n")
+        : "ไม่มีประวัติสนทนาก่อนหน้า";
 
-รูปแบบการตอบกลับ (ต้องเป็น JSON เท่านั้น):
-{
-  "reply": "ข้อความที่ต้องการตอบผู้ใช้ (ปฏิบัติตามกฎ 3 ข้อแรกอย่างเคร่งครัด)",
-  "cssCommand": "คำสั่ง CSS เพียวๆ ที่ใช้ปรับหน้าเว็บตามที่ผู้ใช้ขอ (เช่น 'body { background-color: pink !important; }') ถ้าผู้ใช้ไม่ได้ขอปรับแต่งหน้าเว็บ ให้ใส่ค่าเป็น string ว่าง ('')"
-}`;
+    return [
+        `ประวัติสนทนาล่าสุด:\n${history}`,
+        `คำถามล่าสุดของผู้ใช้:\n${payload.prompt}`
+    ].join("\n\n");
+}
 
-    // เพิ่มคำสั่งเฉพาะของร้านค้า (ถ้ามี)
-    if (shopPrompt && shopPrompt.trim() !== "") {
-        systemPrompt += `\n\nคำสั่งเพิ่มเติมจากเจ้าของร้าน:\n${shopPrompt}`;
+function safeJson(text) {
+    try {
+        return JSON.parse(text);
+    } catch {
+        return null;
+    }
+}
+
+function parseAiReply(text) {
+    if (!text) {
+        return { reply: "ขออภัยครับ AI ยังไม่สามารถสร้างคำตอบได้ในตอนนี้", cssCommand: "" };
     }
 
-    // เพิ่มเนื้อหาจากหน้าเว็บ (ถ้ามี)
-    if (pageContent && pageContent.trim() !== "") {
-        // จำกัดขนาดเนื้อหาไม่เกิน 4000 ตัวอักษร เพื่อไม่ให้เกิน token limit
-        const trimmedContent = pageContent.trim().substring(0, 4000);
-        systemPrompt += `\n\nข้อมูลบนหน้าเว็บปัจจุบันที่ผู้ใช้กำลังดูอยู่:\n---\n${trimmedContent}\n---`;
+    const direct = safeJson(text);
+    if (direct && typeof direct === "object") {
+        return direct;
     }
 
-    return systemPrompt;
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+        const extracted = safeJson(jsonMatch[0]);
+        if (extracted && typeof extracted === "object") {
+            return extracted;
+        }
+    }
+
+    return { reply: text, cssCommand: "" };
+}
+
+function cleanReply(reply) {
+    const text = cleanText(reply, 3000);
+    return text || "ขออภัยครับ ยังไม่มีคำตอบที่เหมาะสมในตอนนี้";
+}
+
+function sanitizeCss(css) {
+    const text = typeof css === "string" ? css.trim().slice(0, 5000) : "";
+    if (!text) return "";
+    if (/(<|>|@import|url\s*\(|javascript:|expression\s*\()/i.test(text)) return "";
+    return text;
+}
+
+function toPublicGeminiError(statusCode) {
+    const error = new Error("Gemini API failed");
+    error.statusCode = statusCode === 429 ? 429 : 500;
+
+    if (statusCode === 400) {
+        error.publicMessage = "คำถามนี้ยังตอบไม่ได้ กรุณาลองถามใหม่ให้ชัดเจนขึ้น";
+    } else if (statusCode === 401 || statusCode === 403) {
+        error.publicMessage = "API Key ยังใช้งานไม่ได้ กรุณาตรวจสอบการตั้งค่าระบบ";
+    } else if (statusCode === 429) {
+        error.publicMessage = "ขณะนี้มีการใช้งานเยอะ กรุณารอสักครู่แล้วลองใหม่";
+    } else {
+        error.publicMessage = "เกิดข้อผิดพลาดจาก AI กรุณาลองใหม่อีกครั้ง";
+    }
+
+    return error;
 }

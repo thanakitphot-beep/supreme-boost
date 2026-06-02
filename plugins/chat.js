@@ -1,128 +1,225 @@
-// plugins/chat.js (เวอร์ชันซ่อนคีย์ปลอดภัย: ส่งผ่าน Backend เพื่อให้คนอื่นนำไปแปะใช้ได้ทันที)
+export function init(app, _clientApiKey, shopPrompt = "", backendUrl = "") {
+    if (!app || document.getElementById("supreme-plugin-chat")) return;
 
-export function init(app, clientApiKey, shopPrompt, backendUrl) {
-    
-    // 1. สร้างหน้าต่างกล่องแชทบนหน้าจอ (ตามโครงสร้างระบบเดิมของคุณ)
-    const chat = document.createElement("div");
-    chat.style.position = "fixed";
-    chat.style.left = "20px";
-    chat.style.bottom = "20px";
-    chat.style.width = "320px";
-    chat.style.height = "400px";
-    chat.style.background = "#ffffff";
-    chat.style.border = "1px solid #ccc";
-    chat.style.borderRadius = "10px";
-    chat.style.zIndex = "999999";
-    chat.style.boxShadow = "0 0 10px rgba(0,0,0,.2)";
-    chat.style.display = "flex";
-    chat.style.flexDirection = "column";
-    chat.style.fontFamily = "Arial, sans-serif";
-    chat.style.color = "#000000";
-
-    chat.innerHTML = `
-        <div style="background:#2563eb; color:white; padding:10px; border-radius:10px 10px 0 0; font-weight:bold;">
-            Supreme AI Chat
-        </div>
-        <div id="messages" style="flex:1; padding:10px; overflow:auto; background:#ffffff;">
-            <div style="margin-top:4px;">🤖 สวัสดีครับ มีอะไรให้ผมช่วยไหมครับ? สามารถสอบถามข้อมูลสินค้าบนหน้าเว็บนี้ได้เลยครับ!</div>
-        </div>
-        <input id="input" placeholder="พิมพ์ข้อความ..." style="border:none; border-top:1px solid #ddd; padding:10px; outline:none; background:#ffffff; color:#000000;">
+    const apiUrl = resolveBackendUrl(backendUrl);
+    const root = document.createElement("div");
+    root.id = "supreme-plugin-chat";
+    root.innerHTML = `
+        <style>
+            #supreme-plugin-chat, #supreme-plugin-chat * { box-sizing: border-box; }
+            #supreme-plugin-chat {
+                position: fixed;
+                right: 20px;
+                bottom: 86px;
+                z-index: 2147482000;
+                font-family: Arial, "Noto Sans Thai", sans-serif;
+            }
+            #supreme-plugin-chat .sp-panel {
+                width: min(360px, calc(100vw - 32px));
+                height: min(520px, calc(100vh - 110px));
+                display: none;
+                flex-direction: column;
+                overflow: hidden;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                background: #ffffff;
+                color: #0f172a;
+                box-shadow: 0 22px 60px rgba(15, 23, 42, 0.22);
+            }
+            #supreme-plugin-chat.sp-open .sp-panel { display: flex; }
+            #supreme-plugin-chat .sp-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                padding: 12px 14px;
+                color: #ffffff;
+                background: linear-gradient(135deg, #2563eb, #14b8a6);
+                font-weight: 700;
+            }
+            #supreme-plugin-chat .sp-close {
+                width: 30px;
+                height: 30px;
+                border: 1px solid rgba(255,255,255,.35);
+                border-radius: 8px;
+                color: #ffffff;
+                background: rgba(255,255,255,.16);
+                cursor: pointer;
+                font-size: 18px;
+            }
+            #supreme-plugin-chat .sp-messages {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                padding: 12px;
+                overflow: auto;
+                background: #f8fafc;
+            }
+            #supreme-plugin-chat .sp-msg {
+                max-width: 88%;
+                padding: 9px 11px;
+                border-radius: 8px;
+                font-size: 14px;
+                line-height: 1.5;
+                white-space: pre-wrap;
+                overflow-wrap: anywhere;
+            }
+            #supreme-plugin-chat .sp-user {
+                align-self: flex-end;
+                color: #ffffff;
+                background: #2563eb;
+            }
+            #supreme-plugin-chat .sp-ai {
+                align-self: flex-start;
+                border: 1px solid #e2e8f0;
+                background: #ffffff;
+                color: #0f172a;
+            }
+            #supreme-plugin-chat .sp-form {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 8px;
+                padding: 10px;
+                border-top: 1px solid #e2e8f0;
+                background: #ffffff;
+            }
+            #supreme-plugin-chat .sp-input {
+                min-height: 40px;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                padding: 9px 10px;
+                outline: none;
+                font: inherit;
+            }
+            #supreme-plugin-chat .sp-send,
+            #supreme-plugin-chat .sp-launch {
+                border: 0;
+                border-radius: 8px;
+                color: #ffffff;
+                background: #2563eb;
+                font-weight: 700;
+                cursor: pointer;
+            }
+            #supreme-plugin-chat .sp-send { padding: 0 14px; }
+            #supreme-plugin-chat .sp-launch {
+                display: block;
+                margin-left: auto;
+                margin-top: 10px;
+                padding: 12px 15px;
+                border-radius: 999px;
+                box-shadow: 0 12px 28px rgba(37, 99, 235, .28);
+            }
+            @media (max-width: 520px) {
+                #supreme-plugin-chat {
+                    left: 12px;
+                    right: 12px;
+                }
+                #supreme-plugin-chat .sp-panel { width: auto; }
+            }
+        </style>
+        <section class="sp-panel" aria-label="Supreme AI Chat">
+            <div class="sp-header">
+                <span>Supreme AI Chat</span>
+                <button class="sp-close" type="button" aria-label="ปิดแชท">×</button>
+            </div>
+            <div class="sp-messages"></div>
+            <form class="sp-form">
+                <input class="sp-input" placeholder="พิมพ์ข้อความ..." autocomplete="off">
+                <button class="sp-send" type="submit">ส่ง</button>
+            </form>
+        </section>
+        <button class="sp-launch" type="button">เปิดแชทช่วยเหลือ</button>
     `;
 
-    app.appendChild(chat);
+    app.appendChild(root);
 
-    const input = chat.querySelector("#input");
-    const messages = chat.querySelector("#messages");
-
-    // 2. ฟังก์ชันส่งคำขอไปหาเซิร์ฟเวอร์ตัวกลาง (Backend Proxy)
-    async function askThroughBackend(userPrompt) {
-        
-        // ✅ ใช้ backendUrl ที่ส่งมาจาก script tag
-        // ถ้าไม่ได้กำหนด → ลองใช้ URL เดียวกับที่โหลด script มา (เช่น deploy บน Vercel ตัวเดียวกัน)
-        let apiUrl = backendUrl;
-        if (!apiUrl || apiUrl.trim() === "") {
-            // ลองหา origin จาก script tag ที่โหลด boost.js มา
-            const scriptTag = document.querySelector('script[src*="boost.js"]');
-            if (scriptTag && scriptTag.src) {
-                try {
-                    const scriptOrigin = new URL(scriptTag.src).origin;
-                    apiUrl = scriptOrigin + "/api/chat";
-                } catch (e) {
-                    apiUrl = "/api/chat"; // fallback สำหรับ relative path
-                }
-            } else {
-                apiUrl = "/api/chat";
-            }
-        }
-
-        // กวาดข้อความบนหน้าเว็บ (ยกเว้นกล่องแชทเอง)
-        const pageContent = document.body.innerText.replace(chat.innerText, "").trim();
-
-        // รวบรวมข้อมูลส่งไปให้ Backend จัดการครอบคีย์ลับให้ที่ฝั่งเซิร์ฟเวอร์
-        const requestData = {
-            prompt: userPrompt,
-            pageContent: pageContent,
-            shopPrompt: shopPrompt
-        };
-
-        try {
-            const response = await fetch(apiUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(requestData)
-            });
-
-            const data = await response.json();
-
-            // คืนค่าออบเจ็กต์ที่มีทั้งคำตอบและคำสั่ง CSS
-            if (data.reply) {
-                return { reply: data.reply, cssCommand: data.cssCommand || "" };
-            } else if (data.error) {
-                return { reply: `🚨 ${data.error}`, cssCommand: "" };
-            } else {
-                return { reply: "🤖 ขออภัยครับ เซิร์ฟเวอร์ส่งข้อมูลกลับมาไม่ถูกต้อง", cssCommand: "" };
-            }
-        } catch (error) {
-            console.error("Backend connection error:", error);
-            return { reply: "❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง", cssCommand: "" };
-        }
-    }
-
-    // สร้าง style tag สำหรับ Adaptive UI
+    const messages = root.querySelector(".sp-messages");
+    const form = root.querySelector(".sp-form");
+    const input = root.querySelector(".sp-input");
+    const launch = root.querySelector(".sp-launch");
+    const close = root.querySelector(".sp-close");
     const adaptiveStyle = document.createElement("style");
-    adaptiveStyle.id = "supreme-adaptive-style";
+    adaptiveStyle.id = "supreme-plugin-adaptive-style";
     document.head.appendChild(adaptiveStyle);
 
-    // 3. ระบบส่งข้อความเมื่อกด Enter
-    input.addEventListener("keydown", async (e) => {
-        if (e.key === "Enter" && input.value.trim()) {
-            const text = input.value.trim();
-            
-            // แสดงข้อความที่ผู้ใช้พิมพ์
-            messages.innerHTML += `<div style="margin-top:8px; color:#555;">👤 ${text}</div>`;
-            input.value = "";
-            messages.scrollTop = messages.scrollHeight;
+    addMessage(messages, "ai", "สวัสดีครับ สอบถามข้อมูลบนหน้าเว็บนี้ได้เลย");
 
-            // ขึ้นสถานะกำลังคิดพิมพ์
-            const tempId = "loading-" + Date.now();
-            messages.innerHTML += `<div id="${tempId}" style="margin-top:8px; color:#2563eb;">🤖 กำลังคิด...</div>`;
-            messages.scrollTop = messages.scrollHeight;
+    launch.addEventListener("click", () => setOpen(true));
+    close.addEventListener("click", () => setOpen(false));
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
 
-            // เรียกทำงานผ่านระบบ Backend ตัวกลาง
-            const aiData = await askThroughBackend(text);
+        const text = input.value.trim();
+        if (!text) return;
 
-            // นำ CSS ที่ได้จาก AI ไปใส่ในหน้าเว็บทันที
-            if (aiData.cssCommand && aiData.cssCommand.trim() !== "") {
-                adaptiveStyle.innerHTML += `\n/* AI Adaptive Update */\n${aiData.cssCommand}`;
-            }
+        input.value = "";
+        addMessage(messages, "user", text);
+        const loading = addMessage(messages, "ai", "กำลังคิด...");
 
-            // แสดงผลคำตอบจริงลงหน้าต่างแชท
-            const loadingDiv = messages.querySelector(`#${tempId}`);
-            if (loadingDiv) {
-                loadingDiv.style.color = "#000000";
-                loadingDiv.innerHTML = `🤖 ${aiData.reply.replace(/\n/g, '<br>')}`;
-            }
-            messages.scrollTop = messages.scrollHeight;
+        const aiData = await askThroughBackend(apiUrl, text, shopPrompt);
+        loading.textContent = aiData.reply;
+
+        if (isSafeCss(aiData.cssCommand)) {
+            adaptiveStyle.textContent += `\n/* Supreme AI adaptive update */\n${aiData.cssCommand.trim()}\n`;
         }
+        messages.scrollTop = messages.scrollHeight;
     });
+
+    function setOpen(open) {
+        root.classList.toggle("sp-open", open);
+        launch.textContent = open ? "ซ่อนแชท" : "เปิดแชทช่วยเหลือ";
+        if (open) input.focus();
+    }
+}
+
+function resolveBackendUrl(backendUrl) {
+    if (backendUrl && backendUrl.trim()) return backendUrl.trim();
+    try {
+        return new URL("../api/chat", import.meta.url).href;
+    } catch {
+        return "/api/chat";
+    }
+}
+
+async function askThroughBackend(apiUrl, prompt, shopPrompt) {
+    try {
+        const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                prompt,
+                shopPrompt,
+                pageContent: document.body.textContent.replace(/\s+/g, " ").trim().slice(0, 6000),
+                title: document.title,
+                url: location.href
+            })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            return { reply: data.error || "ระบบตอบกลับไม่สำเร็จ", cssCommand: "" };
+        }
+        return {
+            reply: typeof data.reply === "string" ? data.reply : "ขออภัยครับ ระบบยังตอบไม่ได้ในตอนนี้",
+            cssCommand: typeof data.cssCommand === "string" ? data.cssCommand : ""
+        };
+    } catch (error) {
+        console.error("Backend connection error:", error);
+        return { reply: "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง", cssCommand: "" };
+    }
+}
+
+function addMessage(container, role, text) {
+    const item = document.createElement("div");
+    item.className = `sp-msg sp-${role}`;
+    item.textContent = text;
+    container.appendChild(item);
+    container.scrollTop = container.scrollHeight;
+    return item;
+}
+
+function isSafeCss(css) {
+    if (!css || typeof css !== "string") return false;
+    return !/(<|>|@import|url\s*\(|javascript:|expression\s*\()/i.test(css);
 }
