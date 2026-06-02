@@ -35,7 +35,7 @@ export function init(app, apiKey, shopPrompt) {
             return "❌ ไม่สามารถคุยกับ AI ได้: ตรวจไม่พบ API Key บนหน้านี้";
         }
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
         
         // 🧠 สร้างโครงสร้างคำสั่งส่งหา Google
         const requestBody = {
