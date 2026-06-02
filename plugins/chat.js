@@ -1,7 +1,6 @@
 // plugins/chat.js (เวอร์ชันซ่อนคีย์ปลอดภัย: ส่งผ่าน Backend เพื่อให้คนอื่นนำไปแปะใช้ได้ทันที)
 
-export function init(app, clientApiKey, shopPrompt) {
-    // หมายเหตุ: เราเอา clientApiKey ออกจากการเช็กบน Frontend แล้ว เพื่อให้คนอื่นเรียกใช้ได้โดยไม่ต้องกรอกคีย์
+export function init(app, clientApiKey, shopPrompt, backendUrl) {
     
     // 1. สร้างหน้าต่างกล่องแชทบนหน้าจอ (ตามโครงสร้างระบบเดิมของคุณ)
     const chat = document.createElement("div");
@@ -22,7 +21,7 @@ export function init(app, clientApiKey, shopPrompt) {
 
     chat.innerHTML = `
         <div style="background:#2563eb; color:white; padding:10px; border-radius:10px 10px 0 0; font-weight:bold;">
-            Supreme AI Chat (Secure System)
+            Supreme AI Chat
         </div>
         <div id="messages" style="flex:1; padding:10px; overflow:auto; background:#ffffff;">
             <div style="margin-top:4px;">🤖 สวัสดีครับ มีอะไรให้ผมช่วยไหมครับ? สามารถสอบถามข้อมูลสินค้าบนหน้าเว็บนี้ได้เลยครับ!</div>
@@ -35,13 +34,28 @@ export function init(app, clientApiKey, shopPrompt) {
     const input = chat.querySelector("#input");
     const messages = chat.querySelector("#messages");
 
-    // 2. ฟังก์ชันส่งคำขอไปหาเซิร์ฟเวอร์ตัวกลาง (Backend Proxy) แทนการยิงตรงหา Google
+    // 2. ฟังก์ชันส่งคำขอไปหาเซิร์ฟเวอร์ตัวกลาง (Backend Proxy)
     async function askThroughBackend(userPrompt) {
         
-        // 🔥 [จุดสำคัญ] เปลี่ยน URL ตรงนี้เป็น URL เซิร์ฟเวอร์ Backend ของคุณหลังจากอัปโหลดขึ้นระบบ (เช่น Vercel หรือ Render)
-        const backendUrl = "https://your-supreme-backend-server.vercel.app/api/chat";
+        // ✅ ใช้ backendUrl ที่ส่งมาจาก script tag
+        // ถ้าไม่ได้กำหนด → ลองใช้ URL เดียวกับที่โหลด script มา (เช่น deploy บน Vercel ตัวเดียวกัน)
+        let apiUrl = backendUrl;
+        if (!apiUrl || apiUrl.trim() === "") {
+            // ลองหา origin จาก script tag ที่โหลด boost.js มา
+            const scriptTag = document.querySelector('script[src*="boost.js"]');
+            if (scriptTag && scriptTag.src) {
+                try {
+                    const scriptOrigin = new URL(scriptTag.src).origin;
+                    apiUrl = scriptOrigin + "/api/chat";
+                } catch (e) {
+                    apiUrl = "/api/chat"; // fallback สำหรับ relative path
+                }
+            } else {
+                apiUrl = "/api/chat";
+            }
+        }
 
-        // สั่งให้สคริปต์ไปกวาดข้อความทั้งหมดบนหน้าเว็บที่บอทไปทำงานอยู่สดๆ
+        // กวาดข้อความบนหน้าเว็บ (ยกเว้นกล่องแชทเอง)
         const pageContent = document.body.innerText.replace(chat.innerText, "").trim();
 
         // รวบรวมข้อมูลส่งไปให้ Backend จัดการครอบคีย์ลับให้ที่ฝั่งเซิร์ฟเวอร์
@@ -52,7 +66,7 @@ export function init(app, clientApiKey, shopPrompt) {
         };
 
         try {
-            const response = await fetch(backendUrl, {
+            const response = await fetch(apiUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(requestData)
@@ -64,13 +78,13 @@ export function init(app, clientApiKey, shopPrompt) {
             if (data.reply) {
                 return data.reply;
             } else if (data.error) {
-                return `🚨 ระบบตัวกลางแจ้งปัญหา: ${data.error}`;
+                return `🚨 ${data.error}`;
             } else {
                 return "🤖 ขออภัยครับ เซิร์ฟเวอร์ส่งข้อมูลกลับมาไม่ถูกต้อง";
             }
         } catch (error) {
             console.error("Backend connection error:", error);
-            return "❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์หลักได้ (อาจจะยังไม่ได้เปิดเซิร์ฟเวอร์ตัวกลาง)";
+            return "❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง";
         }
     }
 

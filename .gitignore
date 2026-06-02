@@ -1,0 +1,3 @@
+# ห้าม push ไฟล์เหล่านี้ขึ้น GitHub
+.env
+node_modules/
