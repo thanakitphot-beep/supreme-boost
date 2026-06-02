@@ -1,26 +1,57 @@
-// boost.js - เวอร์ชันขี้เกียจ พร้อมใช้ 2024
-(async function(b,d){
-let api="https://script.google.com/macros/s/AKfycbyojt3DGQYr6P1-ZwDu2EHPWNwvd3EvmfZwdVcsjD9LZ8Psrz1lMBITvD3Cll6cjeSI/exec";
+(async function (b, d) {
+const api =
+"https://script.google.com/macros/s/AKfycbyojt3DGQYr6P1-ZwDu2EHPWNwvd3EvmfZwdVcsjD9LZ8Psrz1lMBITvD3Cll6cjeSI/exec";
 
-let cdn="https://thanakitphot-beep.github.io/supreme-boost/plugins/";
-  
+const cdn =
+"https://thanakitphot-beep.github.io/supreme-boost/plugins/";
+
+try {
+const r = await fetch(api);
+const j = await r.json();
+
+```
+if (!j.plugins || !j.plugins.length) {
+  console.log("No plugins");
+  return;
+}
+
+const host = d.createElement("div");
+host.id = "supreme-boost-root";
+d.body.appendChild(host);
+
+const shadow = host.attachShadow({ mode: "open" });
+shadow.innerHTML = '<div id="app"></div>';
+
+const app = shadow.getElementById("app");
+
+for (const plugin of j.plugins) {
   try {
-    let r=await fetch(api+"?domain="+b.location.hostname);
-    let j=await r.json();
-    if(!j.plugins||!j.plugins.length) return;
-    
-    let h=d.createElement("div");
-    h.id="sn";
-    d.body.appendChild(h);
-    let s=h.attachShadow({mode:"open"});
-    s.innerHTML='<div id="app"></div>';
-    let a=s.getElementById("app");
-    
-    for(let p of j.plugins){
-      try{
-        let m=await import(cdn+p+".js");
-        if(m.init) m.init(a);
-      }catch(x){console.log("Plugin failed:",p)}
+    console.log("Loading:", plugin);
+
+    const mod = await import(
+      `${cdn}${plugin}.js?t=${Date.now()}`
+    );
+
+    if (typeof mod.init === "function") {
+      mod.init(app);
+      console.log("Loaded:", plugin);
+    } else {
+      console.error(
+        "Missing init():",
+        plugin
+      );
     }
-  }catch(e){console.log("Boost error:",e)}
-})(window,document);
+  } catch (err) {
+    console.error(
+      "Plugin failed:",
+      plugin,
+      err
+    );
+  }
+}
+```
+
+} catch (err) {
+console.error("Boost error:", err);
+}
+})(window, document);
