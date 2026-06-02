@@ -1,6 +1,8 @@
-// plugins/chat.js (เวอร์ชัน Gemini อัจฉริยะ: แอบอ่านหน้าเว็บสดๆ + คุยฟรีเสถียร)
+// plugins/chat.js (เวอร์ชันซ่อนคีย์ปลอดภัย: ส่งผ่าน Backend เพื่อให้คนอื่นนำไปแปะใช้ได้ทันที)
 
-export function init(app, apiKey, shopPrompt) {
+export function init(app, clientApiKey, shopPrompt) {
+    // หมายเหตุ: เราเอา clientApiKey ออกจากการเช็กบน Frontend แล้ว เพื่อให้คนอื่นเรียกใช้ได้โดยไม่ต้องกรอกคีย์
+    
     // 1. สร้างหน้าต่างกล่องแชทบนหน้าจอ (ตามโครงสร้างระบบเดิมของคุณ)
     const chat = document.createElement("div");
     chat.style.position = "fixed";
@@ -20,7 +22,7 @@ export function init(app, apiKey, shopPrompt) {
 
     chat.innerHTML = `
         <div style="background:#2563eb; color:white; padding:10px; border-radius:10px 10px 0 0; font-weight:bold;">
-            Supreme AI Chat (Gemini Auto-Scan)
+            Supreme AI Chat (Secure System)
         </div>
         <div id="messages" style="flex:1; padding:10px; overflow:auto; background:#ffffff;">
             <div style="margin-top:4px;">🤖 สวัสดีครับ มีอะไรให้ผมช่วยไหมครับ? สามารถสอบถามข้อมูลสินค้าบนหน้าเว็บนี้ได้เลยครับ!</div>
@@ -33,58 +35,42 @@ export function init(app, apiKey, shopPrompt) {
     const input = chat.querySelector("#input");
     const messages = chat.querySelector("#messages");
 
-    // 2. ฟังก์ชันหลักในการส่งคำขอไปหา Gemini พร้อมแอบยัดข้อมูลหน้าเว็บเข้าไปด้วย
-    async function askGemini(userPrompt) {
-        if (!apiKey || apiKey.trim() === "" || apiKey.includes("คีย์ของคุณ")) {
-            return "❌ ไม่สามารถคุยกับ AI ได้: ตรวจไม่พบ Gemini API Key";
-        }
+    // 2. ฟังก์ชันส่งคำขอไปหาเซิร์ฟเวอร์ตัวกลาง (Backend Proxy) แทนการยิงตรงหา Google
+    async function askThroughBackend(userPrompt) {
+        
+        // 🔥 [จุดสำคัญ] เปลี่ยน URL ตรงนี้เป็น URL เซิร์ฟเวอร์ Backend ของคุณหลังจากอัปโหลดขึ้นระบบ (เช่น Vercel หรือ Render)
+        const backendUrl = "https://your-supreme-backend-server.vercel.app/api/chat";
 
-        // ใช้โมเดลรุ่น Flash-Lite เพื่อหลบเลี่ยงปัญหา High Demand และได้ความเร็วสูงสุด
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
-
-        // 🔥 [จุดสำคัญ] สั่งให้สคริปต์ไปกวาดข้อความตัวอักษรทั้งหมดที่อยู่บนหน้าเว็บปัจจุบันแบบ Real-time
-        // ยกเว้นส่วนที่เป็นกล่องแชทเพื่อป้องกันไม่ให้ข้อความแชทเก่าๆ ไหลปนเข้าไปสับสน
+        // สั่งให้สคริปต์ไปกวาดข้อความทั้งหมดบนหน้าเว็บที่บอทไปทำงานอยู่สดๆ
         const pageContent = document.body.innerText.replace(chat.innerText, "").trim();
 
-        // จัดการรวมร่าง: คำสั่งร้านค้าเดิม + เนื้อหาที่แอบกวาดมาจากหน้าเว็บ
-        const combinedSystemInstruction = `
-            ${shopPrompt}
-            
-            [ข้อมูลที่ดึงมาจากหน้าเว็บปัจจุบันที่คุณกำลังทำหน้าที่อยู่]:
-            ${pageContent}
-            
-            [กฎเหล็กในการตอบคำถาม]:
-            1. คุณต้องสวมบทบาทเป็นแอดมินของร้านค้านี้อย่างเคร่งครัด
-            2. ให้ตอบคำถามโดยอ้างอิงและใช้ประโยชน์จาก "ข้อมูลที่ดึงมาจากหน้าเว็บปัจจุบัน" ด้านบนนี้เป็นหลัก
-            3. ตอบคำถามอย่างสุภาพ กระชับ สั้น ได้ใจความ ไม่เอาน้ำ ย่อหน้าให้สั้นอ่านง่าย
-            4. หากลูกค้าถามคำถามที่ไม่เกี่ยวข้องกับสินค้า บริการ หรือข้อมูลบนหน้าเว็บนี้เลย ให้ปฏิเสธการตอบอย่างสุภาพ (เช่น "ขออภัยครับ ผมทำหน้าที่เป็นแอดมินคอยให้ข้อมูลของร้านค้านี้เท่านั้น ไม่สามารถตอบเรื่องอื่นได้ครับ") ห้ามหลุดไปคุยเรื่องอื่นเด็ดขาด
-        `;
-
-        const requestBody = {
-            contents: [{ parts: [{ text: userPrompt }] }],
-            systemInstruction: {
-                parts: [{ text: combinedSystemInstruction }]
-            }
+        // รวบรวมข้อมูลส่งไปให้ Backend จัดการครอบคีย์ลับให้ที่ฝั่งเซิร์ฟเวอร์
+        const requestData = {
+            prompt: userPrompt,
+            pageContent: pageContent,
+            shopPrompt: shopPrompt
         };
 
         try {
-            const response = await fetch(url, {
+            const response = await fetch(backendUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify(requestData)
             });
 
             const data = await response.json();
 
-            if (data.candidates && data.candidates[0].content.parts[0].text) {
-                return data.candidates[0].content.parts[0].text;
+            // คืนค่าคำตอบที่ได้กลับมาจากเซิร์ฟเวอร์ตัวกลาง
+            if (data.reply) {
+                return data.reply;
             } else if (data.error) {
-                return `🚨 Google แจ้งปัญหา: ${data.error.message}`;
+                return `🚨 ระบบตัวกลางแจ้งปัญหา: ${data.error}`;
             } else {
-                return "🤖 ขออภัยครับ เกิดข้อผิดพลาดที่ไม่รู้จักในการประมวลผลคำตอบ";
+                return "🤖 ขออภัยครับ เซิร์ฟเวอร์ส่งข้อมูลกลับมาไม่ถูกต้อง";
             }
         } catch (error) {
-            return "❌ เชื่อมต่อกับสมอง AI ล้มเหลว";
+            console.error("Backend connection error:", error);
+            return "❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์หลักได้ (อาจจะยังไม่ได้เปิดเซิร์ฟเวอร์ตัวกลาง)";
         }
     }
 
@@ -103,8 +89,8 @@ export function init(app, apiKey, shopPrompt) {
             messages.innerHTML += `<div id="${tempId}" style="margin-top:8px; color:#2563eb;">🤖 กำลังคิด...</div>`;
             messages.scrollTop = messages.scrollHeight;
 
-            // เรียกทำงานฟังก์ชันถาม AI (ซึ่งรอบนี้จะแอบสแกนหน้าเว็บไปด้วยอัตโนมัติ)
-            const aiReply = await askGemini(text);
+            // เรียกทำงานผ่านระบบ Backend ตัวกลาง
+            const aiReply = await askThroughBackend(text);
 
             // แสดงผลคำตอบจริงลงหน้าต่างแชท
             const loadingDiv = messages.querySelector(`#${tempId}`);
