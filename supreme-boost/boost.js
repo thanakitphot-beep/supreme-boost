@@ -184,7 +184,11 @@
                 }
             } catch (error) {
                 console.error("Supreme Boost chat error:", error);
-                updateMessage(loading, localAction ? localAction.reply : "เชื่อมต่อระบบ AI ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+                const localReply = buildLocalContentReply(text);
+                const errorReply = error && error.message && !/^HTTP\s/i.test(error.message)
+                    ? error.message
+                    : "เชื่อมต่อระบบ AI ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+                updateMessage(loading, localAction ? localAction.reply : (localReply || errorReply));
             } finally {
                 state.busy = false;
                 form.classList.remove("sb-busy");
@@ -579,6 +583,54 @@
         } finally {
             clearTimeout(timeout);
         }
+    }
+
+    function buildLocalContentReply(prompt) {
+        const question = String(prompt || "").toLowerCase();
+        const pageContent = collectPageContent();
+
+        if (!pageContent) return "";
+        if (!/(สินค้า|มีอะไร|แบบ|เสื้อ|กางเกง|หมวก|ราคา|โปร|promotion|product|price)/i.test(question)) {
+            return "";
+        }
+
+        const chunks = extractContentChunks(pageContent);
+
+        const keywords = question
+            .replace(/[^\p{L}\p{N}\s]/gu, " ")
+            .split(/\s+/)
+            .filter((word) => word.length > 1);
+
+        const matched = chunks
+            .filter((chunk) => keywords.some((word) => chunk.toLowerCase().includes(word)))
+            .slice(0, 5);
+
+        const productLike = chunks
+            .filter((chunk) => /(บาท|ราคา|เสื้อ|กางเกง|หมวก|สินค้า|โปรโมชัน|ส่งฟรี)/i.test(chunk))
+            .slice(0, 5);
+
+        const lines = matched.length ? matched : productLike;
+        if (!lines.length) return "";
+
+        return `ตอนนี้ระบบ AI หลักเชื่อมต่อไม่ได้ชั่วคราว แต่ผมอ่านข้อมูลบนหน้านี้ให้ได้ครับ:\n\n${lines.map((line) => `- ${line}`).join("\n")}`;
+    }
+
+    function extractContentChunks(content) {
+        const source = String(content || "");
+        const chunks = [];
+        const pattern = /(เสื้อ|กางเกง|หมวก|สินค้า|ราคา|โปรโมชัน|ส่งฟรี|บาท)/gi;
+        let match;
+
+        while ((match = pattern.exec(source)) !== null && chunks.length < 16) {
+            const start = Math.max(0, match.index - 24);
+            const end = Math.min(source.length, match.index + 170);
+            const chunk = source.slice(start, end).replace(/\s+/g, " ").trim();
+            if (chunk.length > 8 && !chunks.some((item) => item.includes(chunk) || chunk.includes(item))) {
+                chunks.push(chunk);
+            }
+        }
+
+        return chunks;
     }
 
     function collectPageContent() {

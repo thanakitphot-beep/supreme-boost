@@ -43,8 +43,17 @@ module.exports = async function handler(req, res) {
             title: cleanText(body.title, 200)
         };
 
-        const aiData = await askGemini(apiKey, payload);
-        return res.status(200).json(aiData);
+        try {
+            const aiData = await askGemini(apiKey, payload);
+            return res.status(200).json(aiData);
+        } catch (error) {
+            const fallbackReply = buildFallbackReply(payload);
+            if (fallbackReply) {
+                console.error("Gemini failed, using page-content fallback:", error);
+                return res.status(200).json({ reply: fallbackReply, cssCommand: "" });
+            }
+            throw error;
+        }
     } catch (error) {
         console.error("Supreme AI server error:", error);
         const status = Number.isInteger(error.statusCode) ? error.statusCode : 500;
@@ -213,6 +222,53 @@ function sanitizeCss(css) {
     if (!text) return "";
     if (/(<|>|@import|url\s*\(|javascript:|expression\s*\()/i.test(text)) return "";
     return text;
+}
+
+function buildFallbackReply(payload) {
+    const question = cleanText(payload.prompt, 500).toLowerCase();
+    const content = cleanText(payload.pageContent, MAX_PAGE_CHARS);
+
+    if (!content) return "";
+    if (!/(สินค้า|มีอะไร|แบบ|เสื้อ|กางเกง|หมวก|ราคา|โปร|promotion|product|price)/i.test(question)) {
+        return "";
+    }
+
+    const keywords = question
+        .replace(/[^\p{L}\p{N}\s]/gu, " ")
+        .split(/\s+/)
+        .filter((word) => word.length > 1);
+
+    const chunks = extractContentChunks(content);
+
+    const matched = chunks.filter((chunk) => keywords.some((word) => chunk.toLowerCase().includes(word)));
+    const productLike = chunks.filter((chunk) => /(บาท|ราคา|เสื้อ|กางเกง|หมวก|สินค้า|โปรโมชัน|ส่งฟรี)/i.test(chunk));
+    const lines = (matched.length ? matched : productLike).slice(0, 5);
+
+    if (!lines.length) return "";
+
+    return [
+        "ตอนนี้ระบบ AI หลักเชื่อมต่อไม่ได้ชั่วคราว แต่ผมอ่านข้อมูลบนหน้านี้ให้ได้ครับ:",
+        "",
+        ...lines.map((line) => `- ${line}`)
+    ].join("\n");
+}
+
+function extractContentChunks(content) {
+    const source = String(content || "");
+    const chunks = [];
+    const pattern = /(เสื้อ|กางเกง|หมวก|สินค้า|ราคา|โปรโมชัน|ส่งฟรี|บาท)/gi;
+    let match;
+
+    while ((match = pattern.exec(source)) !== null && chunks.length < 16) {
+        const start = Math.max(0, match.index - 24);
+        const end = Math.min(source.length, match.index + 170);
+        const chunk = source.slice(start, end).replace(/\s+/g, " ").trim();
+        if (chunk.length > 8 && !chunks.some((item) => item.includes(chunk) || chunk.includes(item))) {
+            chunks.push(chunk);
+        }
+    }
+
+    return chunks;
 }
 
 function toPublicGeminiError(statusCode) {
