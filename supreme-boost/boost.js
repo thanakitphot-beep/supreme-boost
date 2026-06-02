@@ -1,14 +1,18 @@
-// ดึงตัวจัดการปลั๊กอินเข้ามาทำงาน (ถอยหลัง 1 ก้าวออกไปหาโฟลเดอร์ plugins)
 import { loadPlugins } from '../plugins/manager.js';
 
 console.log("🚀 Supreme Boost Core: กำลังเริ่มต้นระบบ...");
 
 function initCore() {
     const app = document.body;
-    loadPlugins(app);
+
+    // ค้นหาแท็กสคริปต์ของตัวเองเพื่อดึง API Key ออกมา
+    const scriptTag = document.querySelector('script[src*="boost.js"]');
+    const apiKey = scriptTag ? scriptTag.getAttribute('data-gemini-key') : null;
+
+    // ส่งแอป และ คีย์ ต่อไปให้ตัวจัดการปลั๊กอิน
+    loadPlugins(app, apiKey);
 }
 
-// รอให้หน้าเว็บโหลดโครงสร้างเสร็จแล้วลุยเลย
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCore);
 } else {
