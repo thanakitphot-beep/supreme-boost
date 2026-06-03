@@ -27,9 +27,12 @@ module.exports = async function handler(req, res) {
             return res.status(400).json({ error: "กรุณาพิมพ์ข้อความก่อนส่ง" });
         }
 
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            console.error("GEMINI_API_KEY is not configured.");
+        const geminiKey = process.env.GEMINI_API_KEY;
+        const groqKey = process.env.GROQ_API_KEY;
+        const cohereKey = process.env.COHERE_API_KEY;
+
+        if (!geminiKey && !groqKey && !cohereKey) {
+            console.error("No API Keys configured.");
             return res.status(500).json({ error: "ระบบยังไม่ได้ตั้งค่า API Key กรุณาแจ้งผู้ดูแลระบบ" });
         }
 
@@ -44,16 +47,46 @@ module.exports = async function handler(req, res) {
             locale: normalizeLocale(body.locale)
         };
 
-        try {
-            const aiData = await askGemini(apiKey, payload);
+        let aiData = null;
+        let lastError = null;
+
+        // Fallback Logic: 1. Gemini -> 2. Groq -> 3. Cohere
+        if (geminiKey) {
+            try {
+                aiData = await askGemini(geminiKey, payload);
+            } catch (error) {
+                console.error("Gemini failed, falling back...", error);
+                lastError = error;
+            }
+        }
+
+        if (!aiData && groqKey) {
+            try {
+                aiData = await askGroq(groqKey, payload);
+            } catch (error) {
+                console.error("Groq failed, falling back...", error);
+                lastError = error;
+            }
+        }
+
+        if (!aiData && cohereKey) {
+            try {
+                aiData = await askCohere(cohereKey, payload);
+            } catch (error) {
+                console.error("Cohere failed...", error);
+                lastError = error;
+            }
+        }
+
+        if (aiData) {
             return res.status(200).json(aiData);
-        } catch (error) {
+        } else {
             const fallbackReply = buildFallbackReply(payload);
             if (fallbackReply) {
-                console.error("Gemini failed, using page-content fallback:", error);
-                return res.status(200).json({ reply: fallbackReply, cssCommand: "" });
+                console.error("All AIs failed, using page-content fallback.");
+                return res.status(200).json({ reply: fallbackReply, cssCommand: "", action: null });
             }
-            throw error;
+            throw lastError || new Error("All AI providers failed.");
         }
     } catch (error) {
         console.error("Supreme AI server error:", error);
@@ -166,7 +199,89 @@ async function askGemini(apiKey, payload) {
 
         return {
             reply: cleanReply(parsed.reply),
-            cssCommand: sanitizeCss(parsed.cssCommand)
+            cssCommand: sanitizeCss(parsed.cssCommand),
+            action: parsed.action || null
+        };
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function askGroq(apiKey, payload) {
+    const url = "https://api.groq.com/openai/v1/chat/completions";
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: "llama3-8b-8192",
+                messages: [
+                    { role: "system", content: buildSystemPrompt(payload) },
+                    { role: "user", content: buildUserMessage(payload) }
+                ],
+                temperature: 0.45,
+                max_tokens: 900,
+                response_format: { type: "json_object" }
+            }),
+            signal: controller.signal
+        });
+
+        const rawText = await response.text();
+        if (!response.ok) throw new Error(`Groq API Error: ${response.status}`);
+        
+        const data = safeJson(rawText);
+        const replyText = data?.choices?.[0]?.message?.content || "";
+        const parsed = parseAiReply(replyText);
+
+        return {
+            reply: cleanReply(parsed.reply),
+            cssCommand: sanitizeCss(parsed.cssCommand),
+            action: parsed.action || null
+        };
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function askCohere(apiKey, payload) {
+    const url = "https://api.cohere.ai/v1/chat";
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: "command-r",
+                message: buildUserMessage(payload),
+                preamble: buildSystemPrompt(payload),
+                temperature: 0.45,
+                max_tokens: 900
+            }),
+            signal: controller.signal
+        });
+
+        const rawText = await response.text();
+        if (!response.ok) throw new Error(`Cohere API Error: ${response.status}`);
+        
+        const data = safeJson(rawText);
+        const replyText = data?.text || "";
+        const parsed = parseAiReply(replyText);
+
+        return {
+            reply: cleanReply(parsed.reply),
+            cssCommand: sanitizeCss(parsed.cssCommand),
+            action: parsed.action || null
         };
     } finally {
         clearTimeout(timeout);
