@@ -84,8 +84,11 @@
     <main>
         <section class="hero">
             <h1>Supreme Boost Demo</h1>
-            <p>หน้านี้คือตัวอย่างร้านค้าที่ฝังแชท AI ด้วยสคริปต์บรรทัดเดียว ระบบจะอ่านข้อมูลบนหน้าเว็บ ตอบคำถามลูกค้า และปรับธีมหน้าเว็บตามคำขอได้</p>
-            <code>&lt;script src="https://YOUR-VERCEL-DOMAIN.vercel.app/supreme-boost/boost.js" data-shop-prompt="ร้านนี้ชื่อ Supreme Shop มีโปรส่งฟรีเมื่อซื้อครบ 1000 บาท" defer&gt;&lt;/script&gt;</code>
+            <p>หน้านี้คือตัวอย่างร้านค้าที่ฝังแชท AI ด้วยสคริปต์บรรทัดเดียว วางตรงไหนก็ได้ของเว็บ ระบบจะอ่านข้อมูลบนหน้าเว็บ ตอบคำถามลูกค้า และปรับธีมหน้าเว็บตามคำขอได้</p>
+            <code>&lt;script src="https://YOUR-VERCEL-DOMAIN.vercel.app/supreme-boost/boost.js"<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data-shop-prompt="ร้านนี้ชื่อ Supreme Shop มีโปรส่งฟรีเมื่อซื้อครบ 1000 บาท"<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;defer&gt;&lt;/script&gt;</code>
+            <p style="font-size: 14px; color: #666; margin-top: 16px;">
+                <strong>หมายเหตุ:</strong> แทน <code style="background: #f0f0f0; padding: 2px 4px;">YOUR-VERCEL-DOMAIN</code> ด้วย domain ของคุณบน Vercel เช่น <code style="background: #f0f0f0; padding: 2px 4px;">supreme-boost-prod.vercel.app</code>
+            </p>
         </section>
 
         <section class="products" aria-label="สินค้าในร้าน">
@@ -104,6 +107,6 @@
         </section>
     </main>
 
-    <script src="./supreme-boost/boost.js" data-lang="auto" data-shop-prompt="ร้านนี้ชื่อ Supreme Shop ขายเสื้อผ้าวัยรุ่น มีโปรโมชันส่งฟรีเมื่อซื้อครบ 1000 บาท" defer></script>
+    <script src="/supreme-boost/boost.js" data-backend-url="/api/chat" data-lang="auto" data-shop-prompt="ร้านนี้ชื่อ Supreme Shop ขายเสื้อผ้าวัยรุ่น มีโปรโมชันส่งฟรีเมื่อซื้อครบ 1000 บาท" defer></script>
 </body>
 </html>
