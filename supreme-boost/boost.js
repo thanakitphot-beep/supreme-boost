@@ -5,12 +5,99 @@
     const STYLE_ID = "supreme-boost-style";
     const ADAPTIVE_STYLE_ID = "supreme-boost-adaptive-style";
     const DEFAULT_TITLE = "Supreme AI";
-    const DEFAULT_GREETING = "สวัสดีครับ ผมช่วยตอบคำถามจากข้อมูลบนหน้านี้ได้เลย";
     const DEFAULT_PRIMARY = "#2563eb";
     const MAX_PAGE_CHARS = 6000;
     const MAX_HISTORY = 8;
     const PAGE_TEXT_CLASS = "supreme-boost-large-text";
     const PAGE_SMALL_TEXT_CLASS = "supreme-boost-small-text";
+    const SUPPORTED_LOCALES = ["th", "en", "zh", "ja"];
+
+    const I18N = {
+        th: {
+            subtitle: "พร้อมตอบจากข้อมูลหน้าเว็บนี้",
+            placeholder: "พิมพ์คำถาม...",
+            send: "ส่ง",
+            openChat: "เปิดแชท Supreme AI",
+            closeChat: "ปิดแชท",
+            toggleTheme: "สลับธีมหน้าเว็บ",
+            inputLabel: "พิมพ์คำถาม",
+            thinking: "กำลังคิด...",
+            askingMore: "กำลังถาม AI เพิ่มเติม...",
+            noReply: "ขออภัยครับ ระบบยังตอบไม่ได้ในตอนนี้",
+            connectError: "เชื่อมต่อระบบ AI ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+            greeting: "สวัสดีครับ ผมช่วยตอบคำถามจากข้อมูลบนหน้านี้ได้เลย",
+            quick: ["มีสินค้าอะไรบ้าง", "ราคาเท่าไหร่", "มีโปรโมชันไหม", "ช่วยทำหน้าให้อ่านง่ายขึ้น"],
+            reset: "ปรับหน้าเว็บกลับเป็นค่าเดิมให้แล้วครับ",
+            largeText: "ขยายตัวอักษรบนหน้าเว็บให้แล้วครับ",
+            smallText: "ลดขนาดตัวอักษรบนหน้าเว็บให้แล้วครับ",
+            dark: "เปิดธีมเข้มให้แล้วครับ",
+            light: "เปลี่ยนกลับเป็นธีมสว่างให้แล้วครับ",
+            fallbackIntro: "ตอนนี้ระบบ AI หลักเชื่อมต่อไม่ได้ชั่วคราว แต่ผมอ่านข้อมูลบนหน้านี้ให้ได้ครับ:"
+        },
+        en: {
+            subtitle: "Answers from this page",
+            placeholder: "Type a question...",
+            send: "Send",
+            openChat: "Open Supreme AI chat",
+            closeChat: "Close chat",
+            toggleTheme: "Toggle page theme",
+            inputLabel: "Type a question",
+            thinking: "Thinking...",
+            askingMore: "Asking AI for more details...",
+            noReply: "Sorry, I could not generate a reply right now.",
+            connectError: "Could not reach the AI server. Please try again.",
+            greeting: "Hi! I can answer questions based on this page.",
+            quick: ["What products do you have?", "How much does it cost?", "Any promotions?", "Make this page easier to read"],
+            reset: "The page has been reset to default.",
+            largeText: "Text on the page has been enlarged.",
+            smallText: "Text on the page has been reduced.",
+            dark: "Dark theme is now on.",
+            light: "Light theme is now on.",
+            fallbackIntro: "The main AI is temporarily unavailable, but I can read this page for you:"
+        },
+        zh: {
+            subtitle: "根据本页内容回答",
+            placeholder: "输入问题...",
+            send: "发送",
+            openChat: "打开 Supreme AI 聊天",
+            closeChat: "关闭聊天",
+            toggleTheme: "切换页面主题",
+            inputLabel: "输入问题",
+            thinking: "思考中...",
+            askingMore: "正在向 AI 询问更多...",
+            noReply: "抱歉，暂时无法回复。",
+            connectError: "无法连接 AI 服务器，请稍后再试。",
+            greeting: "你好！我可以根据本页内容回答问题。",
+            quick: ["有哪些商品？", "价格多少？", "有促销吗？", "让页面更易阅读"],
+            reset: "页面已恢复默认设置。",
+            largeText: "已放大页面文字。",
+            smallText: "已缩小页面文字。",
+            dark: "已开启深色主题。",
+            light: "已切换为浅色主题。",
+            fallbackIntro: "主 AI 暂时不可用，但我可以读取本页信息："
+        },
+        ja: {
+            subtitle: "このページの内容から回答します",
+            placeholder: "質問を入力...",
+            send: "送信",
+            openChat: "Supreme AI チャットを開く",
+            closeChat: "チャットを閉じる",
+            toggleTheme: "ページテーマを切り替え",
+            inputLabel: "質問を入力",
+            thinking: "考え中...",
+            askingMore: "AI に追加で確認中...",
+            noReply: "申し訳ありません。現在返答できません。",
+            connectError: "AI サーバーに接続できません。もう一度お試しください。",
+            greeting: "こんにちは！このページの内容についてお答えできます。",
+            quick: ["どんな商品がありますか？", "価格はいくらですか？", "プロモーションはありますか？", "ページを読みやすくして"],
+            reset: "ページを元の設定に戻しました。",
+            largeText: "ページの文字を大きくしました。",
+            smallText: "ページの文字を小さくしました。",
+            dark: "ダークテーマをオンにしました。",
+            light: "ライトテーマに戻しました。",
+            fallbackIntro: "メイン AI に一時的に接続できませんが、このページの情報は読み取れます："
+        }
+    };
 
     if (window.__SUPREME_BOOST_READY__) {
         return;
@@ -36,15 +123,70 @@
             ? `${scriptUrl.origin}/api/chat`
             : "/api/chat";
 
+        const langMode = getAttr(script, "data-lang", "auto").toLowerCase();
+
         return {
             title: getAttr(script, "data-title", DEFAULT_TITLE),
-            greeting: getAttr(script, "data-greeting", DEFAULT_GREETING),
+            greeting: getAttr(script, "data-greeting", ""),
             shopPrompt: getAttr(script, "data-shop-prompt", ""),
             backendUrl: getAttr(script, "data-backend-url", backendFromScript),
             primary: normalizeColor(getAttr(script, "data-primary", DEFAULT_PRIMARY)),
             position: getAttr(script, "data-position", "right").toLowerCase() === "left" ? "left" : "right",
-            startOpen: getAttr(script, "data-open", "false") === "true"
+            startOpen: getAttr(script, "data-open", "false") === "true",
+            langMode: langMode === "auto" ? "auto" : normalizeLocale(langMode)
         };
+    }
+
+    function normalizeLocale(value) {
+        const code = String(value || "").toLowerCase().split("-")[0];
+        return SUPPORTED_LOCALES.includes(code) ? code : "en";
+    }
+
+    function detectBrowserLocale() {
+        const htmlLang = document.documentElement.getAttribute("lang");
+        if (htmlLang) return normalizeLocale(htmlLang);
+        const nav = navigator.language || navigator.userLanguage || "en";
+        return normalizeLocale(nav);
+    }
+
+    function detectTextLocale(text) {
+        const sample = String(text || "");
+        if (!sample.trim()) return null;
+
+        const thai = (sample.match(/[\u0E00-\u0E7F]/g) || []).length;
+        const kana = (sample.match(/[\u3040-\u309F\u30A0-\u30FF]/g) || []).length;
+        const cjk = (sample.match(/[\u4E00-\u9FFF]/g) || []).length;
+        const latin = (sample.match(/[a-zA-Z]/g) || []).length;
+        const total = thai + kana + cjk + latin;
+
+        if (total === 0) return null;
+        if (thai >= Math.max(2, total * 0.15)) return "th";
+        if (kana > 0) return "ja";
+        if (cjk >= Math.max(2, total * 0.15)) return "zh";
+        if (latin > 0) return "en";
+        return null;
+    }
+
+    function resolveInitialLocale(config) {
+        if (config.langMode !== "auto") return config.langMode;
+        return detectBrowserLocale();
+    }
+
+    function resolveReplyLocale(config, state, text) {
+        const fromText = detectTextLocale(text);
+        if (fromText) return fromText;
+        if (config.langMode !== "auto") return config.langMode;
+        return state.locale;
+    }
+
+    function t(locale, key) {
+        const pack = I18N[normalizeLocale(locale)] || I18N.en;
+        return key ? pack[key] : pack;
+    }
+
+    function getGreeting(config, locale) {
+        if (config.greeting) return config.greeting;
+        return t(locale, "greeting");
     }
 
     function getAttr(element, name, fallback) {
@@ -74,30 +216,28 @@
         const launcher = document.createElement("button");
         launcher.className = "sb-launcher";
         launcher.type = "button";
-        launcher.setAttribute("aria-label", "เปิดแชท Supreme AI");
         launcher.innerHTML = "<span>AI</span>";
 
         const panel = document.createElement("section");
         panel.className = "sb-panel";
-        panel.setAttribute("aria-label", "Supreme AI Chat");
         panel.setAttribute("aria-live", "polite");
 
         panel.innerHTML = [
             '<div class="sb-header">',
             '  <div>',
             '    <div class="sb-title"></div>',
-            '    <div class="sb-subtitle">พร้อมตอบจากข้อมูลหน้าเว็บนี้</div>',
+            '    <div class="sb-subtitle"></div>',
             "  </div>",
             '  <div class="sb-actions">',
-            '    <button class="sb-icon-btn" type="button" data-action="theme" aria-label="สลับธีมหน้าเว็บ">◐</button>',
-            '    <button class="sb-icon-btn" type="button" data-action="close" aria-label="ปิดแชท">×</button>',
+            '    <button class="sb-icon-btn" type="button" data-action="theme">◐</button>',
+            '    <button class="sb-icon-btn" type="button" data-action="close">×</button>',
             "  </div>",
             "</div>",
             '<div class="sb-messages"></div>',
             '<div class="sb-quick"></div>',
             '<form class="sb-compose">',
-            '  <textarea class="sb-input" rows="1" placeholder="พิมพ์คำถาม..." aria-label="พิมพ์คำถาม"></textarea>',
-            '  <button class="sb-send" type="submit" aria-label="ส่งข้อความ">ส่ง</button>',
+            '  <textarea class="sb-input" rows="1"></textarea>',
+            '  <button class="sb-send" type="submit"></button>',
             "</form>"
         ].join("");
 
@@ -106,10 +246,12 @@
         document.body.appendChild(root);
 
         const title = panel.querySelector(".sb-title");
+        const subtitle = panel.querySelector(".sb-subtitle");
         const messages = panel.querySelector(".sb-messages");
         const quick = panel.querySelector(".sb-quick");
         const form = panel.querySelector(".sb-compose");
         const input = panel.querySelector(".sb-input");
+        const sendButton = panel.querySelector(".sb-send");
         const closeButton = panel.querySelector('[data-action="close"]');
         const themeButton = panel.querySelector('[data-action="theme"]');
         const adaptiveStyle = ensureAdaptiveStyle();
@@ -120,11 +262,15 @@
             open: false,
             busy: false,
             selectedText: "",
-            history: []
+            history: [],
+            locale: resolveInitialLocale(config)
         };
 
-        addMessage(messages, "assistant", config.greeting);
-        renderQuickActions(quick, input, sendMessage);
+        const ui = { subtitle, input, sendButton, closeButton, themeButton, launcher, quick, panel };
+
+        applyLocaleUI(ui, state.locale, config);
+        addMessage(messages, "assistant", getGreeting(config, state.locale));
+        renderQuickActions(quick, input, sendMessage, state.locale);
         setOpen(config.startOpen);
 
         launcher.addEventListener("click", () => setOpen(!state.open));
@@ -160,7 +306,16 @@
         async function sendMessage(rawText) {
             const text = String(rawText || "").trim();
             if (!text || state.busy) return;
-            const localAction = applyLocalPageCommand(text);
+
+            const replyLocale = resolveReplyLocale(config, state, text);
+            if (config.langMode === "auto" && replyLocale !== state.locale) {
+                state.locale = replyLocale;
+                applyLocaleUI(ui, state.locale, config);
+                renderQuickActions(quick, input, sendMessage, state.locale, true);
+            }
+
+            const localAction = applyLocalPageCommand(text, replyLocale);
+            const strings = t(replyLocale);
 
             setOpen(true);
             root.classList.remove("sb-nudge");
@@ -171,12 +326,17 @@
             form.classList.add("sb-busy");
             addMessage(messages, "user", text);
             pushHistory(state, "user", text);
-            const loading = addMessage(messages, "assistant", localAction ? `${localAction.reply}\nกำลังถาม AI เพิ่มเติม...` : "กำลังคิด...", true);
+            const loading = addMessage(
+                messages,
+                "assistant",
+                localAction ? `${localAction.reply}\n${strings.askingMore}` : strings.thinking,
+                true
+            );
 
             try {
-                const data = await askBackend(config, state, text);
+                const data = await askBackend(config, state, text, replyLocale);
                 const reply = mergeLocalReply(localAction, data.reply || "");
-                updateMessage(loading, reply || "ขออภัยครับ ระบบยังตอบไม่ได้ในตอนนี้");
+                updateMessage(loading, reply || strings.noReply);
                 pushHistory(state, "assistant", reply || "");
 
                 if (isSafeCss(data.cssCommand)) {
@@ -184,10 +344,10 @@
                 }
             } catch (error) {
                 console.error("Supreme Boost chat error:", error);
-                const localReply = buildLocalContentReply(text);
+                const localReply = buildLocalContentReply(text, replyLocale);
                 const errorReply = error && error.message && !/^HTTP\s/i.test(error.message)
                     ? error.message
-                    : "เชื่อมต่อระบบ AI ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+                    : strings.connectError;
                 updateMessage(loading, localAction ? localAction.reply : (localReply || errorReply));
             } finally {
                 state.busy = false;
@@ -455,13 +615,22 @@
         return style;
     }
 
-    function renderQuickActions(container, input, onPick) {
-        const items = [
-            "มีสินค้าอะไรบ้าง",
-            "ราคาเท่าไหร่",
-            "มีโปรโมชันไหม",
-            "ช่วยทำหน้าให้อ่านง่ายขึ้น"
-        ];
+    function applyLocaleUI(ui, locale, config) {
+        const strings = t(locale);
+        ui.subtitle.textContent = strings.subtitle;
+        ui.input.placeholder = strings.placeholder;
+        ui.input.setAttribute("aria-label", strings.inputLabel);
+        ui.sendButton.textContent = strings.send;
+        ui.sendButton.setAttribute("aria-label", strings.send);
+        ui.closeButton.setAttribute("aria-label", strings.closeChat);
+        ui.themeButton.setAttribute("aria-label", strings.toggleTheme);
+        ui.launcher.setAttribute("aria-label", strings.openChat);
+        ui.panel.setAttribute("aria-label", config.title || DEFAULT_TITLE);
+    }
+
+    function renderQuickActions(container, input, onPick, locale, replace) {
+        if (replace) container.innerHTML = "";
+        const items = t(locale, "quick");
 
         items.forEach((label) => {
             const button = document.createElement("button");
@@ -509,35 +678,36 @@
         document.documentElement.classList.toggle("supreme-boost-dark-page");
     }
 
-    function applyLocalPageCommand(text) {
+    function applyLocalPageCommand(text, locale) {
         const value = String(text || "").toLowerCase();
         const html = document.documentElement;
+        const strings = t(locale);
 
-        if (/(reset|รีเซ็ต|คืนค่า|กลับปกติ|ขนาดปกติ|ตัวอักษรปกติ)/i.test(value)) {
+        if (/(reset|รีเซ็ต|คืนค่า|กลับปกติ|ขนาดปกติ|ตัวอักษรปกติ|恢复|重置|リセット|reset page)/i.test(value)) {
             html.classList.remove(PAGE_TEXT_CLASS, PAGE_SMALL_TEXT_CLASS, "supreme-boost-dark-page");
-            return { type: "reset", reply: "ปรับหน้าเว็บกลับเป็นค่าเดิมให้แล้วครับ" };
+            return { type: "reset", reply: strings.reset };
         }
 
-        if (/(ขยาย|ตัวใหญ่|ใหญ่ขึ้น|เพิ่มขนาด|อ่านง่าย|อ่านชัด|font\s*size|bigger|large|zoom in)/i.test(value)) {
+        if (/(ขยาย|ตัวใหญ่|ใหญ่ขึ้น|เพิ่มขนาด|อ่านง่าย|อ่านชัด|font\s*size|bigger|large|zoom in|放大|読みやす|文字を大き)/i.test(value)) {
             html.classList.add(PAGE_TEXT_CLASS);
             html.classList.remove(PAGE_SMALL_TEXT_CLASS);
-            return { type: "large-text", reply: "ขยายตัวอักษรบนหน้าเว็บให้แล้วครับ" };
+            return { type: "large-text", reply: strings.largeText };
         }
 
-        if (/(ลดขนาด|ตัวเล็ก|เล็กลง|ย่อ|smaller|small|zoom out)/i.test(value)) {
+        if (/(ลดขนาด|ตัวเล็ก|เล็กลง|ย่อ|smaller|small|zoom out|缩小|文字を小)/i.test(value)) {
             html.classList.add(PAGE_SMALL_TEXT_CLASS);
             html.classList.remove(PAGE_TEXT_CLASS);
-            return { type: "small-text", reply: "ลดขนาดตัวอักษรบนหน้าเว็บให้แล้วครับ" };
+            return { type: "small-text", reply: strings.smallText };
         }
 
-        if (/(ธีมเข้ม|โหมดมืด|สีเข้ม|dark mode|dark theme)/i.test(value)) {
+        if (/(ธีมเข้ม|โหมดมืด|สีเข้ม|dark mode|dark theme|深色|ダーク)/i.test(value)) {
             html.classList.add("supreme-boost-dark-page");
-            return { type: "dark", reply: "เปิดธีมเข้มให้แล้วครับ" };
+            return { type: "dark", reply: strings.dark };
         }
 
-        if (/(ธีมสว่าง|โหมดสว่าง|สีสว่าง|light mode|light theme)/i.test(value)) {
+        if (/(ธีมสว่าง|โหมดสว่าง|สีสว่าง|light mode|light theme|浅色|ライト)/i.test(value)) {
             html.classList.remove("supreme-boost-dark-page");
-            return { type: "light", reply: "เปลี่ยนกลับเป็นธีมสว่างให้แล้วครับ" };
+            return { type: "light", reply: strings.light };
         }
 
         return null;
@@ -552,7 +722,7 @@
         return alreadyConfirmed ? reply : `${localAction.reply}\n\n${reply}`;
     }
 
-    async function askBackend(config, state, prompt) {
+    async function askBackend(config, state, prompt, locale) {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 30000);
 
@@ -567,7 +737,8 @@
                     selectedText: state.selectedText,
                     history: state.history.slice(-MAX_HISTORY),
                     url: location.href,
-                    title: document.title
+                    title: document.title,
+                    locale: normalizeLocale(locale)
                 }),
                 signal: controller.signal
             });
@@ -585,12 +756,13 @@
         }
     }
 
-    function buildLocalContentReply(prompt) {
+    function buildLocalContentReply(prompt, locale) {
         const question = String(prompt || "").toLowerCase();
         const pageContent = collectPageContent();
+        const strings = t(locale);
 
         if (!pageContent) return "";
-        if (!/(สินค้า|มีอะไร|แบบ|เสื้อ|กางเกง|หมวก|ราคา|โปร|promotion|product|price)/i.test(question)) {
+        if (!/(สินค้า|มีอะไร|แบบ|เสื้อ|กางเกง|หมวก|ราคา|โปร|promotion|product|price|商品|価格|产品)/i.test(question)) {
             return "";
         }
 
@@ -612,7 +784,7 @@
         const lines = matched.length ? matched : productLike;
         if (!lines.length) return "";
 
-        return `ตอนนี้ระบบ AI หลักเชื่อมต่อไม่ได้ชั่วคราว แต่ผมอ่านข้อมูลบนหน้านี้ให้ได้ครับ:\n\n${lines.map((line) => `- ${line}`).join("\n")}`;
+        return `${strings.fallbackIntro}\n\n${lines.map((line) => `- ${line}`).join("\n")}`;
     }
 
     function extractContentChunks(content) {

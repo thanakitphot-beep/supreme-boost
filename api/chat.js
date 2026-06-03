@@ -40,7 +40,8 @@ module.exports = async function handler(req, res) {
             selectedText: cleanText(body.selectedText, MAX_SELECTED_CHARS),
             history: normalizeHistory(body.history),
             url: cleanText(body.url, 500),
-            title: cleanText(body.title, 200)
+            title: cleanText(body.title, 200),
+            locale: normalizeLocale(body.locale)
         };
 
         try {
@@ -96,6 +97,27 @@ function normalizeHistory(history) {
             text: cleanText(item && item.text, 1000)
         }))
         .filter((item) => item.text);
+}
+
+const LOCALE_LABELS = {
+    th: "ภาษาไทย",
+    en: "English",
+    zh: "中文",
+    ja: "日本語"
+};
+
+function normalizeLocale(value) {
+    const code = cleanText(typeof value === "string" ? value : "", 10).toLowerCase().split("-")[0];
+    return Object.prototype.hasOwnProperty.call(LOCALE_LABELS, code) ? code : "en";
+}
+
+function buildLanguageInstruction(locale) {
+    const label = LOCALE_LABELS[normalizeLocale(locale)];
+    return [
+        `ผู้ใช้กำลังสนทนาในภาษา: ${label}`,
+        `ต้องตอบเป็นภาษา ${label} เท่านั้น แม้ข้อมูลบนหน้าเว็บจะเป็นภาษาอื่นก็ให้แปลและอธิบายด้วยภาษา ${label}`,
+        "ถ้าผู้ใช้สลับภาษากลางบทสนทนา ให้ตอบตามภาษาของข้อความล่าสุดเสมอ"
+    ].join("\n");
 }
 
 async function askGemini(apiKey, payload) {
@@ -155,7 +177,8 @@ function buildSystemPrompt(payload) {
     return [
         'คุณคือผู้ช่วย AI ประจำเว็บไซต์ ชื่อ "Supreme AI"',
         "หน้าที่คือช่วยตอบคำถามเกี่ยวกับร้านค้า สินค้า บริการ โปรโมชัน และเนื้อหาที่มีอยู่บนหน้าเว็บนี้เท่านั้น",
-        "ตอบเป็นภาษาเดียวกับผู้ใช้ ถ้าผู้ใช้ใช้ภาษาไทยให้ตอบภาษาไทยแบบสุภาพ กระชับ และเป็นมิตร",
+        buildLanguageInstruction(payload.locale),
+        "ตอบแบบสุภาพ กระชับ และเป็นมิตร",
         "ห้ามแต่งข้อมูลสินค้า ราคา สต็อก หรือเงื่อนไขที่ไม่ได้อยู่ในข้อมูลที่ได้รับ ถ้าไม่ทราบให้บอกตรง ๆ ว่ายังไม่มีข้อมูลบนหน้าเว็บ",
         "ถ้าผู้ใช้ถามเรื่องนอกบริบทเว็บไซต์ ให้ปฏิเสธอย่างสุภาพและชวนกลับมาถามเรื่องร้านหรือหน้าเว็บ",
         "คุณสามารถส่ง CSS เพื่อปรับหน้าเว็บตามคำขอได้เฉพาะเมื่อผู้ใช้ขอให้ปรับหน้าตา/ธีม/การอ่านเท่านั้น",

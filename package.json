@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "check": "node --check api/chat.js && node --check supreme-boost/boost.js && node --check Node.js",
-    "dev": "vercel dev"
+    "dev": "vercel dev",
+    "start": "vercel dev"
   }
 }
