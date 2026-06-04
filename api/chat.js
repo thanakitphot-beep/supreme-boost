@@ -82,17 +82,16 @@ module.exports = async function handler(req, res) {
             return res.status(200).json(aiData);
         } else {
             const fallbackReply = buildFallbackReply(payload);
-            if (fallbackReply) {
-                console.error("All AIs failed, using page-content fallback.");
-                return res.status(200).json({ reply: fallbackReply, cssCommand: "", action: null });
-            }
-            throw lastError || new Error("All AI providers failed.");
+            console.error("All AIs failed, using page-content fallback.");
+            return res.status(200).json({ reply: fallbackReply, cssCommand: "", action: null });
         }
     } catch (error) {
         console.error("Supreme AI server error:", error);
-        const status = Number.isInteger(error.statusCode) ? error.statusCode : 500;
-        return res.status(status).json({
-            error: error.publicMessage || "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง"
+        // Always return 200 with a friendly message so the widget never shows a raw error
+        return res.status(200).json({
+            reply: "ขออภัยครับ ขณะนี้ระบบ AI ไม่สามารถเชื่อมต่อได้ชั่วคราว กรุณาลองใหม่อีกครั้งในอีกสักครู่ครับ",
+            cssCommand: "",
+            action: null
         });
     }
 };
@@ -373,10 +372,11 @@ function sanitizeCss(css) {
 function buildFallbackReply(payload) {
     const question = cleanText(payload.prompt, 500).toLowerCase();
     const content = cleanText(payload.pageContent, MAX_PAGE_CHARS);
+    const title = cleanText(payload.title, 200);
 
-    if (!content) return "";
-    if (!/(สินค้า|มีอะไร|แบบ|เสื้อ|กางเกง|หมวก|ราคา|โปร|promotion|product|price)/i.test(question)) {
-        return "";
+    // If no page content at all, still provide a polite message
+    if (!content && !title) {
+        return "ขออภัยครับ ขณะนี้ระบบ AI หลักไม่สามารถเชื่อมต่อได้ชั่วคราว กรุณาลองใหม่อีกครั้งในอีกสักครู่ครับ";
     }
 
     const keywords = question
@@ -384,33 +384,76 @@ function buildFallbackReply(payload) {
         .split(/\s+/)
         .filter((word) => word.length > 1);
 
-    const chunks = extractContentChunks(content);
+    // Extract chunks using both keyword-based and general content extraction
+    const keywordChunks = extractContentChunks(content, keywords);
+    const generalChunks = extractGeneralChunks(content);
 
-    const matched = chunks.filter((chunk) => keywords.some((word) => chunk.toLowerCase().includes(word)));
-    const productLike = chunks.filter((chunk) => /(บาท|ราคา|เสื้อ|กางเกง|หมวก|สินค้า|โปรโมชัน|ส่งฟรี)/i.test(chunk));
-    const lines = (matched.length ? matched : productLike).slice(0, 5);
+    // Prefer keyword-matched chunks, then fall back to general content
+    const lines = keywordChunks.length ? keywordChunks.slice(0, 6) : generalChunks.slice(0, 5);
 
-    if (!lines.length) return "";
+    const intro = "ขออภัยครับ ขณะนี้ระบบ AI หลักมีผู้ใช้งานเยอะ แต่ผมอ่านข้อมูลบนหน้านี้ให้ได้ครับ:";
+
+    if (!lines.length && title) {
+        return `${intro}\n\nหน้านี้คือ "${title}" — กรุณาลองถามใหม่อีกครั้งในอีกสักครู่ เมื่อระบบ AI พร้อมให้บริการครับ`;
+    }
+
+    if (!lines.length) {
+        return "ขออภัยครับ ขณะนี้ระบบ AI หลักไม่สามารถเชื่อมต่อได้ชั่วคราว กรุณาลองใหม่อีกครั้งในอีกสักครู่ครับ";
+    }
 
     return [
-        "ตอนนี้ระบบ AI หลักเชื่อมต่อไม่ได้ชั่วคราว แต่ผมอ่านข้อมูลบนหน้านี้ให้ได้ครับ:",
+        intro,
         "",
         ...lines.map((line) => `- ${line}`)
     ].join("\n");
 }
 
-function extractContentChunks(content) {
+function extractContentChunks(content, keywords) {
     const source = String(content || "");
-    const chunks = [];
-    const pattern = /(เสื้อ|กางเกง|หมวก|สินค้า|ราคา|โปรโมชัน|ส่งฟรี|บาท)/gi;
-    let match;
+    if (!source || !keywords || !keywords.length) return [];
 
-    while ((match = pattern.exec(source)) !== null && chunks.length < 16) {
-        const start = Math.max(0, match.index - 24);
-        const end = Math.min(source.length, match.index + 170);
-        const chunk = source.slice(start, end).replace(/\s+/g, " ").trim();
-        if (chunk.length > 8 && !chunks.some((item) => item.includes(chunk) || chunk.includes(item))) {
-            chunks.push(chunk);
+    const chunks = [];
+
+    for (const word of keywords) {
+        if (word.length < 2) continue;
+        let searchIndex = 0;
+
+        while (chunks.length < 16) {
+            const pos = source.toLowerCase().indexOf(word.toLowerCase(), searchIndex);
+            if (pos === -1) break;
+
+            const start = Math.max(0, pos - 40);
+            const end = Math.min(source.length, pos + 180);
+            const chunk = source.slice(start, end).replace(/\s+/g, " ").trim();
+
+            if (chunk.length > 8 && !chunks.some((item) => item.includes(chunk) || chunk.includes(item))) {
+                chunks.push(chunk);
+            }
+
+            searchIndex = pos + word.length;
+        }
+    }
+
+    return chunks;
+}
+
+function extractGeneralChunks(content) {
+    const source = String(content || "");
+    if (!source || source.length < 10) return [];
+
+    const chunks = [];
+
+    // Split content into meaningful sentences/segments
+    const segments = source
+        .split(/[.!?\n\r;。！？]+/)
+        .map((s) => s.replace(/\s+/g, " ").trim())
+        .filter((s) => s.length > 15 && s.length < 300);
+
+    // Take the first few meaningful segments as a summary
+    for (const seg of segments) {
+        if (chunks.length >= 8) break;
+        if (!chunks.some((item) => item.includes(seg) || seg.includes(item))) {
+            chunks.push(seg);
         }
     }
 
