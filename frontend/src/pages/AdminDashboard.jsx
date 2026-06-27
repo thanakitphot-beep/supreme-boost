@@ -102,7 +102,7 @@ export default function AdminDashboard() {
                     <td className="px-6 py-4 text-white font-medium">{t.company_name}</td>
                     <td className="px-6 py-4 capitalize">{t.package_type}</td>
                     <td className="px-6 py-4">
-                      <span className={\`px-2 py-1 rounded text-xs \${t.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'}\`}>
+                      <span className={`px-2 py-1 rounded text-xs ${t.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
                         {t.status}
                       </span>
                     </td>
