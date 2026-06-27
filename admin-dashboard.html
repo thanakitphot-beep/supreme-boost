@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INDICATOR WEB CHAT — Master Control</title>
+    <meta name="description" content="ระบบจัดการหลังบ้าน INDICATOR WEB CHAT แบบครบวงจร">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <script>
+        const AUTH_TOKEN = 'Bearer ADMIN_SUPREME_TOKEN_12345';
+        if (!localStorage.getItem('admin_token')) {
+            window.location.href = '/admin-login.html';
+        }
+        async function fetchAPI(action, method = 'GET', body = null) {
+            const options = {
+                method,
+                headers: { 'Authorization': AUTH_TOKEN, 'Content-Type': 'application/json' }
+            };
+            if (body) options.body = JSON.stringify(body);
+            const res = await fetch(`/api/admin?action=${action}`, options);
+            if (!res.ok) throw new Error('API Error');
+            return await res.json();
+        }
+    </script>
+    <style>
+        :root {
+            --bg-primary: #050a18;
+            --bg-secondary: #0a1228;
+            --bg-card: rgba(15, 25, 50, 0.7);
+            --border-subtle: rgba(56, 189, 248, 0.08);
+            --border-hover: rgba(56, 189, 248, 0.25);
+            --cyan-glow: rgba(6, 182, 212, 0.15);
+            --text-primary: #f0f4ff;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #06b6d4;
+            --accent-bright: #22d3ee;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Prompt', sans-serif; 
+            background: var(--bg-primary); 
+            color: var(--text-primary); 
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* 1. Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.3); border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.5); }
+
+        /* 2. Sidebar */
+        .sidebar {
+            background: linear-gradient(180deg, #080e24 0%, #0a1228 100%);
+            border-right: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        .sidebar::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 1px; height: 100%;
+            background: linear-gradient(180deg, transparent, rgba(6, 182, 212, 0.2), transparent);
+        }
+
+        /* 3. Menu items */
+        .menu-item {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            border-left: 3px solid transparent;
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 0.01em;
+        }
+        .menu-item::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, rgba(6, 182, 212, 0.08), transparent);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .menu-item:hover { color: var(--accent-bright); }
+        .menu-item:hover::before { opacity: 1; }
+        .menu-item.active {
+            background: linear-gradient(90deg, rgba(6, 182, 212, 0.12), transparent);
+            border-left-color: var(--accent);
+            color: var(--accent-bright);
+            font-weight: 600;
+        }
+        .menu-item.active::before { opacity: 1; }
+        .menu-item .menu-icon {
+            width: 20px; height: 20px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.85rem;
+            transition: transform 0.2s;
+        }
+        .menu-item:hover .menu-icon { transform: scale(1.15); }
+        .menu-item .menu-badge {
+            background: var(--danger);
+            font-size: 0.6rem;
+            min-width: 18px; height: 18px;
+            display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 99px;
+            font-weight: 700;
+            animation: pulse-badge 2s infinite;
+        }
+        @keyframes pulse-badge {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+        }
+
+        /* 4. Glass panel */
+        .glass-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .glass-panel-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-panel-hover:hover {
+            border-color: var(--border-hover);
+            box-shadow: 0 0 30px rgba(6, 182, 212, 0.05), inset 0 1px 0 rgba(255,255,255,0.03);
+            transform: translateY(-2px);
+        }
+
+        /* 5. Tab content animation */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 6. Stat cards */
+        .stat-card {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: -50%; right: -50%;
+            width: 100%; height: 100%;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.06) 0%, transparent 70%);
+            transition: transform 0.5s;
+        }
+        .stat-card:hover::before { transform: translate(-20%, 20%); }
+        .stat-card:hover { border-color: var(--border-hover); transform: translateY(-3px); }
+        .stat-value {
+            font-size: 2.75rem;
+            font-weight: 800;
+            line-height: 1;
+            background: linear-gradient(135deg, #f0f4ff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-card.cyan .stat-value {
+            background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-card.yellow .stat-value {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-card.green .stat-value {
+            background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-card.purple .stat-value {
+            background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-icon {
+            width: 48px; height: 48px;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        /* 7. Table */
+        .data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        .data-table thead th {
+            padding: 14px 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            background: rgba(15, 23, 42, 0.6);
+            border-bottom: 1px solid var(--border-subtle);
+            white-space: nowrap;
+        }
+        .data-table tbody tr {
+            transition: all 0.2s;
+        }
+        .data-table tbody tr:hover {
+            background: rgba(6, 182, 212, 0.03);
+        }
+        .data-table tbody td {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            vertical-align: middle;
+        }
+        .data-table tbody tr:last-child td { border-bottom: none; }
+
+        /* 8. Badges */
+        .badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+        .badge-active { background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .badge-active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #34d399; animation: dot-pulse 2s infinite; }
+        .badge-suspended { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); }
+        .badge-suspended::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #f87171; }
+        .badge-pending { background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); }
+        .badge-pending::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fbbf24; animation: dot-pulse 1.5s infinite; }
+        .badge-approved { background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .badge-rejected { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); }
+        .badge-package { background: rgba(6, 182, 212, 0.1); color: var(--accent-bright); border: 1px solid rgba(6, 182, 212, 0.2); }
+        @keyframes dot-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* 9. Buttons */
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: none;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .btn:hover::after { opacity: 1; }
+        .btn-primary {
+            background: linear-gradient(135deg, #0891b2 0%, #06b6d4 50%, #22d3ee 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35); }
+        .btn-success {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);
+        }
+        .btn-success:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35); }
+        .btn-danger {
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.2);
+        }
+        .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3); }
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        .btn-ghost:hover { color: white; border-color: rgba(148, 163, 184, 0.4); background: rgba(148, 163, 184, 0.05); }
+        .btn-ghost-danger {
+            background: transparent;
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        .btn-ghost-danger:hover { background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.4); }
+        .btn-ghost-cyan {
+            background: transparent;
+            color: var(--accent-bright);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+        }
+        .btn-ghost-cyan:hover { background: rgba(6, 182, 212, 0.08); border-color: rgba(6, 182, 212, 0.4); }
+        .btn-sm { padding: 6px 14px; font-size: 0.75rem; border-radius: 8px; }
+        .btn-xs { padding: 4px 10px; font-size: 0.7rem; border-radius: 6px; }
+        .btn-icon { width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 10px; }
+        .btn-icon-sm { width: 30px; height: 30px; padding: 0; justify-content: center; border-radius: 8px; font-size: 0.75rem; }
+
+        /* 10. Inputs */
+        .form-input {
+            width: 100%;
+            background: rgba(10, 18, 40, 0.8);
+            border: 1px solid rgba(100, 116, 139, 0.2);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: var(--text-primary);
+            font-family: 'Prompt', sans-serif;
+            font-size: 0.9rem;
+            transition: all 0.25s;
+            outline: none;
+        }
+        .form-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1), 0 0 20px rgba(6, 182, 212, 0.05);
+        }
+        .form-input::placeholder { color: var(--text-muted); }
+        .form-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            letter-spacing: 0.02em;
+        }
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+            background-position: right 12px center;
+            background-repeat: no-repeat;
+            background-size: 20px;
+            padding-right: 40px;
+        }
+
+        /* 11. Modal */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .modal-backdrop {
+            position: absolute; inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+        }
+        .modal-content {
+            position: relative; z-index: 10;
+            background: linear-gradient(180deg, #0f1a38 0%, #0a1228 100%);
+            border: 1px solid var(--border-subtle);
+            border-radius: 20px;
+            width: 100%; max-width: 680px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 80px rgba(6, 182, 212, 0.05);
+            transform: scale(0.95) translateY(10px);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .modal-overlay.show .modal-content { transform: scale(1) translateY(0); }
+        .modal-header {
+            padding: 28px 32px 0;
+        }
+        .modal-body { padding: 24px 32px; }
+        .modal-footer {
+            padding: 20px 32px 28px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        /* 12. Code block */
+        .code-block {
+            background: #0d1117;
+            border: 1px solid rgba(100, 116, 139, 0.15);
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            line-height: 1.7;
+            color: #7ee787;
+            overflow-x: auto;
+            position: relative;
+        }
+        .code-block .copy-btn {
+            position: absolute;
+            top: 8px; right: 8px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.65rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .code-block .copy-btn:hover { background: rgba(255,255,255,0.12); color: white; }
+
+        /* 13. Divider */
+        .divider { border: none; border-top: 1px solid var(--border-subtle); margin: 24px 0; }
+
+        /* 14. Tooltip */
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%) translateY(4px);
+            background: #1e293b;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 50;
+        }
+        [data-tooltip]:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* 15. Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, rgba(100, 116, 139, 0.1) 0%, rgba(100, 116, 139, 0.2) 50%, rgba(100, 116, 139, 0.1) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* 16. Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-state i { font-size: 3rem; margin-bottom: 16px; opacity: 0.3; }
+        .empty-state h4 { font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 8px; }
+        .empty-state p { font-size: 0.85rem; }
+
+        /* 17. Toast */
+        .toast-container { position: fixed; top: 24px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+        .toast {
+            display: flex; align-items: center; gap: 12px;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            animation: toastIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            min-width: 300px;
+        }
+        .toast-success { background: linear-gradient(135deg, #064e3b, #065f46); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; }
+        .toast-error { background: linear-gradient(135deg, #450a0a, #7f1d1d); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; }
+        .toast-info { background: linear-gradient(135deg, #0c4a6e, #075985); border: 1px solid rgba(56, 189, 248, 0.3); color: #7dd3fc; }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* 18. QR image hover */
+        .qr-preview {
+            transition: transform 0.3s;
+            cursor: zoom-in;
+        }
+        .qr-preview:hover { transform: scale(1.1); }
+
+        /* 19. Sidebar footer */
+        .sidebar-footer {
+            background: linear-gradient(180deg, transparent, rgba(5, 10, 24, 0.8));
+        }
+
+        /* 20. Page background patterns */
+        .bg-pattern {
+            position: absolute; inset: 0;
+            background-image: radial-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+        }
+
+        /* 21. Status dot */
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-dot.online { background: var(--success); box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
+
+        /* 22. Company avatar */
+        .company-avatar {
+            width: 40px; height: 40px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            text-transform: uppercase;
+        }
+        .avatar-colors-0 { background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(6, 182, 212, 0.05)); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.2); }
+        .avatar-colors-1 { background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.05)); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.2); }
+        .avatar-colors-2 { background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(236, 72, 153, 0.05)); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.2); }
+        .avatar-colors-3 { background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05)); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); }
+        .avatar-colors-4 { background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.05)); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }
+
+        /* 23. Amount display */
+        .amount { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+
+        /* 24. Countdown expiry */
+        .expiry-near { color: #fbbf24; }
+        .expiry-ok { color: var(--text-secondary); }
+        .expiry-expired { color: #f87171; }
+
+        /* 25. Section title */
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+        }
+        .section-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* 26. Header bar */
+        .header-bar {
+            background: linear-gradient(180deg, rgba(10, 18, 40, 0.95), rgba(10, 18, 40, 0.85));
+            border-bottom: 1px solid var(--border-subtle);
+            backdrop-filter: blur(20px);
+        }
+
+        /* 27. Glow line */
+        .glow-line {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body class="flex h-screen antialiased">
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Sidebar -->
+    <aside class="w-72 sidebar flex flex-col h-full z-20">
+        <!-- Logo -->
+        <div class="h-20 flex items-center px-6 border-b border-white/[0.04]">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center mr-3 shadow-lg shadow-cyan-500/20 relative">
+                <i class="fa-solid fa-bolt text-white text-base"></i>
+                <span class="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-[#080e24]"></span>
+            </div>
+            <div>
+                <span class="text-base font-bold tracking-wide block leading-tight">INDICATOR</span>
+                <span class="text-[0.65rem] text-cyan-400 font-medium tracking-widest uppercase">Master Control</span>
+            </div>
+        </div>
+        
+        <!-- Navigation -->
+        <div class="flex-1 overflow-y-auto py-6 px-3">
+            <p class="text-[0.6rem] font-semibold text-slate-500 uppercase tracking-[0.15em] px-3 mb-3">เมนูหลัก</p>
+            <nav class="space-y-1">
+                <button onclick="switchTab('overview')" id="nav-overview" class="menu-item active w-full flex items-center px-4 py-3 text-sm text-slate-300 rounded-lg">
+                    <span class="menu-icon mr-3"><i class="fa-solid fa-chart-pie"></i></span>
+                    <span>ภาพรวมระบบ</span>
+                </button>
+                <button onclick="switchTab('tenants')" id="nav-tenants" class="menu-item w-full flex items-center px-4 py-3 text-sm text-slate-300 rounded-lg">
+                    <span class="menu-icon mr-3"><i class="fa-solid fa-building"></i></span>
+                    <span>จัดการลูกค้า</span>
+                    <span class="menu-badge ml-auto" id="nav-tenants-badge" style="display:none">0</span>
+                </button>
+                <button onclick="switchTab('billing')" id="nav-billing" class="menu-item w-full flex items-center px-4 py-3 text-sm text-slate-300 rounded-lg">
+                    <span class="menu-icon mr-3"><i class="fa-solid fa-receipt"></i></span>
+                    <span>แจ้งโอนเงิน</span>
+                    <span class="menu-badge ml-auto" id="nav-billing-badge" style="display:none">0</span>
+                </button>
+            </nav>
+
+            <p class="text-[0.6rem] font-semibold text-slate-500 uppercase tracking-[0.15em] px-3 mb-3 mt-8">การเงิน</p>
+            <nav class="space-y-1">
+                <button onclick="switchTab('payment-methods')" id="nav-payment-methods" class="menu-item w-full flex items-center px-4 py-3 text-sm text-slate-300 rounded-lg">
+                    <span class="menu-icon mr-3"><i class="fa-solid fa-credit-card"></i></span>
+                    <span>ช่องทางรับเงิน</span>
+                </button>
+                <button onclick="switchTab('settings')" id="nav-settings" class="menu-item w-full flex items-center px-4 py-3 text-sm text-slate-300 rounded-lg">
+                    <span class="menu-icon mr-3"><i class="fa-solid fa-gear"></i></span>
+                    <span>ตั้งค่า Payment</span>
+                </button>
+            </nav>
+        </div>
+        
+        <!-- Sidebar Footer -->
+        <div class="p-4 sidebar-footer space-y-3">
+            <div class="flex items-center gap-3 px-3 py-2">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold">A</div>
+                <div>
+                    <p class="text-xs font-semibold text-white">Admin</p>
+                    <p class="text-[0.6rem] text-slate-500 flex items-center gap-1"><span class="status-dot online"></span> ออนไลน์</p>
+                </div>
+            </div>
+            <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-red-400 bg-red-500/[0.06] rounded-xl hover:bg-red-500/[0.12] transition border border-red-500/[0.08]">
+                <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                <span>ออกจากระบบ</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full bg-[var(--bg-primary)] relative">
+        <div class="bg-pattern"></div>
+        
+        <!-- Header -->
+        <header class="header-bar h-[72px] flex items-center justify-between px-8 z-10 relative">
+            <div>
+                <h2 id="page-title" class="text-lg font-bold text-white">ภาพรวมระบบ</h2>
+                <p id="page-subtitle" class="text-xs text-slate-500 mt-0.5">Dashboard Overview</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-xs text-slate-500"><i class="fa-regular fa-clock mr-1"></i> <span id="current-time"></span></span>
+                <div class="w-px h-5 bg-slate-800"></div>
+                <span class="text-xs font-mono text-slate-500">v2.0</span>
+            </div>
+        </header>
+        <div class="glow-line"></div>
+
+        <!-- Content Area -->
+        <div class="flex-1 overflow-y-auto p-8 z-10 relative">
+            
+            <!-- Overview Tab -->
+            <div id="tab-overview" class="tab-content active">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+                    <div class="glass-panel stat-card cyan p-6 rounded-2xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="stat-icon bg-cyan-500/10 text-cyan-400"><i class="fa-solid fa-building"></i></div>
+                            <span class="text-[0.65rem] text-slate-500 font-medium uppercase tracking-wider">ลูกค้าทั้งหมด</span>
+                        </div>
+                        <div class="stat-value mb-1" id="stats-tenants">0</div>
+                        <p class="text-xs text-slate-500">บัญชีที่ลงทะเบียนแล้ว</p>
+                    </div>
+                    <div class="glass-panel stat-card yellow p-6 rounded-2xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="stat-icon bg-yellow-500/10 text-yellow-400"><i class="fa-solid fa-hourglass-half"></i></div>
+                            <span class="text-[0.65rem] text-slate-500 font-medium uppercase tracking-wider">รออนุมัติ</span>
+                        </div>
+                        <div class="stat-value mb-1" id="stats-billing">0</div>
+                        <p class="text-xs text-slate-500">คำขอเติมเงินที่รอดำเนินการ</p>
+                    </div>
+                    <div class="glass-panel stat-card green p-6 rounded-2xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="stat-icon bg-green-500/10 text-green-400"><i class="fa-solid fa-check-circle"></i></div>
+                            <span class="text-[0.65rem] text-slate-500 font-medium uppercase tracking-wider">ใช้งานอยู่</span>
+                        </div>
+                        <div class="stat-value mb-1" id="stats-active">0</div>
+                        <p class="text-xs text-slate-500">บัญชีที่กำลังใช้งาน</p>
+                    </div>
+                    <div class="glass-panel stat-card purple p-6 rounded-2xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="stat-icon bg-purple-500/10 text-purple-400"><i class="fa-solid fa-credit-card"></i></div>
+                            <span class="text-[0.65rem] text-slate-500 font-medium uppercase tracking-wider">ช่องทางรับเงิน</span>
+                        </div>
+                        <div class="stat-value mb-1" id="stats-payment">0</div>
+                        <p class="text-xs text-slate-500">ช่องทางที่เปิดใช้งาน</p>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="glass-panel p-6 rounded-2xl mb-8">
+                    <h3 class="text-base font-semibold text-white mb-4"><i class="fa-solid fa-bolt text-cyan-400 mr-2"></i> Quick Actions</h3>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="switchTab('tenants'); setTimeout(openAddTenantModal, 300)" class="btn btn-sm btn-ghost-cyan"><i class="fa-solid fa-plus"></i> เพิ่มลูกค้าใหม่</button>
+                        <button onclick="switchTab('billing')" class="btn btn-sm btn-ghost"><i class="fa-solid fa-receipt"></i> ตรวจสอบคำขอเติมเงิน</button>
+                        <button onclick="switchTab('payment-methods')" class="btn btn-sm btn-ghost"><i class="fa-solid fa-credit-card"></i> จัดการช่องทางรับเงิน</button>
+                        <button onclick="switchTab('settings')" class="btn btn-sm btn-ghost"><i class="fa-solid fa-gear"></i> ตั้งค่า Payment</button>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-base font-semibold text-white mb-4"><i class="fa-solid fa-clock-rotate-left text-slate-400 mr-2"></i> ลูกค้าล่าสุด</h3>
+                    <div id="recent-tenants" class="space-y-3">
+                        <div class="skeleton h-12 w-full"></div>
+                        <div class="skeleton h-12 w-full"></div>
+                        <div class="skeleton h-12 w-3/4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tenants Tab -->
+            <div id="tab-tenants" class="tab-content">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                    <div>
+                        <h3 class="section-title text-white">จัดการลูกค้า</h3>
+                        <p class="section-subtitle">Tenant Management — เพิ่ม แก้ไข ลบ และจัดการสถานะลูกค้า</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="openAddTenantModal()" class="btn btn-sm btn-primary">
+                            <i class="fa-solid fa-plus text-xs"></i>
+                            <span>เพิ่มลูกค้า Manual</span>
+                        </button>
+                        <div class="relative">
+                            <i class="fa-solid fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                            <input type="text" id="search-tenant" onkeyup="filterTenants()" placeholder="ค้นหาชื่อบริษัท หรือ API Key..." class="form-input pl-10 pr-4 py-2.5 text-sm w-72">
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel rounded-2xl overflow-hidden">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>บริษัท / ร้านค้า</th>
+                                <th>แพ็กเกจ</th>
+                                <th>หมดอายุ</th>
+                                <th>สถานะ</th>
+                                <th class="text-right">การจัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tenants-list">
+                            <tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>กำลังโหลด...</p></div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 flex items-center justify-between text-xs text-slate-500">
+                    <span id="tenant-count-info">— รายการ</span>
+                    <span>อัพเดทล่าสุด: <span id="tenant-last-update">—</span></span>
+                </div>
+            </div>
+
+            <!-- Billing Tab -->
+            <div id="tab-billing" class="tab-content">
+                <div class="mb-6">
+                    <h3 class="section-title text-white">อนุมัติการแจ้งโอนเงิน</h3>
+                    <p class="section-subtitle">Billing Requests — ตรวจสอบสลิป อนุมัติ หรือปฏิเสธคำขอ</p>
+                </div>
+                <div id="billing-list" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="empty-state glass-panel rounded-2xl col-span-2"><i class="fa-solid fa-spinner fa-spin"></i><p>กำลังโหลด...</p></div>
+                </div>
+            </div>
+
+            <!-- Payment Methods Tab -->
+            <div id="tab-payment-methods" class="tab-content">
+                <div class="mb-6">
+                    <h3 class="section-title text-white">ช่องทางรับเงิน</h3>
+                    <p class="section-subtitle">Payment Methods — เพิ่มบัญชีธนาคาร หรือ QR Code รับเงิน</p>
+                </div>
+                
+                <div class="glass-panel p-8 rounded-2xl max-w-2xl mb-8">
+                    <h4 class="text-base font-semibold text-white mb-5 flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center"><i class="fa-solid fa-plus text-cyan-400 text-xs"></i></div>
+                        เพิ่มบัญชีใหม่
+                    </h4>
+                    <form id="add-bank-form" class="space-y-5">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="form-label">ธนาคาร</label>
+                                <input type="text" id="bankName" placeholder="เช่น กสิกรไทย" class="form-input" required>
+                            </div>
+                            <div>
+                                <label class="form-label">เลขบัญชี</label>
+                                <input type="text" id="accNum" placeholder="xxx-x-xxxxx-x" class="form-input" required>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label">ชื่อบัญชี</label>
+                            <input type="text" id="accName" placeholder="ชื่อ-นามสกุล" class="form-input" required>
+                        </div>
+                        <div>
+                            <label class="form-label">อัปโหลดภาพ QR Code รับเงิน (ถ้ามี)</label>
+                            <div class="flex items-center gap-4">
+                                <label class="btn btn-sm btn-ghost cursor-pointer">
+                                    <i class="fa-solid fa-image"></i> เลือกภาพ
+                                    <input type="file" id="qrFile" accept="image/*" class="hidden">
+                                </label>
+                                <span id="qr-filename" class="text-xs text-slate-500">ยังไม่ได้เลือกไฟล์</span>
+                            </div>
+                        </div>
+                        <hr class="divider">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-check"></i> บันทึกช่องทางชำระเงิน
+                        </button>
+                    </form>
+                </div>
+
+                <div id="bank-list" class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <!-- Injected -->
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="tab-settings" class="tab-content">
+                <div class="mb-6">
+                    <h3 class="section-title text-white">ตั้งค่าระบบ & Payment Gateway</h3>
+                    <p class="section-subtitle">Master Config — เลือกโหมดการรับชำระเงินและตั้งค่า API Keys</p>
+                </div>
+                
+                <div class="glass-panel p-8 rounded-2xl max-w-3xl space-y-8">
+                    <div>
+                        <h4 class="text-base font-semibold text-white mb-5 flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center"><i class="fa-solid fa-credit-card text-cyan-400 text-xs"></i></div>
+                            ระบบรับชำระเงินอัตโนมัติ
+                        </h4>
+                        <div class="space-y-5">
+                            <div>
+                                <label class="form-label">โหมดการชำระเงิน</label>
+                                <select id="paymentMode" class="form-input form-select">
+                                    <option value="manual">⚙️ 1. อนุมัติสลิปด้วยตนเอง (Manual)</option>
+                                    <option value="slipok">🤖 2. AI ตรวจสลิปอัตโนมัติ (SlipOK)</option>
+                                    <option value="stripe">💳 3. ตัดบัตรเครดิต/PromptPay อัตโนมัติ (Stripe)</option>
+                                </select>
+                            </div>
+
+                            <div id="slipok-config" class="hidden glass-panel p-5 rounded-xl space-y-4">
+                                <p class="text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-2"><i class="fa-solid fa-robot mr-1"></i> SlipOK Configuration</p>
+                                <div>
+                                    <label class="form-label">SlipOK API Key</label>
+                                    <input type="password" id="slipokKey" class="form-input" placeholder="sk_slipok_...">
+                                </div>
+                                <div>
+                                    <label class="form-label">Branch ID</label>
+                                    <input type="text" id="slipokBranch" class="form-input" placeholder="branch_xxx">
+                                </div>
+                                <p class="text-xs text-slate-500">สมัครใช้งาน AI ตรวจสลิปได้ที่ <a href="https://slipok.com" target="_blank" class="text-cyan-400 hover:underline">slipok.com</a></p>
+                            </div>
+
+                            <div id="stripe-config" class="hidden glass-panel p-5 rounded-xl space-y-4">
+                                <p class="text-xs font-semibold text-purple-400 uppercase tracking-wider mb-2"><i class="fa-brands fa-stripe-s mr-1"></i> Stripe Configuration</p>
+                                <div>
+                                    <label class="form-label">Stripe Secret Key</label>
+                                    <input type="password" id="stripeSecret" class="form-input" placeholder="sk_live_...">
+                                </div>
+                                <p class="text-xs text-slate-500">สมัครเปิดใช้ Stripe ได้ที่ <a href="https://stripe.com" target="_blank" class="text-cyan-400 hover:underline">stripe.com</a></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="divider">
+                    <button onclick="saveSettings()" class="btn btn-primary">
+                        <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่าทั้งหมด
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Deep Manage Modal -->
+    <div id="manage-modal" class="modal-overlay">
+        <div class="modal-backdrop" onclick="closeManageModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-1">Deep Manage</p>
+                        <h2 class="text-xl font-bold text-white">จัดการ: <span id="m-company" class="text-cyan-400"></span></h2>
+                    </div>
+                    <button onclick="closeManageModal()" class="btn-icon btn-ghost"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <p class="text-slate-500 text-xs font-mono mt-2 flex items-center gap-2">
+                    <i class="fa-solid fa-key text-[0.6rem]"></i>
+                    <span id="m-apikey"></span>
+                    <button onclick="copyText(document.getElementById('m-apikey').innerText)" class="text-cyan-400 hover:text-cyan-300 transition" data-tooltip="คัดลอก API Key"><i class="fa-regular fa-copy"></i></button>
+                </p>
+            </div>
+            
+            <div class="modal-body space-y-6">
+                <div class="grid grid-cols-2 gap-5">
+                    <div>
+                        <label class="form-label">แพ็กเกจ</label>
+                        <select id="m-package" class="form-input form-select">
+                            <option value="basic">🟢 Starter (Basic)</option>
+                            <option value="pro">🔵 Pro Matrix</option>
+                            <option value="enterprise">🟣 Enterprise</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">วันหมดอายุ</label>
+                        <input type="datetime-local" id="m-expiry" class="form-input">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="form-label">สถานะบัญชี</label>
+                    <select id="m-status" class="form-input form-select">
+                        <option value="active">✅ Active (ใช้งานได้)</option>
+                        <option value="suspended">🚫 Suspended (ระงับชั่วคราว)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="form-label flex items-center gap-2">
+                        <i class="fa-solid fa-code text-xs text-cyan-400"></i>
+                        Embed Code ของลูกค้ารายนี้
+                    </label>
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyText(document.getElementById('m-embed').textContent)"><i class="fa-regular fa-copy mr-1"></i> Copy</button>
+                        <pre id="m-embed" class="whitespace-pre-wrap"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer flex justify-between">
+                <button onclick="deleteTenantFromModal()" class="btn btn-sm btn-ghost-danger">
+                    <i class="fa-solid fa-trash text-xs"></i> ลบลูกค้ารายนี้
+                </button>
+                <div class="flex gap-3">
+                    <button onclick="closeManageModal()" class="btn btn-sm btn-ghost">ยกเลิก</button>
+                    <button onclick="saveTenantUpdate()" class="btn btn-sm btn-primary">
+                        <i class="fa-solid fa-check text-xs"></i> บันทึกข้อมูล
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Tenant Modal -->
+    <div id="add-tenant-modal" class="modal-overlay">
+        <div class="modal-backdrop" onclick="closeAddTenantModal()"></div>
+        <div class="modal-content" style="max-width: 480px">
+            <div class="modal-header">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-green-400 font-semibold uppercase tracking-wider mb-1">Manual Add</p>
+                        <h2 class="text-xl font-bold text-white">เพิ่มลูกค้าใหม่</h2>
+                    </div>
+                    <button onclick="closeAddTenantModal()" class="btn-icon btn-ghost"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div class="modal-body space-y-5">
+                <div>
+                    <label class="form-label">ชื่อบริษัท / ร้านค้า</label>
+                    <input type="text" id="add-company" class="form-input" placeholder="เช่น ร้าน ABC">
+                </div>
+                <div>
+                    <label class="form-label">แพ็กเกจ</label>
+                    <select id="add-package" class="form-input form-select">
+                        <option value="basic">🟢 Starter (Basic)</option>
+                        <option value="pro">🔵 Pro Matrix</option>
+                        <option value="enterprise">🟣 Enterprise</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">ระยะเวลา</label>
+                    <select id="add-duration" class="form-input form-select">
+                        <option value="1">1 เดือน</option>
+                        <option value="3">3 เดือน</option>
+                        <option value="6">6 เดือน</option>
+                        <option value="12">1 ปี (12 เดือน)</option>
+                        <option value="unlimited">♾️ ไม่มีวันหมดอายุ (Lifetime)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer flex justify-end gap-3">
+                <button onclick="closeAddTenantModal()" class="btn btn-sm btn-ghost">ยกเลิก</button>
+                <button id="add-tenant-btn" onclick="submitAddTenant()" class="btn btn-sm btn-success">
+                    <i class="fa-solid fa-plus text-xs"></i> เพิ่มลูกค้า
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== UTILITY ====================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', info: 'fa-info-circle' };
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type]}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(40px)'; setTimeout(() => toast.remove(), 300); }, 3500);
+        }
+
+        function copyText(text) {
+            navigator.clipboard.writeText(text).then(() => showToast('คัดลอกสำเร็จ!', 'success'));
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '—';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function getExpiryClass(dateStr) {
+            if (!dateStr) return 'expiry-ok';
+            const diff = new Date(dateStr) - new Date();
+            if (diff < 0) return 'expiry-expired';
+            if (diff < 7 * 24 * 60 * 60 * 1000) return 'expiry-near';
+            return 'expiry-ok';
+        }
+
+        function getExpiryLabel(dateStr) {
+            if (!dateStr) return '♾️ Lifetime';
+            const diff = new Date(dateStr) - new Date();
+            if (diff < 0) return '❌ หมดอายุแล้ว';
+            const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            if (days <= 7) return `⚠️ เหลือ ${days} วัน`;
+            return formatDate(dateStr);
+        }
+
+        function getAvatarColor(index) { return `avatar-colors-${index % 5}`; }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // File name display
+        document.getElementById('qrFile')?.addEventListener('change', (e) => {
+            document.getElementById('qr-filename').textContent = e.target.files[0]?.name || 'ยังไม่ได้เลือกไฟล์';
+        });
+
+        // ==================== TABS ====================
+        const tabTitles = {
+            overview: ['ภาพรวมระบบ', 'Dashboard Overview'],
+            tenants: ['จัดการลูกค้า', 'Tenant Management'],
+            billing: ['อนุมัติเติมเงิน', 'Billing Requests'],
+            'payment-methods': ['ช่องทางรับเงิน', 'Payment Methods'],
+            settings: ['ตั้งค่าระบบ', 'System Settings']
+        };
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            document.getElementById('nav-' + tabId).classList.add('active');
+            const titles = tabTitles[tabId] || ['—', '—'];
+            document.getElementById('page-title').textContent = titles[0];
+            document.getElementById('page-subtitle').textContent = titles[1];
+            if (tabId === 'overview') loadOverview();
+            if (tabId === 'tenants') loadTenants();
+            if (tabId === 'billing') loadBilling();
+            if (tabId === 'payment-methods') loadPaymentMethods();
+            if (tabId === 'settings') loadSettings();
+        }
+
+        document.getElementById('paymentMode').addEventListener('change', (e) => {
+            document.getElementById('slipok-config').classList.toggle('hidden', e.target.value !== 'slipok');
+            document.getElementById('stripe-config').classList.toggle('hidden', e.target.value !== 'stripe');
+        });
+
+        function logout() {
+            localStorage.removeItem('admin_token');
+            window.location.href = '/admin-login.html';
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        // ==================== OVERVIEW ====================
+        async function loadOverview() {
+            try {
+                const [statsData, tenantsData, methodsData] = await Promise.all([
+                    fetchAPI('stats'),
+                    fetchAPI('tenants'),
+                    fetchAPI('payment_methods')
+                ]);
+                document.getElementById('stats-tenants').innerText = statsData.tenants || 0;
+                document.getElementById('stats-billing').innerText = statsData.pendingBilling || 0;
+                const activeTenants = (tenantsData.tenants || []).filter(t => t.status === 'active');
+                document.getElementById('stats-active').innerText = activeTenants.length;
+                const activeMethods = (methodsData.methods || []).filter(m => m.is_active);
+                document.getElementById('stats-payment').innerText = activeMethods.length;
+
+                // Update badge
+                if (statsData.pendingBilling > 0) {
+                    const badge = document.getElementById('nav-billing-badge');
+                    badge.style.display = 'inline-flex';
+                    badge.textContent = statsData.pendingBilling;
+                }
+                if (statsData.tenants > 0) {
+                    const badge = document.getElementById('nav-tenants-badge');
+                    badge.style.display = 'inline-flex';
+                    badge.textContent = statsData.tenants;
+                    badge.style.background = 'rgba(6, 182, 212, 0.2)';
+                    badge.style.color = '#22d3ee';
+                    badge.style.animation = 'none';
+                }
+
+                // Recent tenants
+                const recent = (tenantsData.tenants || []).slice(0, 5);
+                const recentEl = document.getElementById('recent-tenants');
+                if (recent.length === 0) {
+                    recentEl.innerHTML = '<div class="empty-state py-8"><i class="fa-solid fa-inbox block"></i><p>ยังไม่มีลูกค้า</p></div>';
+                } else {
+                    recentEl.innerHTML = recent.map((t, i) => `
+                        <div class="flex items-center gap-4 p-3 rounded-xl hover:bg-white/[0.02] transition">
+                            <div class="company-avatar ${getAvatarColor(i)}">${t.company_name.charAt(0)}</div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-semibold text-white truncate">${t.company_name}</p>
+                                <p class="text-xs text-slate-500 font-mono truncate">${t.api_key}</p>
+                            </div>
+                            <span class="badge badge-${t.status === 'active' ? 'active' : 'suspended'}">${t.status}</span>
+                        </div>
+                    `).join('');
+                }
+            } catch(e) {
+                showToast('ไม่สามารถโหลดข้อมูล Overview ได้', 'error');
+            }
+        }
+
+        // ==================== TENANTS ====================
+        let allTenants = [];
+        let currentEditingId = null;
+
+        async function loadTenants() {
+            const data = await fetchAPI('tenants');
+            allTenants = data.tenants || [];
+            renderTenants(allTenants);
+            document.getElementById('tenant-count-info').textContent = `ทั้งหมด ${allTenants.length} รายการ`;
+            document.getElementById('tenant-last-update').textContent = new Date().toLocaleTimeString('th-TH');
+        }
+
+        function renderTenants(tenants) {
+            const tbody = document.getElementById('tenants-list');
+            if (tenants.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-inbox block"></i><h4>ไม่พบลูกค้า</h4><p>ยังไม่มีลูกค้าในระบบ หรือไม่ตรงกับคำค้นหา</p></div></td></tr>`;
+                return;
+            }
+            tbody.innerHTML = tenants.map((t, i) => `
+                <tr>
+                    <td>
+                        <div class="flex items-center gap-3">
+                            <div class="company-avatar ${getAvatarColor(i)}">${t.company_name.charAt(0)}</div>
+                            <div>
+                                <div class="font-semibold text-white text-[0.9rem]">${t.company_name}</div>
+                                <div class="font-mono text-[0.65rem] text-slate-500 mt-0.5">${t.api_key}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge badge-package">${t.package_type || 'basic'}</span></td>
+                    <td><span class="${getExpiryClass(t.expires_at)} text-sm">${getExpiryLabel(t.expires_at)}</span></td>
+                    <td><span class="badge badge-${t.status === 'active' ? 'active' : 'suspended'}">${t.status}</span></td>
+                    <td class="text-right">
+                        <div class="flex items-center justify-end gap-2">
+                            <button onclick="openManageModal('${t.id}')" class="btn btn-xs btn-ghost-cyan" data-tooltip="จัดการลึก">
+                                <i class="fa-solid fa-gear"></i> <span class="hidden lg:inline">จัดการ</span>
+                            </button>
+                            <button onclick="deleteTenant('${t.id}','${t.company_name.replace(/'/g, "\\'")}')" class="btn-icon-sm btn-ghost-danger" data-tooltip="ลบลูกค้า">
+                                <i class="fa-solid fa-trash text-[0.65rem]"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function filterTenants() {
+            const q = document.getElementById('search-tenant').value.toLowerCase();
+            const filtered = allTenants.filter(t => t.company_name.toLowerCase().includes(q) || t.api_key.toLowerCase().includes(q));
+            renderTenants(filtered);
+            document.getElementById('tenant-count-info').textContent = q ? `ผลลัพธ์ ${filtered.length} / ${allTenants.length} รายการ` : `ทั้งหมด ${allTenants.length} รายการ`;
+        }
+
+        // ==================== MANAGE MODAL ====================
+        function openManageModal(id) {
+            const t = allTenants.find(x => x.id === id);
+            if(!t) return;
+            currentEditingId = id;
+            document.getElementById('m-company').innerText = t.company_name;
+            document.getElementById('m-apikey').innerText = t.api_key;
+            document.getElementById('m-package').value = t.package_type || 'basic';
+            document.getElementById('m-status').value = t.status;
+            
+            if(t.expires_at) {
+                const d = new Date(t.expires_at);
+                const iso = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+                document.getElementById('m-expiry').value = iso;
+            } else {
+                document.getElementById('m-expiry').value = '';
+            }
+
+            const siteUrl = window.location.origin;
+            const embedCode = `<!-- INDICATOR WEB CHAT Widget -->\n<script src="${siteUrl}/supreme-boost/boost.js"\n  data-api-key="${t.api_key}"\n  data-backend-url="${siteUrl}/api/chat"\n  data-title="${t.company_name} AI"\n  data-primary="#06b6d4"\n  data-lang="auto"\n  defer><\/script>`;
+            document.getElementById('m-embed').textContent = embedCode;
+
+            document.getElementById('manage-modal').classList.add('show');
+        }
+
+        function closeManageModal() {
+            document.getElementById('manage-modal').classList.remove('show');
+            currentEditingId = null;
+        }
+
+        async function saveTenantUpdate() {
+            if(!currentEditingId) return;
+            const payload = {
+                id: currentEditingId,
+                package_type: document.getElementById('m-package').value,
+                status: document.getElementById('m-status').value
+            };
+            const exp = document.getElementById('m-expiry').value;
+            if(exp) payload.expires_at = new Date(exp).toISOString();
+
+            try {
+                await fetchAPI('update_tenant', 'POST', payload);
+                showToast('อัปเดตข้อมูลลูกค้าเรียบร้อยแล้ว!', 'success');
+                closeManageModal();
+                loadTenants();
+            } catch(e) {
+                showToast('เกิดข้อผิดพลาดในการอัปเดต', 'error');
+            }
+        }
+
+        async function deleteTenantFromModal() {
+            if(!currentEditingId) return;
+            const name = document.getElementById('m-company').innerText;
+            if(!confirm(`⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบลูกค้า "${name}"?\n\nข้อมูลจะหายไปอย่างถาวร!`)) return;
+            try {
+                await fetchAPI('delete_tenant', 'POST', { id: currentEditingId });
+                showToast('ลบลูกค้าเรียบร้อยแล้ว!', 'success');
+                closeManageModal();
+                loadTenants();
+            } catch(e) {
+                showToast('เกิดข้อผิดพลาดในการลบ', 'error');
+            }
+        }
+
+        // ==================== DELETE ====================
+        async function deleteTenant(id, name) {
+            if(!confirm(`⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบลูกค้า "${name}"?\n\nAPI Key จะใช้งานไม่ได้อีกต่อไป!`)) return;
+            try {
+                await fetchAPI('delete_tenant', 'POST', { id });
+                showToast('ลบลูกค้าเรียบร้อยแล้ว!', 'success');
+                loadTenants();
+            } catch(e) { showToast('เกิดข้อผิดพลาดในการลบ', 'error'); }
+        }
+
+        async function deleteBilling(id) {
+            if(!confirm('⚠️ ต้องการลบรายการเติมเงินนี้?\n\nข้อมูลจะหายไปถาวร!')) return;
+            try {
+                await fetchAPI('delete_billing', 'POST', { id });
+                showToast('ลบรายการเรียบร้อยแล้ว!', 'success');
+                loadBilling();
+            } catch(e) { showToast('เกิดข้อผิดพลาดในการลบ', 'error'); }
+        }
+
+        async function deletePaymentMethod(id, name) {
+            if(!confirm(`⚠️ ต้องการลบช่องทาง "${name}"?\n\nข้อมูลจะหายไปถาวร!`)) return;
+            try {
+                await fetchAPI('delete_payment_method', 'POST', { id });
+                showToast('ลบช่องทางรับเงินเรียบร้อยแล้ว!', 'success');
+                loadPaymentMethods();
+            } catch(e) { showToast('เกิดข้อผิดพลาดในการลบ', 'error'); }
+        }
+
+        // ==================== ADD TENANT ====================
+        function openAddTenantModal() {
+            document.getElementById('add-company').value = '';
+            document.getElementById('add-package').value = 'basic';
+            document.getElementById('add-duration').value = '1';
+            document.getElementById('add-tenant-modal').classList.add('show');
+            setTimeout(() => document.getElementById('add-company').focus(), 300);
+        }
+
+        function closeAddTenantModal() {
+            document.getElementById('add-tenant-modal').classList.remove('show');
+        }
+
+        async function submitAddTenant() {
+            const company = document.getElementById('add-company').value.trim();
+            const pkg = document.getElementById('add-package').value;
+            const dur = document.getElementById('add-duration').value;
+            
+            if(!company) { showToast('กรุณากรอกชื่อบริษัท', 'error'); return; }
+            
+            const btn = document.getElementById('add-tenant-btn');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> กำลังเพิ่ม...';
+            btn.disabled = true;
+
+            try {
+                const result = await fetchAPI('add_tenant', 'POST', {
+                    company_name: company,
+                    package_type: pkg,
+                    duration_months: dur
+                });
+                showToast(`เพิ่ม "${company}" เรียบร้อยแล้ว! API Key: ${result.tenant?.api_key || '—'}`, 'success');
+                closeAddTenantModal();
+                loadTenants();
+            } catch(e) {
+                showToast('เกิดข้อผิดพลาดในการเพิ่มลูกค้า', 'error');
+            }
+            
+            btn.innerHTML = '<i class="fa-solid fa-plus text-xs"></i> เพิ่มลูกค้า';
+            btn.disabled = false;
+        }
+
+        // ==================== BILLING ====================
+        async function loadBilling() {
+            const data = await fetchAPI('billing');
+            const list = document.getElementById('billing-list');
+            const requests = data.requests || [];
+            if (requests.length === 0) {
+                list.innerHTML = '<div class="empty-state glass-panel rounded-2xl col-span-2"><i class="fa-solid fa-inbox block"></i><h4>ไม่มีคำขอเติมเงิน</h4><p>ยังไม่มีลูกค้าแจ้งโอนเงินเข้ามา</p></div>';
+                return;
+            }
+            list.innerHTML = requests.map(r => `
+                <div class="glass-panel glass-panel-hover p-6 rounded-2xl">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h4 class="text-base font-bold text-white">${r.tenant_name}</h4>
+                            <p class="text-xs text-slate-400 mt-1"><i class="fa-solid fa-box mr-1"></i> แพ็กเกจ: <span class="text-cyan-400 font-medium">${r.package_type}</span></p>
+                            ${r.amount ? `<p class="text-xs text-slate-400 mt-0.5"><i class="fa-solid fa-coins mr-1"></i> จำนวน: <span class="amount text-white">${Number(r.amount).toLocaleString()} ฿</span></p>` : ''}
+                        </div>
+                        <span class="badge badge-${r.status}">${r.status === 'pending' ? 'รออนุมัติ' : (r.status === 'approved' ? 'อนุมัติแล้ว' : 'ปฏิเสธ')}</span>
+                    </div>
+                    ${r.contact_email ? `<p class="text-xs text-slate-500 mb-3"><i class="fa-solid fa-envelope mr-1"></i> ${r.contact_email}</p>` : ''}
+                    ${r.slip_base64 ? `<img src="${r.slip_base64}" class="w-full h-36 object-cover rounded-xl mb-4 cursor-pointer border border-white/5 hover:border-cyan-500/30 transition" onclick="window.open('${r.slip_base64}')">` : ''}
+                    <p class="text-[0.65rem] text-slate-600 mb-3"><i class="fa-regular fa-clock mr-1"></i> ${formatDate(r.created_at)}</p>
+                    ${r.status === 'pending' ? `
+                        <div class="flex gap-2 mb-2">
+                            <button onclick="approveBilling('${r.id}')" class="btn btn-sm btn-success flex-1"><i class="fa-solid fa-check text-xs"></i> อนุมัติ & สร้าง Key</button>
+                            <button onclick="rejectBilling('${r.id}')" class="btn btn-sm btn-danger flex-1"><i class="fa-solid fa-xmark text-xs"></i> ปฏิเสธ</button>
+                        </div>
+                    ` : ''}
+                    <button onclick="deleteBilling('${r.id}')" class="w-full btn btn-xs btn-ghost-danger mt-1"><i class="fa-solid fa-trash text-[0.6rem]"></i> ลบรายการนี้</button>
+                </div>
+            `).join('');
+        }
+
+        async function approveBilling(id) {
+            if(!confirm('ยืนยันอนุมัติ? ระบบจะสร้าง API Key ให้ลูกค้าทันที')) return;
+            try {
+                const res = await fetchAPI('approve_billing', 'POST', { id });
+                showToast('อนุมัติสำเร็จ! API Key: ' + res.apiKey, 'success');
+                loadBilling();
+            } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); }
+        }
+
+        async function rejectBilling(id) {
+            if(!confirm('ยืนยันปฏิเสธสลิปนี้?')) return;
+            try {
+                await fetchAPI('reject_billing', 'POST', { id });
+                showToast('ปฏิเสธคำขอเรียบร้อย', 'info');
+                loadBilling();
+            } catch(e) { showToast('เกิดข้อผิดพลาด', 'error'); }
+        }
+
+        // ==================== PAYMENT METHODS ====================
+        async function loadPaymentMethods() {
+            const data = await fetchAPI('payment_methods');
+            const list = document.getElementById('bank-list');
+            const methods = data.methods || [];
+            if (methods.length === 0) {
+                list.innerHTML = '<div class="empty-state glass-panel rounded-2xl col-span-3"><i class="fa-solid fa-credit-card block"></i><h4>ยังไม่มีช่องทางรับเงิน</h4><p>เพิ่มบัญชีธนาคารด้านบนเพื่อเริ่มรับเงิน</p></div>';
+                return;
+            }
+            list.innerHTML = methods.map(m => `
+                <div class="glass-panel glass-panel-hover p-5 rounded-2xl ${!m.is_active ? 'opacity-40' : ''}">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center border border-cyan-500/10">
+                            <i class="fa-solid fa-building-columns text-cyan-400"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-bold text-white text-sm truncate">${m.bank_name}</h4>
+                            <span class="badge ${m.is_active ? 'badge-active' : 'badge-suspended'} text-[0.55rem]">${m.is_active ? 'เปิดใช้งาน' : 'ปิดอยู่'}</span>
+                        </div>
+                    </div>
+                    <p class="text-lg font-mono font-semibold text-cyan-400 mb-1 tracking-wider">${m.account_number}</p>
+                    <p class="text-xs text-slate-400 mb-4">${m.account_name}</p>
+                    ${m.qr_base64 ? `<img src="${m.qr_base64}" class="w-28 h-28 mb-4 rounded-xl mx-auto border border-white/5 qr-preview">` : ''}
+                    <div class="flex gap-2">
+                        <button onclick="togglePaymentMethod('${m.id}', ${!m.is_active})" class="btn btn-xs btn-ghost flex-1">
+                            <i class="fa-solid ${m.is_active ? 'fa-eye-slash' : 'fa-eye'} text-[0.6rem]"></i> ${m.is_active ? 'ปิด' : 'เปิด'}
+                        </button>
+                        <button onclick="deletePaymentMethod('${m.id}','${m.bank_name.replace(/'/g, "\\'")}')" class="btn-icon-sm btn-ghost-danger" data-tooltip="ลบ">
+                            <i class="fa-solid fa-trash text-[0.6rem]"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function togglePaymentMethod(id, is_active) {
+            await fetchAPI('toggle_payment_method', 'POST', { id, is_active });
+            showToast(is_active ? 'เปิดช่องทางรับเงินแล้ว' : 'ปิดช่องทางรับเงินแล้ว', 'info');
+            loadPaymentMethods();
+        }
+
+        document.getElementById('add-bank-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const payload = {
+                bank_name: document.getElementById('bankName').value,
+                account_number: document.getElementById('accNum').value,
+                account_name: document.getElementById('accName').value,
+            };
+            const file = document.getElementById('qrFile').files[0];
+            if (file) payload.qr_base64 = await fileToBase64(file);
+            try {
+                await fetchAPI('add_payment_method', 'POST', payload);
+                showToast('เพิ่มช่องทางรับเงินสำเร็จ!', 'success');
+                e.target.reset();
+                document.getElementById('qr-filename').textContent = 'ยังไม่ได้เลือกไฟล์';
+                loadPaymentMethods();
+            } catch(err) {
+                showToast('เกิดข้อผิดพลาดในการเพิ่ม', 'error');
+            }
+        };
+
+        // ==================== SETTINGS ====================
+        async function loadSettings() {
+            const data = await fetchAPI('settings');
+            const set = data.settings || {};
+            document.getElementById('paymentMode').value = set.payment_mode || 'manual';
+            document.getElementById('stripeSecret').value = set.stripe_secret_key || '';
+            document.getElementById('slipokKey').value = set.slipok_api_key || '';
+            document.getElementById('slipokBranch').value = set.slipok_branch_id || '';
+            document.getElementById('paymentMode').dispatchEvent(new Event('change'));
+        }
+
+        async function saveSettings() {
+            const payload = {
+                payment_mode: document.getElementById('paymentMode').value,
+                stripe_secret_key: document.getElementById('stripeSecret').value,
+                slipok_api_key: document.getElementById('slipokKey').value,
+                slipok_branch_id: document.getElementById('slipokBranch').value
+            };
+            try {
+                await fetchAPI('save_settings', 'POST', payload);
+                showToast('บันทึกการตั้งค่าทั้งหมดสำเร็จ!', 'success');
+            } catch(e) {
+                showToast('เกิดข้อผิดพลาดในการบันทึก', 'error');
+            }
+        }
+
+        // ==================== INIT ====================
+        loadOverview();
+    </script>
+</body>
+</html>

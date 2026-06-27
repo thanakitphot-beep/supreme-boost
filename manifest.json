@@ -1,0 +1,17 @@
+{
+  "name": "INDICATOR 2.0 Admin",
+  "short_name": "INDICATOR Admin",
+  "start_url": "/admin-login.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#06b6d4",
+  "description": "INDICATOR WEB CHAT Backend Management",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -132,9 +132,9 @@ export function init(app, _clientApiKey, shopPrompt = "", backendUrl = "") {
                 font-size: 94% !important;
             }
         </style>
-        <section class="sp-panel" aria-label="Supreme AI Chat">
+        <section class="sp-panel" aria-label="INDICATOR WEB CHAT Chat">
             <div class="sp-header">
-                <span>Supreme AI Chat</span>
+                <span>INDICATOR WEB CHAT Chat</span>
                 <button class="sp-close" type="button" aria-label="ปิดแชท">×</button>
             </div>
             <div class="sp-messages"></div>
@@ -176,7 +176,7 @@ export function init(app, _clientApiKey, shopPrompt = "", backendUrl = "") {
         loading.textContent = mergeLocalReply(localAction, aiData.reply);
 
         if (isSafeCss(aiData.cssCommand)) {
-            adaptiveStyle.textContent += `\n/* Supreme AI adaptive update */\n${aiData.cssCommand.trim()}\n`;
+            adaptiveStyle.textContent += `\n/* INDICATOR WEB CHAT adaptive update */\n${aiData.cssCommand.trim()}\n`;
         }
         messages.scrollTop = messages.scrollHeight;
     });

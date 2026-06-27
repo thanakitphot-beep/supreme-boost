@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Site — v6.1 Omni-Industry Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary: #1a1a1a; --secondary: #f4f4f4; --accent: #6366f1; --text: #333; --muted: #777; --white: #fff; --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Prompt', sans-serif; }
+        body { background: var(--secondary); color: var(--text); overflow-x: hidden; }
+        header { background: var(--white); box-shadow: 0 2px 10px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 100; }
+        .nav { max-width: 1200px; margin: 0 auto; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.8rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; }
+        .logo span { color: var(--accent); }
+        .nav-links { display: flex; gap: 2rem; }
+        .nav-links a { text-decoration: none; color: var(--muted); font-weight: 500; transition: var(--transition); }
+        .nav-links a:hover { color: var(--accent); }
+        .hero { height: 360px; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--white); }
+        .hero h1 { font-size: clamp(2rem,5vw,3.5rem); margin-bottom: 0.5rem; }
+        .hero p { font-size: clamp(1rem,2vw,1.3rem); opacity: 0.9; }
+        .tutorial-card { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border-radius: 16px; padding: 24px; margin: 30px auto; max-width: 1200px; }
+        .tutorial-card h2 { font-size: 20px; margin-bottom: 8px; }
+        .tutorial-card p { opacity: 0.9; font-size: 14px; line-height: 1.6; }
+        .tutorial-card code { background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px; }
+        .instruct-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
+        .instruct-card { background: rgba(255,255,255,0.12); backdrop-filter: blur(8px); border-radius: 12px; padding: 16px; border: 1px solid rgba(255,255,255,0.15); }
+        .instruct-card h3 { font-size: 14px; margin-bottom: 4px; }
+        .instruct-card p { font-size: 12px; opacity: 0.85; }
+        .section-title { max-width: 1200px; margin: 2rem auto 1rem; padding: 0 2rem; font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 12px; }
+        .section-title .badge { font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+        .badge-industry { background: #e0e7ff; color: #4338ca; }
+        .grid { max-width: 1200px; margin: 0 auto 3rem; padding: 0 2rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
+        .card { background: var(--white); border-radius: 12px; overflow: hidden; box-shadow: 0 3px 12px rgba(0,0,0,0.06); transition: var(--transition); }
+        .card:hover { transform: translateY(-6px); box-shadow: 0 10px 24px rgba(0,0,0,0.1); }
+        .card-img { height: 160px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 40px; color: #94a3b8; }
+        .card-body { padding: 1rem 1.2rem 1.2rem; }
+        .card-body h3 { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+        .card-body p { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+        .card-body .meta { font-size: 0.8rem; color: var(--accent); font-weight: 600; margin-top: 8px; }
+        .checkout-section { max-width: 1200px; margin: 0 auto 2rem; padding: 0 2rem; text-align: right; }
+        .checkout-btn { padding: 12px 32px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; transition: var(--transition); font-size: 0.95rem; display: inline-flex; align-items: center; gap: 8px; }
+        .checkout-btn:hover { background: #4f46e5; transform: scale(1.03); }
+        #test-checklist { list-style: none; margin: 16px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+        #test-checklist li { padding: 6px 12px; border-radius: 8px; font-size: 12px; background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); transition: all 0.3s ease; }
+        #test-checklist li.done { background: #dcfce7; color: #16a34a; }
+        #test-checklist li.done::before { content: "\2713 "; }
+        #test-checklist li.fail { background: #fee2e2; color: #dc2626; }
+        #test-checklist li.fail::before { content: "\2717 "; }
+        .brain-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+        .brain-groq { background: #3b82f6; color: #fff; }
+        .brain-cohere { background: #10b981; color: #fff; }
+        .brain-gemini { background: #8b5cf6; color: #fff; }
+        .blog-card .card-img { background: linear-gradient(135deg, #f43f5e, #e11d48); }
+        .saas-card .card-img { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+        .edu-card .card-img { background: linear-gradient(135deg, #22c55e, #16a34a); }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="nav">
+            <div class="logo">Omni<span>AI</span></div>
+            <div class="nav-links">
+                <a href="#blog">Blog</a>
+                <a href="#services">Services</a>
+                <a href="#products">Shop</a>
+                <a href="#contact">Contact</a>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div>
+            <h1>Universal AI — Any Site, Any Industry</h1>
+            <p>Dynamic context extraction | Industry-adaptive persona | Shadow DOM isolation</p>
+        </div>
+    </section>
+
+    <div class="tutorial-card">
+        <h2><span id="phase-icon">&#x1F9E0;</span> TRIPLE-BRAIN MATRIX v6.1 — Omni-Industry Adaptation</h2>
+        <p>Zero-shot industry detection: <span class="brain-badge brain-groq">GROQ Context Deductor</span> determines industry in real-time, <span class="brain-badge brain-cohere">COHERE Universal Safety</span> audits every action, <span class="brain-badge brain-gemini">GEMINI Adaptive Executive</span> generates persona-matched responses</p>
+        <div class="instruct-grid">
+            <div class="instruct-card"><h3>&#x1F9E0; Dynamic Context</h3><p>Extracts &lt;title&gt;, &lt;meta&gt;, &lt;h1&gt;, active section — sends as siteDNA to backend for zero-shot industry detection</p></div>
+            <div class="instruct-card"><h3>&#x1F3F0; Shadow DOM Isolation</h3><p>Widget UI is fully encapsulated in <code>attachShadow({mode:'open'})</code> — immune to host CSS (Tailwind, Bootstrap, custom)</p></div>
+            <div class="instruct-card"><h3>&#x1F50D; Universal Safety</h3><p>9 universal safety rules: PII extraction, form submission, redirects, script injection, token access, content modification, downloads, payment automation</p></div>
+            <div class="instruct-card"><h3>&#x1F464; Dynamic Persona</h3><p>Phase-1 Groq deduces industry + persona: clinical advisor, tech support, academic tutor, content guide, property agent, financial advisor</p></div>
+            <div class="instruct-card"><h3>&#x2728; Tone Adaptation</h3><p>Phase-3 Gemini uses detected tone: professional, casual, clinical, academic, technical, friendly, formal, fun — right for each industry</p></div>
+            <div class="instruct-card"><h3>&#x1F6E1; Agnostic Friction</h3><p>BehavioralObserver detects hesitation on ANY element type (form, article, nav, interactive, catalog, list, content) — no hardcoded CSS classes</p></div>
+        </div>
+        <ul id="test-checklist">
+            <li id="t-widget">v6.1 Widget loaded</li>
+            <li id="t-shadow">Shadow DOM active</li>
+            <li id="t-dna">Context Extraction</li>
+            <li id="t-whisper">Industry Whisper</li>
+            <li id="t-warp">Warp to content</li>
+            <li id="t-phase">Brain Phase Indicator</li>
+            <li id="t-shield">SafetyShield HITL</li>
+            <li id="t-layout">Layout Fortress</li>
+            <li id="t-hesitation">Generic Friction</li>
+            <li id="t-options">Interactive Options</li>
+            <li id="t-shelf">Inline Recommendation Shelf</li>
+        </ul>
+    </div>
+
+    <div class="section-title" id="blog">
+        <span>&#x1F4DD;</span> Blog / Content
+        <span class="badge badge-industry">INDUSTRY: blog / media</span>
+    </div>
+    <section class="grid blog-cards">
+        <div class="card blog-card"><div class="card-img"><i class="fa-solid fa-newspaper"></i></div><div class="card-body"><h3>Web AI: The Next Frontier</h3><p>How in-DOM autonomous agents are reshaping user experience across every industry vertical.</p><div class="meta">&#x1F4C5; 3 min read</div></div></div>
+        <div class="card blog-card"><div class="card-img"><i class="fa-solid fa-brain"></i></div><div class="card-body"><h3>Zero-Shot Industry Detection</h3><p>Our Groq-powered Phase 1 deduces your site's vertical and intent without prior training data.</p><div class="meta">&#x1F4C5; 5 min read</div></div></div>
+        <div class="card blog-card"><div class="card-img"><i class="fa-solid fa-shield-halved"></i></div><div class="card-body"><h3>Universal Safety Architecture</h3><p>9 principles that keep AI actions safe across healthcare, finance, education, and e-commerce.</p><div class="meta">&#x1F4C5; 4 min read</div></div></div>
+    </section>
+
+    <div class="section-title" id="services">
+        <span>&#x1F3E2;</span> SaaS Services
+        <span class="badge badge-industry">INDUSTRY: saas / tech</span>
+    </div>
+    <section class="grid saas-cards">
+        <div class="card saas-card"><div class="card-img"><i class="fa-solid fa-cloud"></i></div><div class="card-body"><h3>AI Analytics Suite</h3><p>Real-time behavioral analytics with autonomous intervention. From &#36;49/mo.</p><div class="meta">&#x1F513; Free 14-day trial</div></div></div>
+        <div class="card saas-card"><div class="card-img"><i class="fa-solid fa-robot"></i></div><div class="card-body"><h3>Widget SDK Pro</h3><p>Embed our universal AI widget in any site. Shadow DOM isolation guaranteed.</p><div class="meta">&#x1F513; Free tier available</div></div></div>
+        <div class="card saas-card"><div class="card-img"><i class="fa-solid fa-chart-line"></i></div><div class="card-body"><h3>Conversion Engine</h3><p>Triple-brain orchestration for maximum user engagement and satisfaction.</p><div class="meta">&#x1F513; Custom pricing</div></div></div>
+    </section>
+
+    <div class="checkout-section">
+        <button class="checkout-btn" id="checkout-test-btn" onclick="alert('Payment demo — SafetyShield should intercept any AI action here!')" style="background:#dc2626;">
+            <i class="fa-solid fa-credit-card"></i> SENSITIVE ZONE: Payment / Checkout
+        </button>
+    </div>
+
+    <div class="section-title" id="products">
+        <span>&#x1F6CD;</span> Shop / Products
+        <span class="badge badge-industry">INDUSTRY: e-commerce</span>
+    </div>
+    <section class="grid product-cards">
+        <div class="card"><div class="card-img"><i class="fa-solid fa-shirt"></i></div><div class="card-body"><h3>Classic Oxford Shirt</h3><p>Premium cotton, slim fit. White, Blue, Black.</p><div class="meta">&#3647;890</div></div></div>
+        <div class="card"><div class="card-img"><i class="fa-solid fa-couch"></i></div><div class="card-body"><h3>Minimalist Silk Dress</h3><p>Elegant design for any occasion.</p><div class="meta">&#3647;1,590</div></div></div>
+        <div class="card"><div class="card-img"><i class="fa-solid fa-clock"></i></div><div class="card-body"><h3>Steel Watch Classic</h3><p>Stainless steel, water-resistant, Japanese movement.</p><div class="meta">&#3647;3,500</div></div></div>
+    </section>
+
+    <div class="section-title" id="contact">
+        <span>&#x1F4E9;</span> Contact / Form
+        <span class="badge badge-industry">INDUSTRY: other</span>
+    </div>
+    <div style="max-width:1200px;margin:0 auto 3rem;padding:0 2rem;">
+        <form style="background:var(--white);border-radius:12px;padding:24px;box-shadow:0 3px 12px rgba(0,0,0,0.06);max-width:500px;">
+            <div style="margin-bottom:12px;"><label style="display:block;font-weight:600;margin-bottom:4px;font-size:14px;">Name</label><input type="text" style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font:inherit;" placeholder="Your name"></div>
+            <div style="margin-bottom:12px;"><label style="display:block;font-weight:600;margin-bottom:4px;font-size:14px;">Email</label><input type="email" style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font:inherit;" placeholder="your@email.com"></div>
+            <div style="margin-bottom:12px;"><label style="display:block;font-weight:600;margin-bottom:4px;font-size:14px;">Message</label><textarea rows="3" style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font:inherit;resize:vertical;" placeholder="How can we help?"></textarea></div>
+            <button type="submit" class="checkout-btn" onclick="event.preventDefault();alert('Form submitted (demo)')"><i class="fa-solid fa-paper-plane"></i> Send</button>
+        </form>
+    </div>
+
+    <script src="/supreme-boost/boost.js"
+            data-lang="auto"
+            data-title="OmniAI v6.1"
+            data-primary="#6366f1"
+            data-position="right"
+            async>
+    </script>
+
+    <script>
+        // Test checklist helpers
+        window._sbTestChecklist = function (id) {
+            var el = document.getElementById('t-' + id);
+            if (el) el.className = 'done';
+        };
+
+        // Detect Shadow DOM
+        setTimeout(function () {
+            var root = document.getElementById('supreme-boost-root');
+            if (root && root.shadowRoot) window._sbTestChecklist('shadow');
+            if (root) window._sbTestChecklist('widget');
+        }, 3000);
+
+        // Monitor brain phase indicators
+        var phaseObserver = new MutationObserver(function () {
+            var root = document.getElementById('supreme-boost-root');
+            if (!root) return;
+            if (root.classList.contains('sb-brain-groq') || root.classList.contains('sb-brain-cohere') || root.classList.contains('sb-brain-gemini')) {
+                window._sbTestChecklist('phase');
+            }
+            if (getComputedStyle(root).contain === 'layout paint style') {
+                window._sbTestChecklist('layout');
+            }
+        });
+
+        // SafetyShield detection
+        var shieldObserver = new MutationObserver(function () {
+            var root = document.getElementById('supreme-boost-root');
+            if (!root || !root.shadowRoot) return;
+            var confirm = root.shadowRoot.querySelector('.sb-confirm-overlay');
+            if (confirm) window._sbTestChecklist('shield');
+        });
+
+        // Whisper detection
+        var whisperObserver = new MutationObserver(function () {
+            var root = document.getElementById('supreme-boost-root');
+            if (!root || !root.shadowRoot) return;
+            var w = root.shadowRoot.querySelector('.sb-whisper');
+            if (w && w.style.opacity === '1') window._sbTestChecklist('whisper');
+        });
+
+        setTimeout(function () {
+            var root = document.getElementById('supreme-boost-root');
+            if (root) {
+                phaseObserver.observe(root, { attributes: true, attributeFilter: ['class', 'style'] });
+                shieldObserver.observe(root, { childList: true, subtree: true });
+                // For shadow DOM mutations, observe the shadow root
+                if (root.shadowRoot) {
+                    whisperObserver.observe(root.shadowRoot, { attributes: true, attributeFilter: ['style'] });
+                }
+            }
+        }, 4000);
+
+        console.log('%c\uD83E\uDDE0 Universal AI v6.1 — Omni-Industry Adaptation', 'font-size:16px;font-weight:bold;color:#6366f1');
+        console.log('\u2022 Shadow DOM isolation for CSS immunity');
+        console.log('\u2022 Zero-shot industry detection via siteDNA');
+        console.log('\u2022 9 universal safety principles');
+        console.log('\u2022 Dynamic persona per industry');
+        console.log('\u2022 Agnostic friction detection (no hardcoded classes)');
+
+        // InlineShelf detection
+        var shelfObserver = new MutationObserver(function () {
+            var el = document.querySelector('.sb-shelf');
+            if (el && el.style.transform === 'translateY(0px)') window._sbTestChecklist('shelf');
+        });
+        setTimeout(function () {
+            shelfObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
+        }, 4000);
+    </script>
+</body>
+</html>

@@ -1,33 +1,36 @@
-# Supreme AI Widget - Embed Code
+# INDICATOR WEB CHAT Widget - Embed Code
 
-> **Copy this code and paste it into your website's HTML to add Supreme AI chat widget**
+> **Copy this code and paste it into your website's HTML to add INDICATOR WEB CHAT chat widget**
+> **This widget works on ANY website, anywhere in the world!**
 
 ---
 
-## Basic (Copy & Paste)
+## ⚡ Quick Setup (Most Reliable)
 
 ```html
-<script src="https://YOUR-VERCEL-DOMAIN.vercel.app/supreme-boost/boost.js"
+<script src="https://test-mu-cyan-21.vercel.app/supreme-boost/boost.js"
         data-shop-prompt="ร้านนี้ชื่อ My Shop"
-        defer>
+        async>
 </script>
 ```
 
 **Replace `YOUR-VERCEL-DOMAIN` with your actual Vercel domain**
 
+> **Pro tip:** Use `async` instead of `defer` for faster and more reliable loading!
+
 ---
 
-## Full Featured
+## Full Featured Version
 
 ```html
-<script src="https://YOUR-VERCEL-DOMAIN.vercel.app/supreme-boost/boost.js"
+<script src="https://test-mu-cyan-21.vercel.app/supreme-boost/boost.js"
         data-lang="auto"
         data-title="Customer AI Support"
-        data-shop-prompt="ร้านนี้ชื่อ Supreme Shop ขายเสื้อผ้าวัยรุ่น มีโปรโมชันส่งฟรีเมื่อซื้อครบ 1000 บาท"
+        data-shop-prompt="ร้านนี้ชื่อ INDICATOR Shop ขายเสื้อผ้าวัยรุ่น มีโปรโมชันส่งฟรีเมื่อซื้อครบ 1000 บาท"
         data-primary="#2563eb"
         data-position="right"
         data-open="false"
-        defer>
+        async>
 </script>
 ```
 
@@ -40,35 +43,57 @@
 | `data-shop-prompt` | `"ร้านนี้ชื่อ..."` | **Required**: Shop info for AI context |
 | `data-lang` | `"auto"` | Language: auto/th/en/zh/ja |
 | `data-title` | `"Customer Support"` | Widget header title |
-| `data-primary` | `"#2563eb"` | Primary color |
+| `data-primary` | `"#2563eb"` | Primary color (any CSS color) |
 | `data-position` | `"right"` | Position: left/right |
 | `data-open` | `"false"` | Open on page load: true/false |
 | `data-greeting` | `"Hi there!"` | Custom greeting message |
+| `data-backend-url` | `"https://..."` | Custom API endpoint (optional) |
 
 ---
 
-## Where to Paste
+## 📍 Where to Paste This Code
 
-You can paste the `<script>` tag **anywhere** inside your HTML. Usually, people put it right before the closing `</body>` tag or in the `<head>` tag.
+The widget works **anywhere** - it doesn't matter where you put the script! Here are the best locations:
 
+### Option 1: Before closing `</body>` (RECOMMENDED)
 ```html
 <!DOCTYPE html>
 <html>
 <head>
     <title>My Website</title>
-    <!-- You can place it here in the head -->
-    <script src="https://YOUR-VERCEL-DOMAIN.vercel.app/supreme-boost/boost.js"
-            data-shop-prompt="..."
-            defer>
-    </script>
 </head>
 <body>
-    <!-- Your website content -->
+    <!-- Your website content here -->
     
-    <!-- Or place it here anywhere in the body -->
-    <!-- <script src="https://YOUR-VERCEL-DOMAIN.vercel.app/supreme-boost/boost.js" ... defer></script> -->
+    <!-- Add INDICATOR WEB CHAT Widget at the bottom -->
+    <script src="https://test-mu-cyan-21.vercel.app/supreme-boost/boost.js"
+            data-shop-prompt="ร้านนี้ชื่อ My Shop"
+            async>
+    </script>
 </body>
 </html>
+```
+
+### Option 2: In the `<head>` section
+```html
+<head>
+    <title>My Website</title>
+    <script src="https://test-mu-cyan-21.vercel.app/supreme-boost/boost.js"
+            data-shop-prompt="ร้านนี้ชื่อ My Shop"
+            async>
+    </script>
+</head>
+```
+
+### Option 3: With other scripts
+You can paste it anywhere among your other scripts - it won't interfere:
+```html
+<script src="https://other-vendor.com/analytics.js"></script>
+<script src="https://test-mu-cyan-21.vercel.app/supreme-boost/boost.js"
+        data-shop-prompt="ร้านนี้ชื่อ My Shop"
+        async>
+</script>
+<script src="https://other-vendor.com/ads.js"></script>
 ```
 
 ---
@@ -77,10 +102,11 @@ You can paste the `<script>` tag **anywhere** inside your HTML. Usually, people 
 
 ✅ Appears as a chat button in the bottom-right corner  
 ✅ Reads your page content to answer questions  
-✅ Supports multiple languages  
-✅ Allows text resizing and dark mode  
+✅ Supports multiple languages (Thai, English, Chinese, Japanese)
+✅ Allows text resizing and dark mode toggle
 ✅ Falls back to page content if AI is unavailable  
-✅ 100% customizable appearance  
+✅ Fully customizable appearance and behavior
+✅ **Works on ANY website** - Shopify, WordPress, custom HTML, etc.
 
 ---
 

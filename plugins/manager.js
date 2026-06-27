@@ -2,7 +2,7 @@ import { init as initDarkMode } from "./darkmode.js";
 import { init as initChat } from "./chat.js";
 
 export function loadPlugins(app, apiKey = "", shopPrompt = "", backendUrl = "") {
-    console.log("Plugin Manager: กำลังเปิดใช้งานปลั๊กอิน Supreme Boost...");
+    console.log("Plugin Manager: กำลังเปิดใช้งานปลั๊กอิน INDICATOR WEB CHAT...");
 
     try {
         initDarkMode(app);

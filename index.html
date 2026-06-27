@@ -3,110 +3,401 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Supreme Boost Demo</title>
+    <title>INDICATOR WEB CHAT - The Intelligent Matrix for Websites</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="icon" type="image/svg+xml" href="/icon.svg">
+    <link rel="apple-touch-icon" href="/icon.svg">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: { primary: '#06b6d4', secondary: '#3b82f6', dark: '#0f172a' }
+                }
+            }
+        }
+    </script>
     <style>
-        :root {
-            color-scheme: light;
-            font-family: Arial, "Noto Sans Thai", sans-serif;
-            color: #0f172a;
-            background: #f8fafc;
+        body { background: #0f172a; color: white; overflow-x: hidden; }
+        .glass-nav {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            min-height: 100vh;
-            background: #f8fafc;
+        .hero-glow {
+            position: absolute;
+            top: -10%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80vw;
+            height: 50vh;
+            background: radial-gradient(circle, rgba(6,182,212,0.15) 0%, rgba(15,23,42,0) 70%);
+            z-index: -1;
         }
-        main {
-            width: min(960px, calc(100% - 32px));
-            margin: 0 auto;
-            padding: 40px 0 96px;
+        .feature-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s ease;
         }
-        .hero {
-            display: grid;
-            gap: 18px;
-            padding: 32px 0;
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(6,182,212,0.4);
+            box-shadow: 0 10px 30px rgba(6,182,212,0.1);
         }
-        h1 {
-            margin: 0;
-            color: #0f172a;
-            font-size: clamp(32px, 6vw, 56px);
-            line-height: 1.08;
-            letter-spacing: 0;
+        .pricing-card {
+            background: linear-gradient(180deg, rgba(30,41,59,0.8) 0%, rgba(15,23,42,0.9) 100%);
+            border: 1px solid rgba(255,255,255,0.1);
         }
-        p {
-            max-width: 680px;
-            margin: 0;
-            color: #475569;
-            font-size: 18px;
-            line-height: 1.7;
+        .pricing-card.popular {
+            border-color: #06b6d4;
+            box-shadow: 0 0 40px rgba(6,182,212,0.15);
+            position: relative;
         }
-        code {
-            display: block;
-            overflow-x: auto;
-            padding: 14px;
-            border: 1px solid #dbe3ef;
-            border-radius: 8px;
-            background: #ffffff;
-            color: #0f172a;
-            font-size: 14px;
-            line-height: 1.6;
-            white-space: nowrap;
+        .badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(90deg, #06b6d4, #3b82f6);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
         }
-        .products {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 14px;
-            margin-top: 26px;
-        }
-        .product {
-            border: 1px solid #dbe3ef;
-            border-radius: 8px;
-            background: #ffffff;
-            padding: 18px;
-        }
-        .product h2 {
-            margin: 0 0 8px;
-            font-size: 18px;
-            line-height: 1.3;
-        }
-        .product p {
-            font-size: 15px;
-            line-height: 1.6;
-        }
-        @media (max-width: 720px) {
-            main { padding-top: 24px; }
-            .products { grid-template-columns: 1fr; }
+        .gradient-text {
+            background: linear-gradient(90deg, #22d3ee, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
     </style>
 </head>
-<body>
-    <main>
-        <section class="hero">
-            <h1>Supreme Boost Demo</h1>
-            <p>หน้านี้คือตัวอย่างร้านค้าที่ฝังแชท AI ด้วยสคริปต์บรรทัดเดียว วางตรงไหนก็ได้ของเว็บ ระบบจะอ่านข้อมูลบนหน้าเว็บ ตอบคำถามลูกค้า และปรับธีมหน้าเว็บตามคำขอได้</p>
-            <code>&lt;script src="https://YOUR-VERCEL-DOMAIN.vercel.app/supreme-boost/boost.js"<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data-shop-prompt="ร้านนี้ชื่อ Supreme Shop มีโปรส่งฟรีเมื่อซื้อครบ 1000 บาท"<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;defer&gt;&lt;/script&gt;</code>
-            <p style="font-size: 14px; color: #666; margin-top: 16px;">
-                <strong>หมายเหตุ:</strong> แทน <code style="background: #f0f0f0; padding: 2px 4px;">YOUR-VERCEL-DOMAIN</code> ด้วย domain ของคุณบน Vercel เช่น <code style="background: #f0f0f0; padding: 2px 4px;">supreme-boost-prod.vercel.app</code>
+<body class="antialiased selection:bg-cyan-500 selection:text-white">
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 glass-nav">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <div class="flex items-center space-x-2 cursor-pointer">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+                        <i class="fa-solid fa-bolt text-white text-xl"></i>
+                    </div>
+                    <span class="text-xl font-bold tracking-wider">INDICATOR <span class="text-cyan-400">WEB CHAT</span></span>
+                </div>
+                <div class="hidden md:flex space-x-8 text-sm font-medium text-slate-300">
+                    <a href="#features" class="hover:text-white transition">ฟีเจอร์</a>
+                    <a href="#pricing" class="hover:text-white transition">ราคา</a>
+                    <a href="#faq" class="hover:text-white transition">FAQ</a>
+                    <a href="/login" class="hover:text-cyan-400 transition text-cyan-400">เข้าสู่ระบบ</a>
+                </div>
+                <div class="hidden md:block">
+                    <a href="/register" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-6 py-2.5 rounded-full font-semibold shadow-lg shadow-cyan-500/30 transition transform hover:scale-105">
+                        ทดลองใช้ฟรี
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+        <div class="hero-glow"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
+            <div class="inline-flex items-center space-x-2 bg-slate-800/50 border border-slate-700 rounded-full px-4 py-1.5 mb-8">
+                <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                <span class="text-xs font-medium text-slate-300">INDICATOR Matrix v7.5 is now Live</span>
+            </div>
+            <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight mb-8">
+                The Intelligent Matrix<br />
+                <span class="gradient-text">For Your Website.</span>
+            </h1>
+            <p class="mt-4 text-xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed">
+                เปลี่ยนหน้าเว็บไซต์ธรรมดาให้กลายเป็นแพลตฟอร์มอัจฉริยะด้วย AI ขั้นสูง<br class="hidden md:block"> มาพร้อมระบบ Telekinesis วาร์ปข้ามหน้า และแสงลมหายใจสุดล้ำ 
             </p>
-        </section>
+            <div class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6">
+                <a href="#pricing" class="w-full sm:w-auto px-8 py-4 rounded-xl text-lg font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:scale-105 transition transform shadow-xl shadow-cyan-500/25">
+                    เลือกแพ็กเกจ
+                </a>
+                <a href="https://test-mu-cyan-21.vercel.app/test-widget-locally.html" class="w-full sm:w-auto px-8 py-4 rounded-xl text-lg font-bold bg-slate-800 text-white border border-slate-700 hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-play mr-2"></i> ดูตัวอย่าง
+                </a>
+            </div>
+        </div>
+    </section>
 
-        <section class="products" aria-label="สินค้าในร้าน">
-            <article class="product">
-                <h2>เสื้อยืด Cotton 100%</h2>
-                <p>ราคา 299 บาท ใส่นุ่ม ระบายอากาศดี เหมาะกับทุกวัน</p>
-            </article>
-            <article class="product">
-                <h2>กางเกงขาสั้น</h2>
-                <p>ราคา 450 บาท ทรงสบาย มีกระเป๋าข้าง ใช้ได้ทั้งอยู่บ้านและออกไปข้างนอก</p>
-            </article>
-            <article class="product">
-                <h2>หมวกแก๊ป Supreme</h2>
-                <p>ราคา 590 บาท ปรับสายได้ มีสีดำและสีกรมท่า</p>
-            </article>
-        </section>
-    </main>
+    <!-- Features -->
+    <section id="features" class="py-24 bg-slate-900/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">ฟีเจอร์ล้ำยุค ระดับ God-Tier</h2>
+                <p class="text-slate-400">เหนือกว่าทุก AI ที่เคยมีมา ด้วยสคริปต์เพียงบรรทัดเดียว</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="feature-card p-8 rounded-2xl">
+                    <div class="w-12 h-12 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-meteor text-cyan-400 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Telekinesis Warp</h3>
+                    <p class="text-slate-400 leading-relaxed">ระบบอ่านใจและพาผู้ใช้วาร์ปข้ามหน้าเว็บไปยังหาสินค้าหรือหน้าที่ต้องการได้ทันทีแบบไม่ต้องกดหาเอง</p>
+                </div>
+                <div class="feature-card p-8 rounded-2xl">
+                    <div class="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-wave-square text-blue-400 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Edge Breathing Glow</h3>
+                    <p class="text-slate-400 leading-relaxed">เอฟเฟกต์แสงออร่าล้อมรอบขอบหน้าจอขณะที่ AI กำลังประมวลผล ให้ความรู้สึกสัมผัสแห่งอนาคต</p>
+                </div>
+                <div class="feature-card p-8 rounded-2xl">
+                    <div class="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-shield-halved text-purple-400 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">SaaS Control Matrix</h3>
+                    <p class="text-slate-400 leading-relaxed">ระบบจัดการหลังบ้านครบวงจร เปิด/ปิดลูกค้า เติมเงิน และจัดการความรู้ AI ได้ในหน้าเดียว (Master Control)</p>
+                </div>
+            </div>
+        </div>
+    </section>
 
-    <script src="/supreme-boost/boost.js" data-backend-url="/api/chat" data-lang="auto" data-shop-prompt="ร้านนี้ชื่อ Supreme Shop ขายเสื้อผ้าวัยรุ่น มีโปรโมชันส่งฟรีเมื่อซื้อครบ 1000 บาท" defer></script>
+    <!-- Pricing -->
+    <section id="pricing" class="py-24 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">แพ็กเกจการลงทุน</h2>
+                <p class="text-slate-400">เลือกแพ็กเกจที่เหมาะสมกับการเติบโตของธุรกิจคุณ</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                <!-- Starter -->
+                <div class="pricing-card p-8 rounded-3xl flex flex-col">
+                    <h3 class="text-xl font-semibold text-slate-300 mb-2">Starter</h3>
+                    <div class="text-4xl font-bold mb-6">฿990<span class="text-lg text-slate-500 font-normal">/เดือน</span></div>
+                    <p class="text-slate-400 mb-8 text-sm">เหมาะสำหรับเว็บไซต์ขนาดเล็กที่ต้องการผู้ช่วยตอบคำถาม</p>
+                    <ul class="space-y-4 mb-8 flex-1">
+                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> AI แชทตอบคำถาม 1,000 ข้อความ/เดือน</li>
+                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> เรียนรู้ข้อมูลเว็บอัตโนมัติ</li>
+                        <li class="flex items-center text-slate-500 text-sm"><i class="fa-solid fa-xmark mr-3"></i> ไม่มีระบบ Telekinesis Warp</li>
+                    </ul>
+                    <button onclick="openCheckout('Starter', 990)" class="w-full py-3 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition border border-slate-700">เริ่มต้นใช้งาน</button>
+                </div>
+
+                <!-- Pro -->
+                <div class="pricing-card popular p-8 rounded-3xl flex flex-col">
+                    <div class="badge">ยอดนิยม</div>
+                    <h3 class="text-xl font-semibold text-cyan-400 mb-2">Pro Matrix</h3>
+                    <div class="text-4xl font-bold mb-6 text-white">฿2,490<span class="text-lg text-slate-400 font-normal">/เดือน</span></div>
+                    <p class="text-slate-300 mb-8 text-sm">ปลดล็อกพลัง Sci-Fi เต็มรูปแบบ ดึงดูดลูกค้าขั้นสุด</p>
+                    <ul class="space-y-4 mb-8 flex-1">
+                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> AI แชท 10,000 ข้อความ/เดือน</li>
+                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ระบบ Edge Breathing Glow</li>
+                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ระบบ Telekinesis Warp</li>
+                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> รองรับ 2 ภาษาหลัก (TH/EN)</li>
+                    </ul>
+                    <button onclick="openCheckout('Pro', 2490)" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:scale-105 transition shadow-lg shadow-cyan-500/25 font-bold">เลือกแพ็กเกจนี้</button>
+                </div>
+
+                <!-- Enterprise -->
+                <div class="pricing-card p-8 rounded-3xl flex flex-col">
+                    <h3 class="text-xl font-semibold text-slate-300 mb-2">Enterprise</h3>
+                    <div class="text-4xl font-bold mb-6">ติดต่อเรา</div>
+                    <p class="text-slate-400 mb-8 text-sm">สำหรับองค์กรที่ต้องการปรับแต่ง AI และไม่จำกัดข้อความ</p>
+                    <ul class="space-y-4 mb-8 flex-1">
+                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ไม่จำกัดข้อความ/เดือน</li>
+                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ป้อนข้อมูล Knowledge Base (RAG) ขั้นสูง</li>
+                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> Custom Widget Design</li>
+                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> SLA Support 24/7</li>
+                    </ul>
+                    <button onclick="openCheckout('Enterprise', 0)" class="w-full py-3 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition border border-slate-700">ติดต่อทีมขาย</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-900 py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center md:text-left flex flex-col md:flex-row justify-between items-center">
+            <div class="mb-4 md:mb-0">
+                <span class="text-lg font-bold tracking-wider">INDICATOR <span class="text-cyan-400">WEB CHAT</span></span>
+                <p class="text-sm text-slate-500 mt-2">&copy; 2026 INDICATOR Matrix Inc. All rights reserved.</p>
+            </div>
+            <div class="flex space-x-6 text-slate-400">
+                <a href="#" class="hover:text-cyan-400 transition"><i class="fa-brands fa-twitter text-xl"></i></a>
+                <a href="#" class="hover:text-cyan-400 transition"><i class="fa-brands fa-github text-xl"></i></a>
+                <a href="#" class="hover:text-cyan-400 transition"><i class="fa-brands fa-discord text-xl"></i></a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Try INDICATOR WEB CHAT Widget on its own landing page! -->
+    <script src="/supreme-boost/boost.js" data-backend-url="/api/chat" data-lang="auto" data-shop-prompt="นี่คือหน้าเว็บขายโปรแกรม INDICATOR WEB CHAT ระบบ AI อัจฉริยะระดับ God-Tier สำหรับธุรกิจ มีแพ็กเกจ Starter (990), Pro (2490) และ Enterprise แนะนำผู้ใช้ให้สมัคร Pro เพราะคุ้มค่าที่สุด มีฟีเจอร์ Telekinesis Warp และ Edge Glow" defer></script>
+
+    <!-- Checkout Modal -->
+    <div id="checkout-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onclick="closeCheckout()"></div>
+        <div class="glass-nav border border-slate-700 p-8 rounded-2xl w-full max-w-md relative z-10 max-h-[90vh] overflow-y-auto">
+            <button onclick="closeCheckout()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h2 class="text-2xl font-bold mb-2">สั่งซื้อแพ็กเกจ <span id="checkout-pkg" class="text-cyan-400"></span></h2>
+            <p class="text-slate-400 text-sm mb-6">กรุณาโอนเงินเข้าบัญชีด้านล่างและแนบสลิปเพื่อรับ API Key</p>
+            
+            <div id="payment-methods-container" class="space-y-4 mb-6">
+                <!-- Injected via JS -->
+                <div class="text-center text-slate-500 py-4"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดช่องทางชำระเงิน...</div>
+            </div>
+
+            <form id="checkout-form" class="space-y-4">
+                <input type="hidden" id="pkgType">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">ชื่อร้านค้า / บริษัท (ภาษาอังกฤษ)</label>
+                    <input type="text" id="coName" placeholder="e.g. Supreme Shop" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-cyan-400 focus:outline-none" required>
+                </div>
+                <div id="email-group">
+                    <label class="block text-sm font-medium text-slate-300 mb-1">อีเมลติดต่อ</label>
+                    <input type="email" id="coEmail" placeholder="admin@example.com" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-cyan-400 focus:outline-none" required>
+                </div>
+                <div id="slip-group">
+                    <label class="block text-sm font-medium text-slate-300 mb-1 flex justify-between">
+                        <span>แนบรูปสลิปโอนเงิน</span>
+                        <span id="ai-verify-badge" class="hidden text-xs bg-cyan-500/20 text-cyan-400 px-2 rounded-full border border-cyan-500/30">AI Verification</span>
+                    </label>
+                    <input type="file" id="slipFile" accept="image/*" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-cyan-600 file:text-white cursor-pointer" required>
+                </div>
+                <button type="submit" id="btn-submit" class="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl hover:scale-105 transition mt-4">
+                    ส่งข้อมูล
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="success-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-slate-900/90 backdrop-blur-md"></div>
+        <div class="text-center relative z-10 max-w-lg p-6">
+            <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fa-solid fa-check text-4xl text-green-400"></i>
+            </div>
+            <h2 class="text-3xl font-bold mb-4">ส่งคำขอสำเร็จ!</h2>
+            <p class="text-slate-300 text-lg mb-8">เราได้รับสลิปของคุณแล้ว<br>แอดมินจะตรวจสอบและส่ง <b>API Key</b> ไปให้ทางอีเมลภายใน 15 นาที</p>
+            <button onclick="document.getElementById('success-modal').classList.add('hidden')" class="px-8 py-3 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition">กลับสู่หน้าหลัก</button>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'manual';
+
+        async function openCheckout(pkgName, amount) {
+            document.getElementById('checkout-pkg').innerText = pkgName;
+            document.getElementById('pkgType').value = pkgName;
+            document.getElementById('checkout-modal').classList.remove('hidden');
+            
+            // Fetch payment methods
+            try {
+                const res = await fetch('/api/checkout');
+                const data = await res.json();
+                currentMode = data.paymentMode || 'manual';
+                const container = document.getElementById('payment-methods-container');
+                const slipGroup = document.getElementById('slip-group');
+                const btn = document.getElementById('btn-submit');
+                const aiBadge = document.getElementById('ai-verify-badge');
+
+                if (currentMode === 'stripe') {
+                    container.innerHTML = '<div class="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-center"><i class="fa-brands fa-stripe text-3xl text-blue-400 mb-2"></i><p class="text-sm text-slate-300">รองรับบัตรเครดิตและพร้อมเพย์ (ชำระเงินอัตโนมัติ)</p></div>';
+                    slipGroup.classList.add('hidden');
+                    document.getElementById('slipFile').required = false;
+                    btn.innerText = 'ดำเนินการชำระเงิน (Stripe)';
+                } else {
+                    slipGroup.classList.remove('hidden');
+                    document.getElementById('slipFile').required = true;
+                    if (currentMode === 'slipok') {
+                        aiBadge.classList.remove('hidden');
+                        btn.innerText = 'อัปโหลดสลิป & ตรวจสอบ AI';
+                    } else {
+                        aiBadge.classList.add('hidden');
+                        btn.innerText = 'ส่งสลิปและรอรับ API Key';
+                    }
+
+                    if (data.paymentMethods && data.paymentMethods.length > 0) {
+                        container.innerHTML = data.paymentMethods.map(m => `
+                            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between">
+                                <div>
+                                    <div class="font-bold text-white">${m.bank_name}</div>
+                                    <div class="text-cyan-400 font-mono text-lg">${m.account_number}</div>
+                                    <div class="text-sm text-slate-400">${m.account_name}</div>
+                                </div>
+                                ${m.qr_base64 ? `<img src="${m.qr_base64}" class="w-16 h-16 rounded border border-slate-600">` : ''}
+                            </div>
+                        `).join('');
+                    } else {
+                        container.innerHTML = '<div class="text-red-400 text-sm">ยังไม่มีช่องทางชำระเงิน กรุณาติดต่อแอดมิน</div>';
+                    }
+                }
+            } catch (err) {
+                document.getElementById('payment-methods-container').innerHTML = '<div class="text-red-400 text-sm">โหลดข้อมูลช่องทางชำระเงินล้มเหลว</div>';
+            }
+        }
+
+        function closeCheckout() {
+            document.getElementById('checkout-modal').classList.add('hidden');
+        }
+
+        document.getElementById('checkout-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-submit');
+            btn.innerText = 'กำลังส่งข้อมูล...';
+            btn.disabled = true;
+
+            const payload = {
+                companyName: document.getElementById('coName').value,
+                email: document.getElementById('coEmail').value,
+                packageType: document.getElementById('pkgType').value
+            };
+
+            const submitData = async () => {
+                try {
+                    const res = await fetch('/api/checkout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json();
+                    
+                    if (res.ok) {
+                        if (data.redirectUrl) {
+                            window.location.href = data.redirectUrl;
+                            return;
+                        }
+                        closeCheckout();
+                        if (data.autoApproved) {
+                            document.querySelector('#success-modal h2').innerText = 'ตรวจสอบสำเร็จ!';
+                            document.querySelector('#success-modal p').innerHTML = `AI ตรวจสอบสลิปถูกต้อง<br><b>API Key ของคุณคือ:</b><br><code class="bg-slate-800 p-2 mt-2 block rounded">${data.apiKey}</code>`;
+                        }
+                        document.getElementById('success-modal').classList.remove('hidden');
+                    } else {
+                        alert('เกิดข้อผิดพลาด: ' + (data.error || ''));
+                    }
+                } catch (err) {
+                    alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+                }
+                btn.innerText = 'ทำรายการต่อ';
+                btn.disabled = false;
+            };
+
+            if (currentMode !== 'stripe') {
+                const file = document.getElementById('slipFile').files[0];
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => {
+                    payload.slipBase64 = reader.result;
+                    submitData();
+                };
+            } else {
+                submitData();
+            }
+        });
+    </script>
 </body>
 </html>

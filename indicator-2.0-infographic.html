@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INDICATOR 2.0: The Revenue Intelligence Engine</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            cyan: '#0891b2',
+                            darkCyan: '#0e7490',
+                            slate: '#1e293b',
+                            light: '#f8fafc',
+                            white: '#ffffff'
+                        }
+                    },
+                    fontFamily: {
+                        prompt: ['Prompt', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts: Prompt -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #f1f5f9;
+            color: #1e293b;
+            scroll-behavior: smooth;
+        }
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+        }
+        .glass-dark {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        .chart-container {
+            position: relative;
+            margin: auto;
+            max-width: 100%;
+            height: 350px;
+        }
+        
+        /* CSS Step Flow */
+        .step-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            position: relative;
+        }
+        @media (min-width: 768px) {
+            .step-container {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: stretch;
+            }
+            .step-container::before {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 0;
+                width: 100%;
+                height: 4px;
+                background: #cbd5e1;
+                z-index: 0;
+                transform: translateY(-50%);
+            }
+        }
+        .step-item {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            text-align: center;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            background: white;
+            border: 2px solid #0891b2;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .step-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border-color: #0e7490;
+        }
+        .step-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 4rem;
+            height: 4rem;
+            background: #0891b2;
+            color: white;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            border: 4px solid white;
+            box-shadow: 0 0 0 2px #0891b2;
+        }
+        
+        /* Heatmap Mockup */
+        .heatmap-mockup {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background: #f8fafc;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            border: 1px solid #cbd5e1;
+        }
+        .heatmap-overlay {
+            position: absolute;
+            top: 40%;
+            left: 70%;
+            width: 180px;
+            height: 180px;
+            background: radial-gradient(circle, rgba(239,68,68,0.85) 0%, rgba(245,158,11,0.6) 40%, rgba(252,211,77,0.2) 70%, transparent 100%);
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        .heatmap-button {
+            position: absolute;
+            top: 40%;
+            left: 70%;
+            transform: translate(-50%, -50%);
+            background: #0891b2;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: bold;
+            z-index: 10;
+            box-shadow: 0 0 20px rgba(8, 145, 178, 0.6);
+            transition: transform 0.2s;
+        }
+        .heatmap-button:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+        }
+        
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.8; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.8; }
+        }
+        
+        .fade-in {
+            animation: fadeIn 1s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Custom UI */
+        .gradient-text {
+            background: linear-gradient(90deg, #0891b2, #0e7490, #1e293b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="antialiased text-brand-slate">
+
+    <!-- Header / Navbar -->
+    <nav class="fixed w-full z-50 glassmorphism border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex-shrink-0 flex items-center font-bold text-2xl tracking-tight text-brand-slate">
+                    <i class="fa-solid fa-chart-line text-brand-cyan mr-3"></i> INDICATOR <span class="text-brand-cyan ml-1">2.0</span>
+                </div>
+                <div>
+                    <a href="#roi" class="bg-brand-cyan hover:bg-brand-darkCyan text-white px-6 py-2 rounded-full font-medium transition shadow-md">ดูผลลัพธ์ ROI</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Section 1: Hero Visual -->
+    <section class="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center fade-in">
+        <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 leading-tight">
+            เปลี่ยนแชทบอทให้เป็น<br/>
+            <span class="gradient-text">Revenue Intelligence Engine</span>
+        </h1>
+        <p class="mt-4 max-w-3xl text-lg md:text-xl text-gray-500 mx-auto mb-12">
+            ไม่ใช่แค่ AI ที่ตอบคำถาม แต่คือสมองกลที่วิเคราะห์พฤติกรรม คาดเดาความต้องการ และขับเคลื่อนยอดขายแบบเรียลไทม์ พร้อมการติดตั้งที่ง่ายดายใน 1 วัน
+        </p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <div class="glassmorphism p-8 rounded-2xl text-center border border-gray-200 transform transition hover:-translate-y-2">
+                <div class="text-brand-cyan text-5xl mb-4"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                <div class="text-4xl font-bold text-brand-slate mb-2">+30%</div>
+                <div class="text-gray-500 font-medium">Conversion Rate สูงขึ้น</div>
+            </div>
+            <div class="glassmorphism p-8 rounded-2xl text-center border border-gray-200 transform transition hover:-translate-y-2">
+                <div class="text-brand-cyan text-5xl mb-4"><i class="fa-solid fa-user-clock"></i></div>
+                <div class="text-4xl font-bold text-brand-slate mb-2">-50%</div>
+                <div class="text-gray-500 font-medium">ภาระงานของ Admin ลดลง</div>
+            </div>
+            <div class="glassmorphism p-8 rounded-2xl text-center border border-gray-200 transform transition hover:-translate-y-2">
+                <div class="text-brand-cyan text-5xl mb-4"><i class="fa-solid fa-rocket"></i></div>
+                <div class="text-4xl font-bold text-brand-slate mb-2">24x</div>
+                <div class="text-gray-500 font-medium">ประหยัดเวลาพัฒนา (vs เขียนเอง)</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: Predictive Intelligence (Line Chart) -->
+    <section class="py-20 bg-white border-y border-gray-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="fade-in">
+                    <div class="inline-block px-4 py-1.5 bg-brand-cyan bg-opacity-10 text-brand-cyan rounded-full text-sm font-bold tracking-wide mb-4 uppercase">The Brain</div>
+                    <h2 class="text-3xl md:text-4xl font-bold text-brand-slate mb-6">Predictive Intelligence</h2>
+                    <p class="text-gray-600 mb-8 leading-relaxed text-lg">
+                        ด้วยระบบวิเคราะห์อารมณ์และพฤติกรรม (Sentiment & Behavior Tracker) INDICATOR 2.0 สามารถคาดการณ์โอกาสในการสูญเสียลูกค้า (Churn Prediction) และเสนอส่วนลด (Dynamic Voucher) เพื่อดึงดูดลูกค้ากลับมาได้อัตโนมัติ 
+                    </p>
+                    <ul class="space-y-4">
+                        <li class="flex items-start bg-gray-50 p-3 rounded-lg border border-gray-100">
+                            <div class="bg-brand-cyan text-white p-2 rounded-full mr-4 flex-shrink-0">
+                                <i class="fa-solid fa-door-open w-4 h-4 flex items-center justify-center"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-brand-slate">ตรวจจับ Exit Intent</h4>
+                                <span class="text-sm text-gray-500">ตอบสนองทันทีที่ผู้ใช้จะออกจากเว็บ (เมาส์เลื่อนออก)</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start bg-gray-50 p-3 rounded-lg border border-gray-100">
+                            <div class="bg-brand-cyan text-white p-2 rounded-full mr-4 flex-shrink-0">
+                                <i class="fa-solid fa-hourglass-half w-4 h-4 flex items-center justify-center"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-brand-slate">วิเคราะห์ Dwell Time</h4>
+                                <span class="text-sm text-gray-500">ตรวจสอบหากลูกค้านิ่งนานเกินไปที่หน้าชำระเงิน</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <div class="glassmorphism p-6 md:p-8 rounded-2xl shadow-xl border border-gray-200">
+                    <h3 class="text-lg font-bold text-center text-brand-slate mb-6">คาดการณ์การเติบโตของรายได้ (Revenue Projection)</h3>
+                    <div class="chart-container">
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 3: Autonomous UX Evolution -->
+    <section class="py-20 bg-brand-light">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center fade-in">
+            <div class="inline-block px-4 py-1.5 bg-brand-cyan bg-opacity-10 text-brand-cyan rounded-full text-sm font-bold tracking-wide mb-4 uppercase">The Engine</div>
+            <h2 class="text-3xl md:text-4xl font-bold text-brand-slate mb-6">Autonomous UX Evolution</h2>
+            <p class="text-gray-600 max-w-3xl mx-auto mb-12 text-lg">
+                AI สั่งปรับแต่งหน้าเว็บเพื่อช่วยเหลือลูกค้าที่กำลังสับสนแบบเรียลไทม์ (Dynamic Injection) เช่น การ Highlight ปุ่มที่ถูกต้องเมื่อตรวจพบการวนหาข้อมูลซ้ำๆ หรือการแสดง Popup ให้ความช่วยเหลืออัตโนมัติ
+            </p>
+            
+            <div class="max-w-4xl mx-auto glassmorphism p-2 rounded-xl shadow-2xl border border-gray-200">
+                <div class="flex items-center space-x-2 bg-gray-100 p-4 rounded-t-lg border-b border-gray-200">
+                    <div class="w-3.5 h-3.5 rounded-full bg-red-400"></div>
+                    <div class="w-3.5 h-3.5 rounded-full bg-yellow-400"></div>
+                    <div class="w-3.5 h-3.5 rounded-full bg-green-400"></div>
+                    <div class="text-xs text-gray-500 ml-4 font-mono font-medium tracking-wider"><i class="fa-solid fa-lock mr-2"></i>indicator-ai.com/preview</div>
+                </div>
+                <div class="p-8 bg-white rounded-b-lg">
+                    <div class="heatmap-mockup">
+                        <!-- Mockup Web Structure -->
+                        <div class="absolute top-6 left-6 w-40 h-8 bg-gray-200 rounded-md"></div>
+                        <div class="absolute top-6 right-6 flex space-x-4">
+                            <div class="w-16 h-8 bg-gray-100 rounded-md"></div>
+                            <div class="w-16 h-8 bg-gray-100 rounded-md"></div>
+                        </div>
+                        <div class="absolute top-24 left-1/2 transform -translate-x-1/2 w-4/5 h-40 bg-gray-100 rounded-xl border border-gray-200 border-dashed flex items-center justify-center">
+                            <span class="text-gray-400 font-medium">Product Content Area</span>
+                        </div>
+                        <div class="absolute bottom-10 left-8 w-1/3 h-6 bg-gray-200 rounded"></div>
+                        
+                        <!-- Heatmap Overlay -->
+                        <div class="heatmap-overlay"></div>
+                        <button class="heatmap-button">
+                            <i class="fa-solid fa-cart-shopping mr-2"></i> Add to Cart
+                            <div class="absolute -top-14 -right-32 bg-brand-slate text-white text-sm px-4 py-2 rounded-lg shadow-xl font-normal whitespace-nowrap">
+                                <span class="text-brand-cyan font-bold"><i class="fa-solid fa-robot"></i> AI Action:</span> ลูกค้าสับสน<br>เน้นปุ่มสั่งซื้อด้วย CSS Pulse!
+                                <div class="absolute bottom-[-6px] left-8 w-3 h-3 bg-brand-slate transform rotate-45"></div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 4: Technical Architecture -->
+    <section class="py-20 bg-white border-y border-gray-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 fade-in">
+            <div class="text-center mb-16">
+                <div class="inline-block px-4 py-1.5 bg-brand-cyan bg-opacity-10 text-brand-cyan rounded-full text-sm font-bold tracking-wide mb-4 uppercase">Architecture</div>
+                <h2 class="text-3xl md:text-4xl font-bold text-brand-slate mb-6">Multi-Agent AI System</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto text-lg">
+                    ระบบสมองกลอัจฉริยะที่ตรวจสอบกันเอง (Self-Correction) เพื่อป้องกันปัญหาข้อมูลผิดพลาด (Hallucination) โดยทำงานร่วมกันเป็นทีมเพื่อให้ได้คำตอบที่แม่นยำที่สุด
+                </p>
+            </div>
+            
+            <div class="step-container max-w-5xl mx-auto">
+                <!-- Step 1 -->
+                <div class="step-item">
+                    <div class="step-icon"><i class="fa-solid fa-database"></i></div>
+                    <div class="bg-gray-100 text-xs font-bold px-2 py-1 rounded text-gray-500 mb-3 tracking-widest uppercase">Step 01</div>
+                    <h3 class="text-xl font-bold text-brand-slate mb-3">Agent A: Generator</h3>
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        ค้นข้อมูลจาก <b>Vector DB</b> (Pinecone/pgvector) และทำการร่างคำตอบตาม Tone of Voice ของแบรนด์ที่กำหนดไว้
+                    </p>
+                </div>
+                
+                <!-- Step 2 -->
+                <div class="step-item">
+                    <div class="step-icon" style="background-color: #f59e0b; box-shadow: 0 0 0 2px #f59e0b;"><i class="fa-solid fa-clipboard-check"></i></div>
+                    <div class="bg-gray-100 text-xs font-bold px-2 py-1 rounded text-gray-500 mb-3 tracking-widest uppercase">Step 02</div>
+                    <h3 class="text-xl font-bold text-brand-slate mb-3">Agent B: Evaluator</h3>
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        ทำ <b>Fact-check</b> เปรียบเทียบคำตอบกับข้อมูลอ้างอิง ป้องกันการมั่วข้อมูล หากข้อมูลไม่มีในฐานจะสั่งตอบ "I don't know" ทันที
+                    </p>
+                </div>
+                
+                <!-- Step 3 -->
+                <div class="step-item">
+                    <div class="step-icon" style="background-color: #10b981; box-shadow: 0 0 0 2px #10b981;"><i class="fa-solid fa-shield-halved"></i></div>
+                    <div class="bg-gray-100 text-xs font-bold px-2 py-1 rounded text-gray-500 mb-3 tracking-widest uppercase">Step 03</div>
+                    <h3 class="text-xl font-bold text-brand-slate mb-3">Agent C: Safety Filter</h3>
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        กรองเนื้อหาที่ไม่เหมาะสม คำหยาบ และป้องกันการหลุดของข้อมูลส่วนบุคคล (PII) ให้อยู่ในมาตรฐานก่อนส่งออก
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 5: Trust & Compliance -->
+    <section class="py-20 bg-brand-slate text-white relative overflow-hidden">
+        <!-- Background Pattern -->
+        <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#0891b2 1px, transparent 1px); background-size: 30px 30px;"></div>
+        
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+                <div>
+                    <div class="inline-block px-4 py-1.5 bg-white bg-opacity-10 text-white rounded-full text-sm font-bold tracking-wide mb-6 uppercase">The Trust</div>
+                    <h2 class="text-3xl md:text-4xl font-bold mb-6">Enterprise-Grade <br> <span class="text-brand-cyan">Security & Compliance</span></h2>
+                    <p class="text-gray-300 mb-8 text-lg">
+                        สร้างความไว้วางใจให้กับองค์กรด้วยระบบรักษาความปลอดภัยระดับสูงสุด รองรับมาตรฐาน PDPA / GDPR เต็มรูปแบบ
+                    </p>
+                    <div class="space-y-6">
+                        <div class="glass-dark p-6 rounded-xl border-l-4 border-brand-cyan hover:bg-gray-800 transition">
+                            <h4 class="font-bold text-xl text-white mb-2"><i class="fa-solid fa-user-secret text-brand-cyan mr-3"></i>PII Masking Engine</h4>
+                            <p class="text-gray-400">ใช้เทคโนโลยี NLP ตรวจจับและแปลงข้อมูลสำคัญ (บัตรเครดิต, เบอร์โทรศัพท์) เป็นเครื่องหมายดอกจัน (****) ทันทีในระดับ Network Layer ก่อนบันทึก</p>
+                        </div>
+                        <div class="glass-dark p-6 rounded-xl border-l-4 border-brand-cyan hover:bg-gray-800 transition">
+                            <h4 class="font-bold text-xl text-white mb-2"><i class="fa-solid fa-eye text-brand-cyan mr-3"></i>Transparency Dashboard</h4>
+                            <p class="text-gray-400">ลูกค้ามีสิทธิดูข้อมูลที่ AI จัดเก็บ และสามารถกดยกเลิก/ลบข้อมูลของตนเองได้ (Right to be forgotten) ตอบโจทย์กฎหมายแบบ 100%</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative flex justify-center">
+                    <div class="absolute inset-0 bg-brand-cyan opacity-20 blur-[100px] rounded-full transform scale-150"></div>
+                    <div class="glass-dark p-10 rounded-2xl border border-gray-600 text-center w-full max-w-md relative z-10 shadow-2xl">
+                        <div class="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+                            <i class="fa-solid fa-lock text-5xl text-green-500"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4 text-white">100% Data Sovereignty</h3>
+                        <p class="text-gray-400 mb-6">ข้อมูลทั้งหมดถูกเข้ารหัสด้วยมาตรฐาน <span class="text-brand-cyan font-mono">AES-256-GCM</span> และแยกระบบฐานข้อมูลของแต่ละองค์กร (Multi-tenant Isolation) ปลอดภัยไร้รอยรั่ว</p>
+                        <div class="flex justify-center space-x-4 text-3xl text-gray-600">
+                            <i class="fa-brands fa-aws hover:text-white transition"></i>
+                            <i class="fa-solid fa-server hover:text-white transition"></i>
+                            <i class="fa-solid fa-shield-virus hover:text-white transition"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 6: ROI Summary & Integration -->
+    <section id="roi" class="py-24 bg-brand-light border-t border-gray-200">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center fade-in">
+            <div class="inline-block px-4 py-1.5 bg-brand-cyan bg-opacity-10 text-brand-cyan rounded-full text-sm font-bold tracking-wide mb-6 uppercase">Integration</div>
+            <h2 class="text-4xl md:text-5xl font-extrabold text-brand-slate mb-6">AI คือทรัพย์สิน ไม่ใช่รายจ่าย</h2>
+            <p class="text-xl text-gray-600 mb-12">
+                อัปเกรดประสบการณ์ลูกค้า เพิ่มยอดขาย และลดต้นทุนการทำงานด้วย <span class="font-bold text-brand-cyan">1-Line Script Installation</span> พร้อมใช้งานใน 1 วัน
+            </p>
+            
+            <div class="bg-white rounded-2xl shadow-2xl border border-gray-200 mb-12 text-left overflow-hidden transform transition hover:scale-[1.01]">
+                <div class="flex items-center justify-between bg-brand-slate p-4 border-b border-gray-800">
+                    <div class="flex space-x-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    </div>
+                    <span class="text-sm font-mono text-gray-300">Developer Snippet</span>
+                    <button class="text-gray-400 hover:text-white transition" onclick="alert('Code copied!')"><i class="fa-regular fa-copy"></i></button>
+                </div>
+                <div class="p-6 bg-gray-900 text-gray-300 font-mono text-sm overflow-x-auto">
+                    <span class="text-blue-400">&lt;script&gt;</span><br>
+                    &nbsp;&nbsp;<span class="text-white">window</span>.IndicatorConfig = {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="text-green-300">apiKey</span>: <span class="text-yellow-300">"YOUR_ENTERPRISE_API_KEY"</span>,<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="text-green-300">theme</span>: <span class="text-yellow-300">"cyber-calm"</span>,<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="text-green-300">modules</span>: [<span class="text-yellow-300">"chat"</span>, <span class="text-yellow-300">"r9-insight-layer"</span>]<br>
+                    &nbsp;&nbsp;};<br>
+                    <span class="text-blue-400">&lt;/script&gt;</span><br>
+                    <span class="text-blue-400">&lt;script</span> <span class="text-purple-400">async src</span>=<span class="text-yellow-300">"https://cdn.indicator-ai.com/v2/widget.js"</span><span class="text-blue-400">&gt;&lt;/script&gt;</span>
+                </div>
+            </div>
+            
+            <a href="#" class="inline-flex items-center justify-center bg-brand-cyan text-white text-lg font-bold px-10 py-5 rounded-full shadow-lg hover:bg-brand-darkCyan transition transform hover:-translate-y-1 hover:shadow-2xl">
+                เริ่มต้นใช้งาน INDICATOR 2.0 วันนี้ <i class="fa-solid fa-arrow-right ml-3"></i>
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-white py-10 text-center border-t border-gray-200">
+        <div class="flex items-center justify-center font-bold text-xl text-gray-300 mb-4">
+            <i class="fa-solid fa-chart-line mr-2"></i> INDICATOR 2.0
+        </div>
+        <p class="text-gray-500 font-medium text-sm">&copy; 2026 INDICATOR 2.0 - Revenue Intelligence Engine. All rights reserved.</p>
+    </footer>
+
+    <!-- Chart.js Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Label Wrapping Function Logic for Thai
+            const wrapLabel = (text, maxLineLength = 16) => {
+                const words = text.split(' ');
+                const lines = [];
+                let currentLine = '';
+                
+                words.forEach(word => {
+                    // Break line if adding word exceeds length
+                    if (currentLine.length + word.length > maxLineLength) {
+                        if(currentLine) lines.push(currentLine);
+                        currentLine = word;
+                    } else {
+                        currentLine += (currentLine ? ' ' : '') + word;
+                    }
+                });
+                if(currentLine) lines.push(currentLine);
+                return lines;
+            };
+
+            const ctx = document.getElementById('revenueChart').getContext('2d');
+            
+            // Labels
+            const labels = [
+                'เดือนที่ 1', 'เดือนที่ 2', 'เดือนที่ 3', 'เดือนที่ 4', 'เดือนที่ 5', 'เดือนที่ 6'
+            ];
+            
+            // Wrap labels
+            const labelsWrapped = labels.map(l => wrapLabel(l));
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labelsWrapped,
+                    datasets: [
+                        {
+                            label: 'ไม่มี INDICATOR (Baseline)',
+                            data: [100, 105, 110, 112, 115, 118],
+                            borderColor: '#cbd5e1',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.4
+                        },
+                        {
+                            label: 'ใช้ INDICATOR 2.0',
+                            data: [100, 115, 135, 160, 190, 225],
+                            borderColor: '#0891b2',
+                            backgroundColor: 'rgba(8, 145, 178, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#0e7490',
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: { family: 'Prompt', size: 13, weight: '500' },
+                                color: '#1e293b',
+                                usePointStyle: true,
+                                boxWidth: 8
+                            }
+                        },
+                        tooltip: {
+                            titleFont: { family: 'Prompt', size: 14, weight: 'bold' },
+                            bodyFont: { family: 'Prompt', size: 13 },
+                            padding: 12,
+                            backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                            callbacks: {
+                                title: function(tooltipItems) {
+                                    const item = tooltipItems[0];
+                                    // Make sure label is returned correctly handling wrapped arrays
+                                    return Array.isArray(item.label) ? item.label.join(' ') : item.label.replace(/,/g, ' '); 
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: {
+                                color: '#f1f5f9',
+                                drawBorder: false
+                            },
+                            title: {
+                                display: true,
+                                text: 'การเติบโตของรายได้ (%)',
+                                font: { family: 'Prompt', weight: 'bold' },
+                                color: '#64748b'
+                            },
+                            ticks: {
+                                font: { family: 'Prompt' },
+                                color: '#64748b'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false,
+                                drawBorder: false
+                            },
+                            ticks: {
+                                font: { family: 'Prompt' },
+                                color: '#64748b'
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-# Supreme Boost Setup Guide
+# INDICATOR WEB CHAT Setup Guide
 
 ## Quick Start (5 minutes)
 
@@ -30,7 +30,7 @@ npm run dev
 Open the URL shown in terminal (usually `http://127.0.0.1:3000`)
 
 ### 5. Test the Widget
-- You should see the demo page with a Supreme AI chat widget in the bottom-right
+- You should see the demo page with a INDICATOR WEB CHAT chat widget in the bottom-right
 - Ask it questions about the products shown
 - Try: "มีสินค้าอะไรบ้าง" or "What products do you have?"
 
@@ -177,4 +177,4 @@ This project uses:
 - Vercel for hosting
 - Vanilla JavaScript (no dependencies)
 
-Created for Supreme Shop AI assistant integration.
+Created for INDICATOR Shop AI assistant integration.

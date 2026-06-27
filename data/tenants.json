@@ -1,0 +1,29 @@
+[
+  {
+    "id": "tenant_1",
+    "companyName": "Tech Corp (Active)",
+    "apiKey": "CLIENT_A",
+    "status": "active",
+    "packageType": "enterprise",
+    "expiresAt": "2027-12-31T23:59:59Z",
+    "createdAt": "2026-06-20T10:00:00Z"
+  },
+  {
+    "id": "tenant_2",
+    "companyName": "Demo Store (Expired)",
+    "apiKey": "CLIENT_B",
+    "status": "active",
+    "packageType": "basic",
+    "expiresAt": "2026-01-01T00:00:00Z",
+    "createdAt": "2025-01-01T10:00:00Z"
+  },
+  {
+    "id": "tenant_1781935248591",
+    "companyName": "INfinix",
+    "apiKey": "KEY_HW5CBFKFWBP333TT",
+    "status": "active",
+    "packageType": "basic",
+    "expiresAt": "2027-06-20T00:00:00.000Z",
+    "createdAt": "2026-06-20T06:00:48.591Z"
+  }
+]

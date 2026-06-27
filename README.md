@@ -1,4 +1,4 @@
-# Supreme Boost
+# INDICATOR WEB CHAT
 
 โปรเจคนี้เป็นตัวอย่าง widget แชท AI สำหรับเว็บไซต์ โดยใช้สคริปต์ฝังหน้าเว็บเดียวและ backend serverless API เพื่อเชื่อมต่อกับ Gemini API.
 
@@ -30,7 +30,7 @@
 
 ```html
 <script src="https://YOUR-VERCEL-DOMAIN.vercel.app/supreme-boost/boost.js"
-        data-shop-prompt="ร้านนี้ชื่อ Supreme Shop มีโปรส่งฟรีเมื่อซื้อครบ 1000 บาท"
+        data-shop-prompt="ร้านนี้ชื่อ INDICATOR Shop มีโปรส่งฟรีเมื่อซื้อครบ 1000 บาท"
         defer>
 </script>
 ```
@@ -61,7 +61,7 @@ npm run dev
 <script src="https://YOUR-VERCEL-DOMAIN.vercel.app/supreme-boost/boost.js"
         data-lang="auto"
         data-title="Customer AI Support"
-        data-shop-prompt="ร้านนี้ชื่อ Supreme Shop ขายเสื้อผ้าวัยรุ่น มีโปรโมชันส่งฟรีเมื่อซื้อครบ 1000 บาท"
+        data-shop-prompt="ร้านนี้ชื่อ INDICATOR Shop ขายเสื้อผ้าวัยรุ่น มีโปรโมชันส่งฟรีเมื่อซื้อครบ 1000 บาท"
         data-primary="#2563eb"
         data-position="right"
         defer>

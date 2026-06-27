@@ -3,8 +3,40 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "check": "node --check api/chat.js && node --check supreme-boost/boost.js && node --check Node.js",
-    "dev": "node server.js",
-    "start": "node server.js"
-  }
+    "check": "node --check api/chat.js && node --check supreme-boost/boost.js",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "prod": "pm2 start server.js --name supreme-boost --watch --ignore-watch=\"node_modules\"",
+    "stop": "pm2 stop supreme-boost",
+    "restart": "pm2 restart supreme-boost",
+    "logs": "pm2 logs supreme-boost",
+    "status": "pm2 status"
+  },
+  "dependencies": {
+    "@google/genai": "^2.8.0",
+    "@supabase/supabase-js": "^2.108.2",
+    "cheerio": "^1.0.0-rc.12",
+    "docx": "^9.7.1",
+    "dotenv": "^17.4.2",
+    "socket.io": "^4.8.3",
+    "vercel": "^54.13.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "description": "โปรเจคนี้เป็นตัวอย่าง widget แชท AI สำหรับเว็บไซต์ โดยใช้สคริปต์ฝังหน้าเว็บเดียวและ backend serverless API เพื่อเชื่อมต่อกับ Gemini API.",
+  "main": "server.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thanakitphot-beep/supreme-boost.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/thanakitphot-beep/supreme-boost/issues"
+  },
+  "homepage": "https://github.com/thanakitphot-beep/supreme-boost#readme"
 }

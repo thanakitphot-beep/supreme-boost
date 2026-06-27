@@ -1,9 +1,20 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    }
+  "builds": [
+    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "frontend/dist" } },
+    { "src": "api/chat.js", "use": "@vercel/node" },
+    { "src": "api/crawl.js", "use": "@vercel/node" },
+    { "src": "api/admin.js", "use": "@vercel/node" },
+    { "src": "api/settings.js", "use": "@vercel/node" },
+    { "src": "api/logs.js", "use": "@vercel/node" },
+    { "src": "api/auth.js", "use": "@vercel/node" },
+    { "src": "api/knowledge.js", "use": "@vercel/node" },
+    { "src": "supreme-boost/**", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/supreme-boost/(.*)", "dest": "/supreme-boost/$1" },
+    { "src": "/(.*)", "dest": "/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "headers": [
     {
