@@ -78,6 +78,9 @@ function App() {
             <CustomerPortal />
           </ProtectedRoute>
         } />
+        
+        {/* Catch-all route for old HTML paths */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   )
