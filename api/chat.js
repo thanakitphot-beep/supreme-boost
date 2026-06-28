@@ -499,7 +499,23 @@ async function multiAgentPipeline(payload) {
     }
 
     if (!result) {
-        return { status: "silent_abort", reason: "brain3_empty" };
+        // ไม่เคย silent_abort — ส่ง friendly fallback reply ให้ผู้ใช้เสมอ
+        console.warn("[Pipeline] Brain 3 all providers failed. Returning human-friendly fallback.");
+        return {
+            reply: "สวัสดีครับ ✨ มีอะไรให้ผมช่วยได้ไหมครับ? ถามมาได้เลยนะครับ",
+            cssCommand: "",
+            action: null,
+            interactive: {
+                type: "options",
+                message: "ผมช่วยคุณได้หลายอย่างครับ",
+                items: [
+                    { name: "แนะนำสินค้า", description: "ให้ผมช่วยหาสิ่งที่คุณต้องการ" },
+                    { name: "ถามคำถาม", description: "ถามอะไรก็ได้เกี่ยวกับเว็บนี้" },
+                    { name: "ขอความช่วยเหลือ", description: "บอกปัญหาของคุณมาได้เลย" }
+                ]
+            },
+            status: "ok"
+        };
     }
 
     console.log("[DEBUG] Brain 3 Output:", JSON.stringify(result));
@@ -1135,23 +1151,28 @@ function buildAdaptiveResponsePrompt(payload, phase1Result, phase2Result) {
         dna.geoContext ? "GeoContext: " + dna.geoContext : ""
     ].filter(Boolean).join("\n");
     return [
-        'You are "' + (phase1Result.persona || "Helpful Assistant") + '" — an AI persona for the ' + (phase1Result.industry || "this") + ' website.',
-        'Respond with a ' + (phase1Result.tone || "friendly") + ' tone. Be concise and helpful.',
+        'You are "' + (phase1Result.persona || "Helpful Assistant") + '" — a friendly, smart AI assistant embedded on the ' + (phase1Result.industry || "this") + ' website.',
+        'Your tone: ' + (phase1Result.tone || "friendly") + '. Be concise, warm, and genuinely helpful.',
         'CRITICAL: YOU MUST RESPOND IN ' + (payload.locale || "the user's language") + '.',
-        'FLEXIBILITY: You are allowed to answer general questions, chat naturally, and provide creative responses outside of the website context, but maintain your persona.',
+        'ULTRA FLEXIBILITY RULES:',
+        '- You CAN and SHOULD answer ANY general question (math, science, cooking, general advice, weather, jokes, etc.) even if it has nothing to do with the website.',
+        '- If you do not know something specific to the site, use your general knowledge to help.',
+        '- NEVER say "I cannot answer that" or "I only know about this website". Always provide a helpful response.',
+        '- If unsure about site-specific data, acknowledge it briefly and still give a general helpful answer.',
+        '- Never show error messages, API failures, or technical details to the user.',
         dna.geoContext ? "Adapt your context and currency/metrics to the user's GeoContext." : "",
-        "User intent: " + (phase1Result.intent || "unknown"),
-        "Action: " + (phase1Result.actionType || "none"),
+        "User intent: " + (phase1Result.intent || "general_chat"),
+        "Action: " + (phase1Result.actionType || "answer"),
         "Target: " + (phase1Result.targetText || "none"),
         "CRITICAL: If Action is 'warp', you MUST output action.type='warp' and action.targetText=Target. Do NOT set it to null.",
         phase2Result && phase2Result.safe === false ? "⚠️ Safety note: " + (phase2Result.reason || "") : "",
-        phase1Result.industry ? "Industry: " + phase1Result.industry : "",
+        phase1Result.industry ? "Industry context: " + phase1Result.industry : "",
         dnaBlock ? "Structured DNA:\n" + dnaBlock : "",
         payload.ragContext ? "KNOWLEDGE BASE CONTEXT:\nUse these verified facts to answer the user's query comprehensively. If the information answers their question, summarize it naturally. If a fact contains a URL that is DIFFERENT from the current Page URL, you MUST output actionType: 'warp_cross_page' with that url.\n" + payload.ragContext : "",
         SUPER_AI_100_SKILLS,
-        payload.pageContent ? "Page Content:\n" + payload.pageContent : "",
-        "Return ONLY valid JSON: {\"reply\":\"your response (in user's language)\",\"cssCommand\":\"CSS if needed or empty\",\"action\":{\"type\":\"warp|warp_cross_page|highlight|confetti|speech|inject_html|null\",\"targetText\":\"...\",\"url\":\"...\",\"keywords\":[]},\"interactive\":{\"type\":\"carousel|action_slider|options|null\",\"message\":\"...\",\"items\":[{\"name\":\"...\",\"description\":\"...\",\"image\":\"...\"}]}}",
-        "CRITICAL: YOU MUST ALWAYS PROVIDE A 'reply' TEXT. Never leave it empty, even if you are performing an action."
+        payload.pageContent ? "Page Content (for context):\n" + payload.pageContent : "",
+        "Return ONLY valid JSON: {\"reply\":\"your response (in user's language, NEVER empty)\",\"cssCommand\":\"CSS if needed or empty string\",\"action\":{\"type\":\"warp|warp_cross_page|highlight|confetti|speech|inject_html|null\",\"targetText\":\"...\",\"url\":\"...\",\"keywords\":[]},\"interactive\":{\"type\":\"carousel|action_slider|options|null\",\"message\":\"...\",\"items\":[{\"name\":\"...\",\"description\":\"...\",\"image\":\"...\"}]}}",
+        "ABSOLUTELY CRITICAL: The 'reply' field must ALWAYS have meaningful text. Never return an empty reply or an error message visible to the user."
     ].filter(Boolean).join("\n");
 }
 
@@ -1159,21 +1180,22 @@ function buildGroqFallbackPrompt(payload, phase1Result, phase2Result) {
     var persona = phase1Result.persona || "Helpful Assistant";
     var industry = phase1Result.industry || "website";
     return [
-        'You are "' + persona + '" — AI assistant for ' + industry + ' website.',
-        'FLEXIBILITY: You are allowed to answer general questions, chat naturally, and provide creative responses outside of the website context, but maintain your persona.',
-        "User intent: " + (phase1Result.intent || "unknown"),
-        "Suggested action: " + (phase1Result.actionType || "none"),
+        'You are "' + persona + '" — a friendly, knowledgeable AI assistant for ' + industry + ' website.',
+        'ULTRA FLEXIBILITY: Answer ANY question the user asks, even if unrelated to the website. Use your general knowledge freely.',
+        'NEVER show error messages or say you cannot help. Always provide a useful, warm response.',
+        "User intent: " + (phase1Result.intent || "general_chat"),
+        "Suggested action: " + (phase1Result.actionType || "answer"),
         "Target: " + (phase1Result.targetText || "none"),
         "CRITICAL: If Suggested action is 'warp', you MUST output action.type='warp' and action.targetText=Target. Do NOT set it to null.",
         "Safety: " + (phase2Result && phase2Result.safe === false ? "⚠️ " + (phase2Result.reason || "needs confirmation") : "passed"),
-        payload.ragContext ? "KNOWLEDGE BASE CONTEXT:\nUse these verified facts to answer the user's query if relevant:\n" + payload.ragContext : "",
+        payload.ragContext ? "KNOWLEDGE BASE CONTEXT (use if relevant):\n" + payload.ragContext : "",
         SUPER_AI_100_SKILLS,
         payload.title ? "Current page: " + payload.title : "",
         payload.pageContent ? "Page content:\n" + payload.pageContent : "",
         "",
         "Return ONLY valid JSON. No text outside the JSON object:",
         "{",
-        '  "reply": "response text (user\'s language, concise)",',
+        '  "reply": "response text (user\'s language, always non-empty and helpful)",',
         '  "cssCommand": "CSS rule string or empty",',
         '  "action": {',
         '    "type": "warp|warp_cross_page|highlight|confetti|speech|inject_html|null",',
@@ -1191,8 +1213,7 @@ function buildGroqFallbackPrompt(payload, phase1Result, phase2Result) {
         '    "items": [{ "name": "...", "description": "...", "image": "..." }]',
         '  }',
         "}",
-        "RULES: reply in user's language. targetText must come from pageContent. If uncertain, action=null and interactive=null.",
-        "CRITICAL: YOU MUST ALWAYS PROVIDE A 'reply' TEXT. Never leave it empty, even if you are performing an action."
+        "ABSOLUTE RULE: 'reply' must NEVER be empty. If uncertain, give a friendly general answer."
     ].filter(Boolean).join("\n");
 }
 
