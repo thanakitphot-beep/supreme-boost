@@ -90,15 +90,15 @@
                     </div>
                     <span class="text-xl font-bold tracking-wider">INDICATOR <span class="text-cyan-400">WEB CHAT</span></span>
                 </div>
-                <div class="hidden md:flex space-x-8 text-sm font-medium text-slate-300">
+                <div class="hidden md:flex space-x-8 text-sm font-medium text-slate-300" id="nav-links">
                     <a href="#features" class="hover:text-white transition">ฟีเจอร์</a>
                     <a href="#pricing" class="hover:text-white transition">ราคา</a>
                     <a href="#faq" class="hover:text-white transition">FAQ</a>
-                    <a href="/login" class="hover:text-cyan-400 transition text-cyan-400">เข้าสู่ระบบ</a>
+                    <a href="javascript:void(0)" onclick="openAuthModal('login')" id="nav-login-btn" class="hover:text-cyan-400 transition text-cyan-400">เข้าสู่ระบบ</a>
                 </div>
-                <div class="hidden md:block">
-                    <a href="/register" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-6 py-2.5 rounded-full font-semibold shadow-lg shadow-cyan-500/30 transition transform hover:scale-105">
-                        ทดลองใช้ฟรี
+                <div class="hidden md:block" id="nav-action-container">
+                    <a href="javascript:void(0)" onclick="openAuthModal('register')" id="nav-register-btn" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-6 py-2.5 rounded-full font-semibold shadow-lg shadow-cyan-500/30 transition transform hover:scale-105">
+                        สมัครสมาชิก
                     </a>
                 </div>
             </div>
@@ -236,6 +236,84 @@
     <!-- Try INDICATOR WEB CHAT Widget on its own landing page! -->
     <script src="/supreme-boost/boost.js" data-backend-url="/api/chat" data-lang="auto" data-shop-prompt="นี่คือหน้าเว็บขายโปรแกรม INDICATOR WEB CHAT ระบบ AI อัจฉริยะระดับ God-Tier สำหรับธุรกิจ มีแพ็กเกจ Starter (990), Pro (2490) และ Enterprise แนะนำผู้ใช้ให้สมัคร Pro เพราะคุ้มค่าที่สุด มีฟีเจอร์ Telekinesis Warp และ Edge Glow" defer></script>
 
+    <!-- Customer Dashboard -->
+    <section id="customer-dashboard" class="py-24 bg-slate-900 hidden relative z-10 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
+                <div>
+                    <h2 class="text-3xl font-bold">บัญชีของฉัน</h2>
+                    <p class="text-slate-400 mt-1">ยินดีต้อนรับ, <span id="dash-username" class="text-cyan-400">User</span></p>
+                </div>
+                <button onclick="logoutCustomer()" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/40 transition">
+                    <i class="fa-solid fa-right-from-bracket mr-2"></i>ออกจากระบบ
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- API Key Card -->
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="p-3 bg-cyan-500/20 rounded-lg"><i class="fa-solid fa-key text-cyan-400"></i></div>
+                        <h3 class="text-xl font-bold">API Key ของคุณ</h3>
+                    </div>
+                    <div class="bg-slate-950 p-4 rounded-lg flex items-center justify-between border border-slate-800">
+                        <code id="dash-apikey" class="text-sm text-slate-300 blur-sm hover:blur-none transition cursor-pointer">sk_live_xxxxx</code>
+                        <button onclick="copyKey()" class="text-slate-400 hover:text-white"><i class="fa-regular fa-copy"></i></button>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">* นำ API Key นี้ไปใส่ใน Widget Code หรือระบบของคุณ</p>
+                </div>
+                <!-- Status Card -->
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="p-3 bg-blue-500/20 rounded-lg"><i class="fa-solid fa-box-open text-blue-400"></i></div>
+                        <h3 class="text-xl font-bold">สถานะแพ็กเกจ</h3>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex justify-between border-b border-slate-700 pb-2">
+                            <span class="text-slate-400">แพ็กเกจ</span>
+                            <span id="dash-pkg" class="font-bold text-white uppercase px-2 py-1 bg-slate-900 rounded border border-slate-700">...</span>
+                        </div>
+                        <div class="flex justify-between border-b border-slate-700 pb-2">
+                            <span class="text-slate-400">สถานะ</span>
+                            <span id="dash-status" class="font-bold text-green-400">...</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">หมดอายุ</span>
+                            <span id="dash-expire" class="font-mono text-white">...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Auth Modal (Login / Register) -->
+    <div id="auth-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onclick="closeAuthModal()"></div>
+        <div class="glass-nav border border-slate-700 p-8 rounded-2xl w-full max-w-md relative z-10">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h2 class="text-2xl font-bold mb-2" id="auth-title">เข้าสู่ระบบ</h2>
+            <p class="text-slate-400 text-sm mb-6" id="auth-subtitle">จัดการบัญชีและดูสถานะแพ็กเกจของคุณ</p>
+            
+            <form id="auth-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">ชื่อผู้ใช้ (Username)</label>
+                    <input type="text" id="auth-username" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-cyan-400 focus:outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">รหัสผ่าน (Password)</label>
+                    <input type="password" id="auth-password" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-cyan-400 focus:outline-none" required>
+                </div>
+                <div id="auth-error" class="text-red-400 text-sm hidden text-center"></div>
+                <button type="submit" id="auth-btn-submit" class="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl hover:scale-105 transition mt-4">
+                    เข้าสู่ระบบ
+                </button>
+            </form>
+            <div class="mt-4 text-center text-sm text-slate-400">
+                <span id="auth-switch-text">ยังไม่มีบัญชี?</span> 
+                <a href="javascript:void(0)" onclick="toggleAuthMode()" class="text-cyan-400 hover:underline" id="auth-switch-link">สมัครสมาชิก</a>
+            </div>
+        </div>
+    </div>
     <!-- Checkout Modal -->
     <div id="checkout-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
         <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onclick="closeCheckout()"></div>
@@ -287,8 +365,134 @@
     </div>
 
     <script>
-        let currentMode = 'manual';
+        // === Auth logic ===
+        let authMode = 'login'; // 'login' or 'register'
 
+        function openAuthModal(mode) {
+            authMode = mode;
+            updateAuthModalUI();
+            document.getElementById('auth-error').classList.add('hidden');
+            document.getElementById('auth-modal').classList.remove('hidden');
+        }
+
+        function closeAuthModal() {
+            document.getElementById('auth-modal').classList.add('hidden');
+        }
+
+        function toggleAuthMode() {
+            authMode = authMode === 'login' ? 'register' : 'login';
+            updateAuthModalUI();
+        }
+
+        function updateAuthModalUI() {
+            if (authMode === 'login') {
+                document.getElementById('auth-title').innerText = 'เข้าสู่ระบบ';
+                document.getElementById('auth-subtitle').innerText = 'จัดการบัญชีและดูสถานะแพ็กเกจของคุณ';
+                document.getElementById('auth-btn-submit').innerText = 'เข้าสู่ระบบ';
+                document.getElementById('auth-switch-text').innerText = 'ยังไม่มีบัญชี?';
+                document.getElementById('auth-switch-link').innerText = 'สมัครสมาชิก';
+            } else {
+                document.getElementById('auth-title').innerText = 'สมัครสมาชิก';
+                document.getElementById('auth-subtitle').innerText = 'สร้างบัญชีใหม่เพื่อรับ API Key';
+                document.getElementById('auth-btn-submit').innerText = 'สมัครสมาชิก';
+                document.getElementById('auth-switch-text').innerText = 'มีบัญชีแล้ว?';
+                document.getElementById('auth-switch-link').innerText = 'เข้าสู่ระบบ';
+            }
+        }
+
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('auth-btn-submit');
+            const errorMsg = document.getElementById('auth-error');
+            const username = document.getElementById('auth-username').value;
+            const password = document.getElementById('auth-password').value;
+
+            btn.innerText = 'กำลังตรวจสอบ...';
+            btn.disabled = true;
+            errorMsg.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/customer-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: authMode, username, password })
+                });
+                const data = await res.json();
+                
+                if (res.ok && data.success) {
+                    localStorage.setItem('customer_data', JSON.stringify(data.tenant));
+                    closeAuthModal();
+                    checkAuthStatus();
+                } else {
+                    errorMsg.innerText = data.error || 'ล้มเหลว';
+                    errorMsg.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorMsg.innerText = 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
+                errorMsg.classList.remove('hidden');
+            }
+
+            btn.innerText = authMode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก';
+            btn.disabled = false;
+        });
+
+        function checkAuthStatus() {
+            const tenantStr = localStorage.getItem('customer_data');
+            if (tenantStr) {
+                try {
+                    const tenant = JSON.parse(tenantStr);
+                    // Update Nav
+                    document.getElementById('nav-login-btn').classList.add('hidden');
+                    document.getElementById('nav-action-container').innerHTML = `
+                        <a href="#customer-dashboard" class="bg-slate-800 border border-slate-700 text-white px-6 py-2.5 rounded-full font-semibold hover:bg-slate-700 transition flex items-center space-x-2">
+                            <i class="fa-solid fa-user-astronaut text-cyan-400"></i>
+                            <span>${tenant.username || tenant.company_name}</span>
+                        </a>
+                    `;
+                    
+                    // Show Dashboard
+                    document.getElementById('customer-dashboard').classList.remove('hidden');
+                    document.getElementById('dash-username').innerText = tenant.username || tenant.company_name;
+                    document.getElementById('dash-apikey').innerText = tenant.api_key;
+                    document.getElementById('dash-pkg').innerText = tenant.package_type;
+                    
+                    const statusEl = document.getElementById('dash-status');
+                    statusEl.innerText = tenant.status === 'active' ? 'ใช้งานปกติ (Active)' : 'ระงับการใช้งาน (Suspended)';
+                    statusEl.className = tenant.status === 'active' ? 'font-bold text-green-400' : 'font-bold text-red-400';
+
+                    const expireDate = tenant.expires_at ? new Date(tenant.expires_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : 'ไม่มีวันหมดอายุ';
+                    document.getElementById('dash-expire').innerText = expireDate;
+                } catch (e) {
+                    logoutCustomer();
+                }
+            } else {
+                // Not logged in
+                document.getElementById('nav-login-btn').classList.remove('hidden');
+                document.getElementById('nav-action-container').innerHTML = `
+                    <a href="javascript:void(0)" onclick="openAuthModal('register')" id="nav-register-btn" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-6 py-2.5 rounded-full font-semibold shadow-lg shadow-cyan-500/30 transition transform hover:scale-105">
+                        สมัครสมาชิก
+                    </a>
+                `;
+                document.getElementById('customer-dashboard').classList.add('hidden');
+            }
+        }
+
+        function logoutCustomer() {
+            localStorage.removeItem('customer_data');
+            checkAuthStatus();
+        }
+
+        function copyKey() {
+            const key = document.getElementById('dash-apikey').innerText;
+            navigator.clipboard.writeText(key);
+            alert('คัดลอก API Key แล้ว');
+        }
+
+        // Initialize auth status on load
+        document.addEventListener('DOMContentLoaded', checkAuthStatus);
+
+        // === Checkout logic ===
+        let currentMode = 'manual';
         async function openCheckout(pkgName, amount) {
             document.getElementById('checkout-pkg').innerText = pkgName;
             document.getElementById('pkgType').value = pkgName;

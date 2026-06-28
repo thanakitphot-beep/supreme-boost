@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const crypto = require('crypto');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -12,111 +13,120 @@ function setCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
+function hashPassword(password) {
+    return crypto.createHash('sha256').update(password).digest('hex');
+}
+
 module.exports = async function handler(req, res) {
     setCorsHeaders(res);
     if (req.method === "OPTIONS") return res.status(200).end();
     if (!supabase) return res.status(500).json({ error: "Database not configured" });
 
     try {
-        // POST: Login with API Key
         if (req.method === "POST") {
             const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-            const { apiKey, action, email, displayName } = body;
+            const { action, username, password } = body;
 
-            // Handle Simulated Google Login Flow
-            if (action === 'google_login' && email) {
-                // Check if a tenant already exists with this email (using company_name as email for simulation)
-                let { data: existingTenant, error: searchError } = await supabase
-                    .from('tenants')
-                    .select('*')
-                    .eq('company_name', email)
-                    .maybeSingle();
-
-                if (!existingTenant) {
-                    // Create new test tenant for this Google User
-                    const newApiKey = 'sk_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-                    const { data: inserted, error: insertError } = await supabase
-                        .from('tenants')
-                        .insert([{
-                            company_name: email,
-                            api_key: newApiKey,
-                            status: 'active',
-                            package_type: 'pro',
-                            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-                        }])
-                        .select()
-                        .single();
-                    
-                    if (insertError) throw insertError;
-                    existingTenant = inserted;
+            // 1. Register Action
+            if (action === 'register') {
+                if (!username || !password) {
+                    return res.status(400).json({ error: "Username and Password are required" });
                 }
 
-                if (existingTenant.status === 'suspended') {
+                const hashedPassword = hashPassword(password);
+                const newApiKey = 'sk_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                
+                const { data: inserted, error: insertError } = await supabase
+                    .from('tenants')
+                    .insert([{
+                        id: crypto.randomUUID(),
+                        company_name: username,
+                        username: username,
+                        password: hashedPassword,
+                        api_key: newApiKey,
+                        status: 'active',
+                        package_type: 'basic',
+                        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+                    }])
+                    .select()
+                    .single();
+                
+                if (insertError) {
+                    if (insertError.code === '23505') { // Unique violation
+                        return res.status(400).json({ error: "Username already exists" });
+                    }
+                    if (insertError.message.includes('column "username" of relation "tenants" does not exist')) {
+                         return res.status(500).json({ error: "DATABASE ERROR: Please run the SQL command in the implementation plan to add 'username' and 'password' columns to the 'tenants' table." });
+                    }
+                    throw insertError;
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    tenant: {
+                        id: inserted.id,
+                        username: inserted.username,
+                        company_name: inserted.company_name,
+                        api_key: inserted.api_key,
+                        status: inserted.status,
+                        package_type: inserted.package_type,
+                        expires_at: inserted.expires_at
+                    }
+                });
+            }
+
+            // 2. Login Action
+            if (action === 'login') {
+                if (!username || !password) {
+                    return res.status(400).json({ error: "Username and Password are required" });
+                }
+
+                const hashedPassword = hashPassword(password);
+
+                const { data: tenant, error } = await supabase
+                    .from('tenants')
+                    .select('*')
+                    .eq('username', username)
+                    .maybeSingle();
+
+                if (error) {
+                     if (error.message.includes('column "username" does not exist')) {
+                         return res.status(500).json({ error: "DATABASE ERROR: Please run the SQL command in the implementation plan to add 'username' and 'password' columns." });
+                     }
+                     throw error;
+                }
+
+                if (!tenant || tenant.password !== hashedPassword) {
+                    return res.status(401).json({ error: "Invalid Username or Password" });
+                }
+                
+                if (tenant.status === 'suspended') {
                     return res.status(403).json({ error: "Account suspended. Please contact admin." });
                 }
 
                 return res.status(200).json({
                     success: true,
                     tenant: {
-                        id: existingTenant.id,
-                        company_name: existingTenant.company_name,
-                        api_key: existingTenant.api_key,
-                        status: existingTenant.status,
-                        package_type: existingTenant.package_type,
-                        expires_at: existingTenant.expires_at,
-                        created_at: existingTenant.created_at
+                        id: tenant.id,
+                        username: tenant.username,
+                        company_name: tenant.company_name,
+                        api_key: tenant.api_key,
+                        status: tenant.status,
+                        package_type: tenant.package_type,
+                        expires_at: tenant.expires_at,
+                        created_at: tenant.created_at
                     }
                 });
             }
 
-            if (!apiKey) return res.status(400).json({ error: "API Key is required" });
-
-            const { data: tenant, error } = await supabase
-                .from('tenants')
-                .select('*')
-                .eq('api_key', apiKey)
-                .maybeSingle();
-
-            if (error) throw error;
-            if (!tenant) return res.status(401).json({ error: "Invalid API Key" });
-            if (tenant.status === 'suspended') return res.status(403).json({ error: "Account suspended. Please contact admin." });
-
-            return res.status(200).json({
-                success: true,
-                tenant: {
-                    id: tenant.id,
-                    company_name: tenant.company_name,
-                    api_key: tenant.api_key,
-                    status: tenant.status,
-                    package_type: tenant.package_type,
-                    expires_at: tenant.expires_at,
-                    created_at: tenant.created_at
-                }
-            });
+            return res.status(400).json({ error: "Invalid action" });
         }
 
-        // GET: Verify API Key (for session check)
-        if (req.method === "GET") {
-            const authHeader = req.headers.authorization;
-            if (!authHeader || !authHeader.startsWith('Bearer ')) {
-                return res.status(401).json({ error: "No token" });
-            }
-            const apiKey = authHeader.substring(7);
-
-            const { data: tenant } = await supabase
-                .from('tenants')
-                .select('id, company_name, status, package_type, expires_at')
-                .eq('api_key', apiKey)
-                .maybeSingle();
-
-            if (!tenant) return res.status(401).json({ error: "Invalid" });
-
-            return res.status(200).json({ success: true, tenant });
-        }
+        // GET: Session verification via auth header token can be added here if needed
 
         return res.status(405).json({ error: "Method not allowed" });
     } catch (err) {
-        console.error("Customer Auth error:", err);
-        return res.status(500).json({ error: "Internal server error" });
+        console.error('Customer Auth Error:', err);
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
     }
 };
