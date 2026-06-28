@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "check": "node --check api/chat.js && node --check supreme-boost/boost.js",
-    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "build": "echo 'No build required for serverless node'",
     "dev": "nodemon server.js",
     "start": "node server.js",
     "prod": "pm2 start server.js --name supreme-boost --watch --ignore-watch=\"node_modules\"",
