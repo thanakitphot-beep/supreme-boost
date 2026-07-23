@@ -101,7 +101,8 @@
                         <span class="text-[0.65rem] font-bold tracking-[0.2em] text-cyan-400 uppercase mt-0.5" style="text-shadow: 0 0 8px rgba(34,211,238,0.5);">Web Chat</span>
                     </div>
                 </div>
-                <div class="hidden md:flex space-x-8 text-sm font-medium text-slate-300" id="nav-links">
+                <!-- Desktop Menu -->
+                <div class="hidden md:flex items-center space-x-8 text-sm font-medium text-slate-300" id="nav-links">
                     <a href="#features" class="hover:text-white transition">ฟีเจอร์</a>
                     <a href="#pricing" class="hover:text-white transition">ราคา</a>
                     <a href="#faq" class="hover:text-white transition">FAQ</a>
@@ -112,6 +113,22 @@
                         สมัครสมาชิก
                     </a>
                 </div>
+
+                <!-- Mobile Menu Button -->
+                <div class="md:hidden flex items-center">
+                    <button id="mobile-menu-btn" class="text-slate-300 hover:text-white focus:outline-none p-2" onclick="toggleMobileMenu()">
+                        <i class="fa-solid fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mobile Menu -->
+            <div id="mobile-menu" class="hidden md:hidden pb-4 pt-2 border-t border-slate-700/50 space-y-2 mt-2">
+                <a href="#features" onclick="toggleMobileMenu()" class="block text-base font-medium text-slate-300 hover:text-white px-2 py-2">ฟีเจอร์</a>
+                <a href="#pricing" onclick="toggleMobileMenu()" class="block text-base font-medium text-slate-300 hover:text-white px-2 py-2">ราคา</a>
+                <a href="#faq" onclick="toggleMobileMenu()" class="block text-base font-medium text-slate-300 hover:text-white px-2 py-2">FAQ</a>
+                <a href="javascript:void(0)" onclick="toggleMobileMenu(); openAuthModal('login')" id="nav-login-btn-mobile" class="block text-base font-medium text-cyan-400 px-2 py-2">เข้าสู่ระบบ</a>
+                <a href="javascript:void(0)" onclick="toggleMobileMenu(); openAuthModal('register')" id="nav-register-btn-mobile" class="block w-full text-center bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold mt-4">สมัครสมาชิก</a>
             </div>
         </div>
     </nav>
@@ -643,6 +660,23 @@
         data-position="right"
         data-lang="th"
         data-start-open="false">
+    </script>
+    <script>
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            const btn = document.getElementById('mobile-menu-btn');
+            const icon = btn.querySelector('i');
+            
+            if (menu.classList.contains('hidden')) {
+                menu.classList.remove('hidden');
+                icon.classList.remove('fa-bars');
+                icon.classList.add('fa-xmark');
+            } else {
+                menu.classList.add('hidden');
+                icon.classList.remove('fa-xmark');
+                icon.classList.add('fa-bars');
+            }
+        }
     </script>
 </body>
 </html>
