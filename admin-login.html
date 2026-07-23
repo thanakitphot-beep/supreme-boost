@@ -26,8 +26,17 @@
     
     <div class="w-full max-w-md mx-4 p-8 glass-card rounded-2xl relative z-10">
         <div class="text-center mb-8">
-            <img src="logo.png" alt="Admin Login Logo" class="h-20 w-auto mx-auto" style="mix-blend-mode: screen; filter: drop-shadow(0 0 5px rgba(255,255,255,0.2));">
-            <p class="text-slate-400 mt-2">เข้าสู่ระบบจัดการหลังบ้าน</p>
+            <div class="flex items-center justify-center space-x-3 mb-2">
+                <div class="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center relative overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.4)]">
+                    <div class="absolute inset-0 bg-gradient-to-br from-cyan-400/20 to-blue-500/20"></div>
+                    <i class="fa-solid fa-bolt text-cyan-400 text-2xl relative z-10" style="filter: drop-shadow(0 0 5px rgba(34,211,238,0.8));"></i>
+                </div>
+                <div class="flex flex-col justify-center text-left">
+                    <span class="text-2xl font-black tracking-widest leading-none" style="background: linear-gradient(to bottom, #ffffff 0%, #a3a3a3 48%, #e0e0e0 52%, #ffffff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 4px rgba(255,255,255,0.2));">INDICATOR</span>
+                    <span class="text-[0.75rem] font-bold tracking-[0.2em] text-cyan-400 uppercase mt-1" style="text-shadow: 0 0 8px rgba(34,211,238,0.5);">Admin Login</span>
+                </div>
+            </div>
+            <p class="text-slate-400 mt-4">เข้าสู่ระบบจัดการหลังบ้าน</p>
         </div>
 
         <form id="login-form" class="space-y-6">
