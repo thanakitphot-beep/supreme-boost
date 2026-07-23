@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>INDICATOR WEB CHAT - The Intelligent Matrix for Websites</title>
+    <!-- SEO & Social Media Tags -->
+    <meta name="description" content="ยกระดับเว็บไซต์ของคุณด้วย INDICATOR WEB CHAT ผู้ช่วย AI อัจฉริยะ (Nanometer Architecture) ที่มีระบบเข้าอกเข้าใจและตอบโต้ลูกค้าได้อัตโนมัติ">
+    <meta name="keywords" content="AI Chatbot, แชทบอทอัจฉริยะ, ผู้ช่วย AI หน้าเว็บ, ระบบตอบกลับอัตโนมัติ, Indicator Web Chat, AI เว็บไซต์">
+    <meta property="og:title" content="INDICATOR WEB CHAT - ผู้ช่วย AI อัจฉริยะระดับนาโนเมตร">
+    <meta property="og:description" content="เปลี่ยนหน้าเว็บธรรมดาให้มีชีวิตชีวาด้วย AI อัจฉริยะที่สามารถตัดสินใจแทนคุณได้">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://test-mu-cyan-21.vercel.app">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -85,10 +92,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
                 <div class="flex items-center space-x-2 cursor-pointer">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
-                        <i class="fa-solid fa-bolt text-white text-xl"></i>
-                    </div>
-                    <span class="text-xl font-bold tracking-wider">INDICATOR <span class="text-cyan-400">WEB CHAT</span></span>
+                    <img src="logo.png" alt="Indicator Web Chat" class="h-12 w-auto" style="mix-blend-mode: screen; filter: drop-shadow(0 0 5px rgba(255,255,255,0.2));">
                 </div>
                 <div class="hidden md:flex space-x-8 text-sm font-medium text-slate-300" id="nav-links">
                     <a href="#features" class="hover:text-white transition">ฟีเจอร์</a>
@@ -123,9 +127,6 @@
             <div class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6">
                 <a href="#pricing" class="w-full sm:w-auto px-8 py-4 rounded-xl text-lg font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:scale-105 transition transform shadow-xl shadow-cyan-500/25">
                     เลือกแพ็กเกจ
-                </a>
-                <a href="https://test-mu-cyan-21.vercel.app/test-widget-locally.html" class="w-full sm:w-auto px-8 py-4 rounded-xl text-lg font-bold bg-slate-800 text-white border border-slate-700 hover:bg-slate-700 transition">
-                    <i class="fa-solid fa-play mr-2"></i> ดูตัวอย่าง
                 </a>
             </div>
         </div>
@@ -234,7 +235,7 @@
     </footer>
 
     <!-- Try INDICATOR WEB CHAT Widget on its own landing page! -->
-    <script src="/supreme-boost/boost.js" data-backend-url="/api/chat" data-lang="auto" data-shop-prompt="นี่คือหน้าเว็บขายโปรแกรม INDICATOR WEB CHAT ระบบ AI อัจฉริยะระดับ God-Tier สำหรับธุรกิจ มีแพ็กเกจ Starter (990), Pro (2490) และ Enterprise แนะนำผู้ใช้ให้สมัคร Pro เพราะคุ้มค่าที่สุด มีฟีเจอร์ Telekinesis Warp และ Edge Glow" defer></script>
+    <script src="/supreme-boost/boost.js?v=20260711_3" data-backend-url="/api/chat" data-lang="auto" data-shop-prompt="นี่คือหน้าเว็บขายโปรแกรม INDICATOR WEB CHAT ระบบ AI อัจฉริยะระดับ God-Tier สำหรับธุรกิจ มีแพ็กเกจ Starter (990), Pro (2490) และ Enterprise แนะนำผู้ใช้ให้สมัคร Pro เพราะคุ้มค่าที่สุด มีฟีเจอร์ Telekinesis Warp และ Edge Glow" defer></script>
 
     <!-- Customer Dashboard -->
     <section id="customer-dashboard" class="py-24 bg-slate-900 hidden relative z-10 border-t border-slate-800">
@@ -404,8 +405,8 @@
             e.preventDefault();
             const btn = document.getElementById('auth-btn-submit');
             const errorMsg = document.getElementById('auth-error');
-            const username = document.getElementById('auth-username').value;
-            const password = document.getElementById('auth-password').value;
+            const username = document.getElementById('auth-username').value.trim();
+            const password = document.getElementById('auth-password').value.trim();
 
             btn.innerText = 'กำลังตรวจสอบ...';
             btn.disabled = true;
@@ -532,7 +533,7 @@
                                     <div class="text-cyan-400 font-mono text-lg">${m.account_number}</div>
                                     <div class="text-sm text-slate-400">${m.account_name}</div>
                                 </div>
-                                ${m.qr_base64 ? `<img src="${m.qr_base64}" class="w-16 h-16 rounded border border-slate-600">` : ''}
+                                ${m.qr_base64 ? `<img src="${m.qr_base64}" class="w-16 h-16 rounded border border-slate-600 cursor-zoom-in transition hover:scale-105" onclick="openQrModal('${m.qr_base64}')">` : ''}
                             </div>
                         `).join('');
                     } else {
@@ -546,6 +547,15 @@
 
         function closeCheckout() {
             document.getElementById('checkout-modal').classList.add('hidden');
+        }
+
+        function openQrModal(src) {
+            document.getElementById('qr-zoom-img').src = src;
+            document.getElementById('qr-modal').classList.remove('hidden');
+        }
+
+        function closeQrModal() {
+            document.getElementById('qr-modal').classList.add('hidden');
         }
 
         document.getElementById('checkout-form').addEventListener('submit', async (e) => {
@@ -602,6 +612,30 @@
                 submitData();
             }
         });
+    </script>
+    <!-- QR Zoom Modal -->
+    <div id="qr-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm" onclick="closeQrModal()">
+        <div class="relative bg-slate-900 p-4 rounded-2xl border border-slate-700 shadow-2xl max-w-sm w-full mx-4" onclick="event.stopPropagation()">
+            <button type="button" onclick="closeQrModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-800 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h3 class="text-white font-bold text-lg mb-4 text-center">สแกนเพื่อชำระเงิน</h3>
+            <img id="qr-zoom-img" src="" class="w-full rounded-xl object-contain border border-slate-600">
+            <p class="text-slate-400 text-sm text-center mt-4">บันทึกรูปภาพหรือสแกนผ่านแอปธนาคาร</p>
+        </div>
+    </div>
+
+    <!-- Supreme Boost AI Widget Demo -->
+    <script 
+        id="supreme-boost-script"
+        src="./supreme-boost/boost.js" 
+        data-api-key="INDICATOR_TEST" 
+        data-url="http://localhost:3000/api/chat"
+        data-title="INDICATOR AI"
+        data-primary="#06b6d4"
+        data-position="right"
+        data-lang="th"
+        data-start-open="false">
     </script>
 </body>
 </html>

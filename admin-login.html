@@ -24,12 +24,9 @@
 <body class="antialiased selection:bg-cyan-500 selection:text-white flex items-center justify-center min-h-screen">
     <div class="hero-glow"></div>
     
-    <div class="w-full max-w-md p-8 glass-card rounded-2xl relative z-10">
+    <div class="w-full max-w-md mx-4 p-8 glass-card rounded-2xl relative z-10">
         <div class="text-center mb-8">
-            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-cyan-500/30">
-                <i class="fa-solid fa-lock text-white text-3xl"></i>
-            </div>
-            <h1 class="text-3xl font-bold tracking-wider">ADMIN <span class="text-cyan-400">LOGIN</span></h1>
+            <img src="logo.png" alt="Admin Login Logo" class="h-20 w-auto mx-auto" style="mix-blend-mode: screen; filter: drop-shadow(0 0 5px rgba(255,255,255,0.2));">
             <p class="text-slate-400 mt-2">เข้าสู่ระบบจัดการหลังบ้าน</p>
         </div>
 
@@ -70,10 +67,10 @@
             errorMsg.classList.add('hidden');
 
             try {
-                const res = await fetch('/api/auth', {
+                const res = await fetch('/api/admin?action=login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
+                    body: JSON.stringify({ code: password })
                 });
                 
                 const data = await res.json();
@@ -82,7 +79,7 @@
                     localStorage.setItem('admin_token', `Bearer ${data.token}`);
                     window.location.href = '/admin';
                 } else {
-                    errorMsg.innerText = data.message || 'รหัสผ่านไม่ถูกต้อง';
+                    errorMsg.innerText = data.error || 'รหัสผ่านไม่ถูกต้อง';
                     errorMsg.classList.remove('hidden');
                 }
             } catch (err) {

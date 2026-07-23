@@ -1,7 +1,6 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const url = require('url');
 const socketIo = require('socket.io'); // Added socket.io
 
 // ─── Global System Logs Interceptor ───
@@ -41,6 +40,10 @@ console.warn = function(...args) {
     addLog('WARN', args);
     originalWarn.apply(console, args);
 };
+
+// ─── Metrics and Rate Limiter ───
+const { requestCounter } = require('./api/v1/health.js');
+const { checkRateLimit } = require('./services/rateLimit.js');
 // ──────────────────────────────────────
 
 function loadEnv() {
@@ -68,9 +71,8 @@ function loadEnv() {
 }
 loadEnv();
 
-const chatModule = require('./api/chat.js');
-const chatHandler = chatModule;
-const crawlHandler = chatModule.crawlHandler;
+const chatHandler = require('./api/chat.js');
+const crawlHandler = require('./api/crawl.js');
 const adminHandler = require('./api/admin.js');
 
 const MIME = {
@@ -98,6 +100,8 @@ function serveStatic(req, res, pathname) {
         filePath = path.join(__dirname, 'admin-dashboard.html');
     } else if (pathname === '/login') {
         filePath = path.join(__dirname, 'admin-login.html');
+    } else if (pathname === '/pricing') {
+        filePath = path.join(__dirname, 'pricing.html');
     }
     fs.readFile(filePath, (err, data) => {
         if (err) {
@@ -151,30 +155,51 @@ function wrapRes(res) {
 
 // ─── Shared handler used by both Vercel Lambda and local server ──
 function handleRequest(req, res) {
-    const parsedUrl = url.parse(req.url, true);
+    // ✅ FIX 8: ใช้ WHATWG URL API แทน url.parse() ที่ deprecated
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(req.url, 'http://localhost');
+    } catch {
+        parsedUrl = new URL('/', 'http://localhost');
+    }
     const pathname = parsedUrl.pathname;
+    req.query = Object.fromEntries(parsedUrl.searchParams.entries());
+
+    // Request Tracing & Metrics
+    req.id = req.headers['x-request-id'] || Math.random().toString(36).substring(2, 15);
+    res.setHeader('X-Request-ID', req.id);
+    if (requestCounter) requestCounter.total++;
 
     if (req.method === 'OPTIONS') {
         res.writeHead(200, {
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type'
+            'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-ID, X-API-Key'
         });
         res.end();
         return;
     }
 
+    const routeType = pathname.includes('/chat') ? 'chat' : 'api';
+    if (!checkRateLimit(req, wrapRes(res), routeType)) {
+        if (requestCounter) requestCounter.error++;
+        return;
+    }
+
     const API_HANDLERS = {
         '/api/chat': chatHandler,
+        '/api/v1/chat': chatHandler, // New v1 endpoint
         '/api/crawl': crawlHandler,
         '/api/admin': adminHandler,
         '/api/settings': require('./api/settings.js'),
-        '/api/logs': require('./api/logs.js'),
         '/api/auth': require('./api/auth.js'),
         '/api/customer-auth': require('./api/customer-auth.js'),
         '/api/knowledge': require('./api/knowledge.js'),
         '/api/knowledge/crawl': require('./api/knowledge.js'),
-        '/api/knowledge/search': require('./api/knowledge.js')
+        '/api/knowledge/search': require('./api/knowledge.js'),
+        '/api/v1/health': require('./api/v1/health.js'),
+        '/metrics': require('./api/v1/health.js'),
+        '/api/v1/memory': require('./api/v1/memory.js')
     };
 
     const handler = API_HANDLERS[pathname];
@@ -184,7 +209,28 @@ function handleRequest(req, res) {
         return handler(req, wrapRes(res));
     }
 
-    serveStatic(req, res, pathname);
+    // --- Serve static files and extensionless routes for local testing ---
+    if (pathname === '/' || pathname === '/admin' || pathname === '/login' || pathname === '/pricing') {
+        return serveStatic(req, res, pathname);
+    }
+    // Direct .html access
+    if (pathname === '/admin-login.html') {
+        return serveStatic(req, res, '/login');
+    }
+
+    const extmap = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css' };
+    const ext = path.extname(pathname);
+    if (ext && extmap[ext]) {
+        const filePath = path.join(__dirname, pathname);
+        if (fs.existsSync(filePath)) {
+            res.writeHead(200, { 'Content-Type': extmap[ext] });
+            return res.end(fs.readFileSync(filePath));
+        }
+    }
+
+    // Default 404
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
 }
 
 // ─── On Vercel, export the handler ──
@@ -205,12 +251,16 @@ if (require.main === module) {
         });
     });
 
-    // Initialize socket.io
-    io = socketIo(server);
+    // Initialize socket.io (WebSocket for Real-time logs and Audio Streaming later)
+    io = socketIo(server, { cors: { origin: '*' } });
     io.on('connection', (socket) => {
-        console.log('✅ Admin Dashboard connected via WebSocket');
-        // Send initial logs
+        console.log(`✅ Client connected via WebSocket: ${socket.id}`);
+        // Send initial logs to admin dashboards
         socket.emit('initial-logs', global.systemLogs);
+        
+        socket.on('audio-stream', (data) => {
+            // Placeholder for OMEGA-JARVIS Phase 3 (Voice)
+        });
     });
     global.io = io;
 

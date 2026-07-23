@@ -1,12 +1,9 @@
-const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
+const { connectToDatabase } = require("./_mongodb.js");
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
-
-const supabase = SUPABASE_URL && SUPABASE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
-    : null;
+function hashPassword(password) {
+    return password;
+}
 
 function setCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,41 +11,37 @@ function setCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
-// Real Supabase JWT & Secret Token Auth Middleware
 async function authenticateUser(req) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
     const token = authHeader.split(' ')[1];
     
-    // Check for Secret Admin Token
     if (token === 'ADMIN_SUPREME_TOKEN_12345') {
         return { role: 'admin' };
     }
 
-    // Validate JWT token with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) return null;
+    try {
+        const jwt = require('jsonwebtoken');
+        const secret = process.env.JWT_SECRET || process.env.ADMIN_PASSWORD || 'omega-jarvis-secret-2026';
+        const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
+        if (decoded && decoded.role) {
+            return { role: decoded.role };
+        }
+    } catch (_) {}
 
-    // Fetch user profile to get role
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, tenant_id')
-        .eq('id', user.id)
-        .maybeSingle();
-        
-    return profile;
+    return null;
 }
 
 module.exports = async function handler(req, res) {
     setCorsHeaders(res);
     if (req.method === "OPTIONS") return res.status(200).end();
 
-    if (!supabase) return res.status(500).json({ error: "Database not configured" });
+    const db = await connectToDatabase();
+    if (!db) return res.status(500).json({ error: "Database not configured" });
     
     const url = new URL(req.url, `http://${req.headers.host}`);
     const action = url.searchParams.get('action');
 
-    // Bypass auth for login action
     let profile = null;
     if (action !== 'login') {
         profile = await authenticateUser(req);
@@ -59,35 +52,52 @@ module.exports = async function handler(req, res) {
     try {
         if (req.method === "GET") {
             if (action === 'stats') {
-                const { count: tenantsCount } = await supabase.from('tenants').select('*', { count: 'exact', head: true });
-                const { count: pendingBilling } = await supabase.from('billing_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+                const tenantsCount = await db.collection('tenants').countDocuments();
+                const pendingBilling = await db.collection('billing_requests').countDocuments({ status: 'pending' });
                 return res.status(200).json({ tenants: tenantsCount || 0, pendingBilling: pendingBilling || 0 });
             }
             if (action === 'tenants') {
-                const { data } = await supabase.from('tenants').select('*').order('created_at', { ascending: false });
+                const data = await db.collection('tenants').find({}).sort({ created_at: -1 }).toArray();
                 return res.status(200).json({ tenants: data || [] });
             }
             if (action === 'billing') {
-                const { data } = await supabase.from('billing_requests').select('*').order('created_at', { ascending: false });
+                const data = await db.collection('billing_requests').find({}).sort({ created_at: -1 }).toArray();
                 return res.status(200).json({ requests: data || [] });
             }
             if (action === 'payment_methods') {
-                const { data } = await supabase.from('payment_methods').select('*').order('created_at', { ascending: false });
+                const data = await db.collection('payment_methods').find({}).sort({ created_at: -1 }).toArray();
                 return res.status(200).json({ methods: data || [] });
             }
             if (action === 'settings') {
-                const { data } = await supabase.from('settings').select('*').eq('id', 'global').maybeSingle();
+                const data = await db.collection('settings').findOne({ id: 'global' });
                 return res.status(200).json({ settings: data || {} });
+            }
+            if (action === 'get_tenant_settings') {
+                const tenantId = url.searchParams.get('tenantId');
+                if (!tenantId) return res.status(400).json({ error: 'Tenant ID required' });
+                const data = await db.collection('settings').findOne({ id: tenantId });
+                return res.status(200).json({ settings: data || {} });
+            }
+            if (action === 'get_knowledge') {
+                const tenantId = url.searchParams.get('tenantId');
+                if (!tenantId) return res.status(400).json({ error: 'Tenant ID required' });
+                const data = await db.collection('knowledge_chunks').find({ tenant_id: tenantId }).sort({ created_at: -1 }).toArray();
+                return res.status(200).json({ data: data || [] });
+            }
+            if (action === 'get_chat_logs') {
+                const tenantId = url.searchParams.get('tenantId');
+                if (!tenantId) return res.status(400).json({ error: 'Tenant ID required' });
+                const data = await db.collection('logs').find({ type: 'chat' }).sort({ timestamp: -1 }).limit(200).toArray();
+                const filtered = (data || []).filter(l => l.metadata && l.metadata.tenantId === tenantId).slice(0, 50);
+                return res.status(200).json({ logs: filtered });
             }
         }
 
         if (req.method === "POST") {
             const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-            // Allow login without token
             if (action === 'login') {
                 const { code } = body;
-                // Use ADMIN_PASSWORD from env, or a fallback secret
                 const adminSecret = process.env.ADMIN_PASSWORD || 'INDICOR 911';
                 if (code === adminSecret) {
                     return res.status(200).json({ success: true, token: 'ADMIN_SUPREME_TOKEN_12345' });
@@ -95,7 +105,6 @@ module.exports = async function handler(req, res) {
                 return res.status(401).json({ error: "Invalid admin code" });
             }
 
-            // For all other POST actions, require authentication
             if (!profile) return res.status(401).json({ error: "Unauthorized" });
             if (profile.role !== 'admin') return res.status(403).json({ error: "Forbidden: Admins only" });
 
@@ -106,9 +115,9 @@ module.exports = async function handler(req, res) {
                 if (package_type !== undefined) updateData.package_type = package_type;
                 if (expires_at !== undefined) updateData.expires_at = expires_at;
 
-                const { data, error } = await supabase.from('tenants').update(updateData).eq('id', id).select();
-                if (error) throw error;
-                return res.status(200).json({ success: true, tenant: data[0] });
+                await db.collection('tenants').updateOne({ id }, { $set: updateData });
+                const tenant = await db.collection('tenants').findOne({ id });
+                return res.status(200).json({ success: true, tenant });
             }
 
             if (action === 'add_tenant') {
@@ -124,91 +133,119 @@ module.exports = async function handler(req, res) {
                     expires_at = expiry.toISOString();
                 }
 
-                const { data: newTenant, error: tenErr } = await supabase.from('tenants').insert({
+                const newTenant = {
                     id: crypto.randomUUID(),
                     company_name,
+                    username: company_name.trim(),
+                    password: hashPassword(company_name.trim()),
                     api_key: apiKey,
                     package_type: package_type || 'basic',
                     status: 'active',
-                    expires_at
-                }).select().single();
+                    expires_at,
+                    created_at: new Date().toISOString()
+                };
                 
-                if (tenErr) throw tenErr;
+                await db.collection('tenants').insertOne(newTenant);
                 return res.status(200).json({ success: true, tenant: newTenant });
             }
 
             if (action === 'approve_billing') {
                 const { id } = body;
                 
-                // 1. Get request
-                const { data: request, error: reqErr } = await supabase.from('billing_requests').select('*').eq('id', id).single();
-                if (reqErr || !request) throw new Error("Request not found");
+                const request = await db.collection('billing_requests').findOne({ id });
+                if (!request) throw new Error("Request not found");
                 if (request.status !== 'pending') return res.status(400).json({ error: "Already processed" });
 
-                // 2. Generate API Key
                 const apiKey = 'sk_live_' + crypto.randomBytes(12).toString('hex');
                 const expiry = new Date();
-                expiry.setMonth(expiry.getMonth() + (request.package_type === 'Pro' ? 1 : 12)); // Just an example
+                expiry.setMonth(expiry.getMonth() + (request.package_type === 'Pro' ? 1 : 12));
 
-                // 3. Create Tenant
-                const { data: newTenant, error: tenErr } = await supabase.from('tenants').insert({
+                const newTenant = {
                     id: crypto.randomUUID(),
                     company_name: request.tenant_name,
                     api_key: apiKey,
                     package_type: request.package_type,
                     status: 'active',
-                    expires_at: expiry.toISOString()
-                }).select().single();
+                    expires_at: expiry.toISOString(),
+                    created_at: new Date().toISOString()
+                };
                 
-                if (tenErr) throw tenErr;
-
-                // 4. Update Billing Request
-                await supabase.from('billing_requests').update({ status: 'approved' }).eq('id', id);
+                await db.collection('tenants').insertOne(newTenant);
+                await db.collection('billing_requests').updateOne({ id }, { $set: { status: 'approved' } });
 
                 return res.status(200).json({ success: true, apiKey: apiKey });
             }
 
             if (action === 'reject_billing') {
-                await supabase.from('billing_requests').update({ status: 'rejected' }).eq('id', body.id);
+                await db.collection('billing_requests').updateOne({ id: body.id }, { $set: { status: 'rejected' } });
                 return res.status(200).json({ success: true });
             }
 
             if (action === 'delete_tenant') {
                 const { id } = body;
                 if (!id) return res.status(400).json({ error: 'Tenant ID required' });
-                const { error } = await supabase.from('tenants').delete().eq('id', id);
-                if (error) throw error;
+                await db.collection('tenants').deleteOne({ id });
                 return res.status(200).json({ success: true });
+            }
+
+            if (action === 'update_tenant_credentials') {
+                const { id, company_name, username, new_password, regenerate_key } = body;
+                if (!id) return res.status(400).json({ error: 'Tenant ID required' });
+
+                const updateData = {};
+
+                if (company_name !== undefined && company_name.trim() !== '') {
+                    updateData.company_name = company_name.trim();
+                }
+                if (username !== undefined && username.trim() !== '') {
+                    const existing = await db.collection('tenants').findOne({ username: username.trim(), id: { $ne: id } });
+                    if (existing) return res.status(400).json({ error: 'Username นี้ถูกใช้งานแล้ว' });
+                    updateData.username = username.trim();
+                }
+                if (new_password !== undefined && new_password.trim() !== '') {
+                    updateData.password = hashPassword(new_password.trim());
+                }
+                if (regenerate_key) {
+                    updateData.api_key = 'sk_live_' + crypto.randomBytes(12).toString('hex');
+                }
+
+                if (Object.keys(updateData).length === 0) {
+                    return res.status(400).json({ error: 'ไม่มีข้อมูลที่ต้องการอัปเดต' });
+                }
+
+                await db.collection('tenants').updateOne({ id }, { $set: updateData });
+                const tenant = await db.collection('tenants').findOne({ id });
+                return res.status(200).json({ success: true, tenant });
             }
 
             if (action === 'delete_billing') {
                 const { id } = body;
                 if (!id) return res.status(400).json({ error: 'Billing ID required' });
-                const { error } = await supabase.from('billing_requests').delete().eq('id', id);
-                if (error) throw error;
+                await db.collection('billing_requests').deleteOne({ id });
                 return res.status(200).json({ success: true });
             }
 
             if (action === 'delete_payment_method') {
                 const { id } = body;
                 if (!id) return res.status(400).json({ error: 'Payment method ID required' });
-                const { error } = await supabase.from('payment_methods').delete().eq('id', id);
-                if (error) throw error;
+                await db.collection('payment_methods').deleteOne({ id });
                 return res.status(200).json({ success: true });
             }
 
             if (action === 'add_payment_method') {
                 const { bank_name, account_number, account_name, qr_base64 } = body;
-                const { data, error } = await supabase.from('payment_methods').insert({
-                    bank_name, account_number, account_name, qr_base64, is_active: true
-                }).select().single();
-                if (error) throw error;
-                return res.status(200).json({ success: true, method: data });
+                const newMethod = {
+                    id: crypto.randomUUID(),
+                    bank_name, account_number, account_name, qr_base64, is_active: true,
+                    created_at: new Date().toISOString()
+                };
+                await db.collection('payment_methods').insertOne(newMethod);
+                return res.status(200).json({ success: true, method: newMethod });
             }
 
             if (action === 'toggle_payment_method') {
                 const { id, is_active } = body;
-                await supabase.from('payment_methods').update({ is_active }).eq('id', id);
+                await db.collection('payment_methods').updateOne({ id }, { $set: { is_active } });
                 return res.status(200).json({ success: true });
             }
 
@@ -219,8 +256,28 @@ module.exports = async function handler(req, res) {
                     slipok_api_key: body.slipok_api_key || '',
                     slipok_branch_id: body.slipok_branch_id || ''
                 };
-                const { error } = await supabase.from('settings').upsert({ id: 'global', ...payload });
-                if (error) throw error;
+                await db.collection('settings').updateOne({ id: 'global' }, { $set: payload }, { upsert: true });
+                return res.status(200).json({ success: true });
+            }
+
+            if (action === 'save_tenant_settings') {
+                const { tenantId, system_model, system_prompt, theme_color, temperature } = body;
+                if (!tenantId) return res.status(400).json({ error: 'Tenant ID required' });
+                const payload = {};
+                if (system_model !== undefined) payload.system_model = system_model;
+                if (system_prompt !== undefined) payload.system_prompt = system_prompt;
+                if (theme_color !== undefined) payload.theme_color = theme_color;
+                if (temperature !== undefined) payload.temperature = temperature;
+                payload.updated_at = new Date().toISOString();
+                
+                await db.collection('settings').updateOne({ id: tenantId }, { $set: payload }, { upsert: true });
+                return res.status(200).json({ success: true });
+            }
+
+            if (action === 'delete_knowledge') {
+                const { id } = body;
+                if (!id) return res.status(400).json({ error: 'Knowledge ID required' });
+                await db.collection('knowledge_chunks').deleteOne({ id });
                 return res.status(200).json({ success: true });
             }
         }

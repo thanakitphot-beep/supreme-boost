@@ -1,11 +1,5 @@
-const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
-const supabase = SUPABASE_URL && SUPABASE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
-    : null;
+const { connectToDatabase } = require("./_mongodb.js");
 
 function setCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,13 +8,15 @@ function setCorsHeaders(res) {
 }
 
 function hashPassword(password) {
-    return crypto.createHash('sha256').update(password).digest('hex');
+    return password; // Plain text per admin request
 }
 
 module.exports = async function handler(req, res) {
     setCorsHeaders(res);
     if (req.method === "OPTIONS") return res.status(200).end();
-    if (!supabase) return res.status(500).json({ error: "Database not configured" });
+
+    const db = await connectToDatabase();
+    if (!db) return res.status(500).json({ error: "Database not configured" });
 
     try {
         if (req.method === "POST") {
@@ -33,44 +29,39 @@ module.exports = async function handler(req, res) {
                     return res.status(400).json({ error: "Username and Password are required" });
                 }
 
+                // Check unique username
+                const existing = await db.collection('tenants').findOne({ username });
+                if (existing) {
+                    return res.status(400).json({ error: "Username already exists" });
+                }
+
                 const hashedPassword = hashPassword(password);
                 const newApiKey = 'sk_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
                 
-                const { data: inserted, error: insertError } = await supabase
-                    .from('tenants')
-                    .insert([{
-                        id: crypto.randomUUID(),
-                        company_name: username,
-                        username: username,
-                        password: hashedPassword,
-                        api_key: newApiKey,
-                        status: 'active',
-                        package_type: 'basic',
-                        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-                    }])
-                    .select()
-                    .single();
-                
-                if (insertError) {
-                    if (insertError.code === '23505') { // Unique violation
-                        return res.status(400).json({ error: "Username already exists" });
-                    }
-                    if (insertError.message.includes('column "username" of relation "tenants" does not exist')) {
-                         return res.status(500).json({ error: "DATABASE ERROR: Please run the SQL command in the implementation plan to add 'username' and 'password' columns to the 'tenants' table." });
-                    }
-                    throw insertError;
-                }
+                const newTenant = {
+                    id: crypto.randomUUID(),
+                    company_name: username,
+                    username: username,
+                    password: hashedPassword,
+                    api_key: newApiKey,
+                    status: 'active',
+                    package_type: 'basic',
+                    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+                    created_at: new Date().toISOString()
+                };
+
+                await db.collection('tenants').insertOne(newTenant);
 
                 return res.status(200).json({
                     success: true,
                     tenant: {
-                        id: inserted.id,
-                        username: inserted.username,
-                        company_name: inserted.company_name,
-                        api_key: inserted.api_key,
-                        status: inserted.status,
-                        package_type: inserted.package_type,
-                        expires_at: inserted.expires_at
+                        id: newTenant.id,
+                        username: newTenant.username,
+                        company_name: newTenant.company_name,
+                        api_key: newTenant.api_key,
+                        status: newTenant.status,
+                        package_type: newTenant.package_type,
+                        expires_at: newTenant.expires_at
                     }
                 });
             }
@@ -81,23 +72,21 @@ module.exports = async function handler(req, res) {
                     return res.status(400).json({ error: "Username and Password are required" });
                 }
 
-                const hashedPassword = hashPassword(password);
+                const tenant = await db.collection('tenants').findOne({ username });
 
-                const { data: tenant, error } = await supabase
-                    .from('tenants')
-                    .select('*')
-                    .eq('username', username)
-                    .maybeSingle();
-
-                if (error) {
-                     if (error.message.includes('column "username" does not exist')) {
-                         return res.status(500).json({ error: "DATABASE ERROR: Please run the SQL command in the implementation plan to add 'username' and 'password' columns." });
-                     }
-                     throw error;
+                if (!tenant) {
+                    return res.status(401).json({ error: "Invalid Username or Password" });
                 }
 
-                if (!tenant || tenant.password !== hashedPassword) {
+                const plainMatch = tenant.password === password;
+                const hashMatch = tenant.password === crypto.createHash('sha256').update(password).digest('hex');
+                if (!plainMatch && !hashMatch) {
                     return res.status(401).json({ error: "Invalid Username or Password" });
+                }
+                
+                // Migrate old hashed password to plain text automatically
+                if (hashMatch && !plainMatch) {
+                    await db.collection('tenants').updateOne({ id: tenant.id }, { $set: { password } });
                 }
                 
                 if (tenant.status === 'suspended') {
@@ -121,8 +110,6 @@ module.exports = async function handler(req, res) {
 
             return res.status(400).json({ error: "Invalid action" });
         }
-
-        // GET: Session verification via auth header token can be added here if needed
 
         return res.status(405).json({ error: "Method not allowed" });
     } catch (err) {

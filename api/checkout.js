@@ -1,11 +1,5 @@
-const { createClient } = require('@supabase/supabase-js');
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
-
-const supabase = SUPABASE_URL && SUPABASE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
-    : null;
+const crypto = require('crypto');
+const { connectToDatabase } = require("./_mongodb.js");
 
 function setCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,14 +11,13 @@ module.exports = async function handler(req, res) {
     setCorsHeaders(res);
     if (req.method === "OPTIONS") return res.status(200).end();
 
-    if (!supabase) {
-        return res.status(500).json({ error: "Database not configured" });
-    }
+    const db = await connectToDatabase();
+    if (!db) return res.status(500).json({ error: "Database not configured" });
 
     try {
         if (req.method === "GET") {
-            const { data: set } = await supabase.from('settings').select('*').eq('id', 'global').maybeSingle();
-            const { data: methods } = await supabase.from('payment_methods').select('id, bank_name, account_number, account_name, qr_base64').eq('is_active', true);
+            const set = await db.collection('settings').findOne({ id: 'global' });
+            const methods = await db.collection('payment_methods').find({ is_active: true }).project({ id: 1, bank_name: 1, account_number: 1, account_name: 1, qr_base64: 1 }).toArray();
             
             return res.status(200).json({ 
                 paymentMethods: methods || [],
@@ -39,25 +32,17 @@ module.exports = async function handler(req, res) {
                 return res.status(400).json({ error: "Missing required fields" });
             }
 
-            const { data: set } = await supabase.from('settings').select('*').eq('id', 'global').maybeSingle();
+            const set = await db.collection('settings').findOne({ id: 'global' });
             const mode = (set && set.payment_mode) || 'manual';
 
             if (mode === 'stripe') {
-                // Here you would use the Stripe Node SDK:
-                // const stripe = require('stripe')(set.stripe_secret_key);
-                // const session = await stripe.checkout.sessions.create({ ... })
-                // return res.status(200).json({ redirectUrl: session.url });
-                
-                // For demonstration, we return a mock URL
                 return res.status(200).json({ redirectUrl: 'https://checkout.stripe.com/pay/cs_live_mock_12345' });
             }
 
             if (mode === 'slipok') {
-                // Verify slip with SlipOK API
                 if (!body.slipBase64) return res.status(400).json({ error: "Missing slip image" });
                 
                 try {
-                    // Remove "data:image/jpeg;base64," prefix for API
                     const base64Data = body.slipBase64.split(',')[1] || body.slipBase64;
                     const slipRes = await fetch('https://api.slipok.com/api/line/apikey/' + set.slipok_branch_id, {
                         method: 'POST',
@@ -68,17 +53,18 @@ module.exports = async function handler(req, res) {
                     const slipData = await slipRes.json();
                     if (!slipData.success) throw new Error(slipData.message || "Invalid slip");
                     
-                    // If valid, Auto-Approve!
-                    const apiKey = 'sk_live_' + require('crypto').randomBytes(12).toString('hex');
+                    const apiKey = 'sk_live_' + crypto.randomBytes(12).toString('hex');
                     const expiry = new Date();
                     expiry.setMonth(expiry.getMonth() + (body.packageType === 'Pro' ? 1 : 12));
                     
-                    await supabase.from('tenants').insert({
+                    await db.collection('tenants').insertOne({
+                        id: crypto.randomUUID(),
                         company_name: body.companyName,
                         api_key: apiKey,
                         package_type: body.packageType,
                         status: 'active',
-                        expires_at: expiry.toISOString()
+                        expires_at: expiry.toISOString(),
+                        created_at: new Date().toISOString()
                     });
                     
                     return res.status(200).json({ success: true, autoApproved: true, apiKey: apiKey });
@@ -91,24 +77,27 @@ module.exports = async function handler(req, res) {
             // Default Manual Mode
             if (!body.slipBase64) return res.status(400).json({ error: "Missing slip image" });
 
-            const { data, error } = await supabase
-                .from('billing_requests')
-                .insert({
-                    tenant_name: body.companyName,
-                    contact_email: body.email || '',
-                    package_type: body.packageType,
-                    amount: body.amount || 0,
-                    slip_base64: body.slipBase64,
-                    status: 'pending'
-                })
-                .select()
-                .single();
+            const newRequest = {
+                id: crypto.randomUUID(),
+                tenant_name: body.companyName,
+                contact_email: body.email || '',
+                package_type: body.packageType,
+                amount: body.amount || 0,
+                slip_base64: body.slipBase64,
+                status: 'pending',
+                created_at: new Date().toISOString()
+            };
 
-            if (error) throw error;
+            await db.collection('billing_requests').insertOne(newRequest);
 
-            supabase.from('logs').insert({ type: 'info', message: `New manual billing request from ${body.companyName}` }).then().catch(()=>{});
+            db.collection('logs').insertOne({ 
+                id: crypto.randomUUID(),
+                type: 'info', 
+                message: `New manual billing request from ${body.companyName}`,
+                timestamp: new Date().toISOString()
+            }).then().catch(()=>{});
 
-            return res.status(200).json({ success: true, message: "Request submitted. Waiting for admin approval.", requestId: data.id });
+            return res.status(200).json({ success: true, message: "Request submitted. Waiting for admin approval.", requestId: newRequest.id });
         }
 
         return res.status(405).json({ error: "Method not allowed" });

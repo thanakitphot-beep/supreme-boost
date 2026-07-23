@@ -116,5 +116,90 @@ create table if not exists public.profiles (
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- Note: RLS should be enabled on production databases.
--- alter table public.profiles enable row level security;
+-- ==============================================================================
+-- OMEGA-JARVIS v3.0.0 UPGRADES
+-- ==============================================================================
+
+-- 1. Memory entries (Long-Term Memory)
+create table if not exists public.memory_entries (
+  id uuid default gen_random_uuid() primary key,
+  tenant_id text not null,
+  user_id text,
+  content text,
+  embedding vector(768),
+  importance float default 0.5,
+  tags jsonb,
+  expires_at timestamp with time zone,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists memory_entries_embedding_idx 
+on public.memory_entries 
+using hnsw (embedding vector_cosine_ops);
+
+create or replace function match_memory_entries (
+  query_embedding vector(768),
+  match_threshold float,
+  match_count int,
+  filter_tenant_id text
+)
+returns table (
+  id uuid,
+  tenant_id text,
+  user_id text,
+  content text,
+  importance float,
+  tags jsonb,
+  similarity float
+)
+language sql stable
+as $$
+  select
+    id,
+    tenant_id,
+    user_id,
+    content,
+    importance,
+    tags,
+    1 - (memory_entries.embedding <=> query_embedding) as similarity
+  from memory_entries
+  where tenant_id = filter_tenant_id
+    and (expires_at is null or expires_at > now())
+    and 1 - (memory_entries.embedding <=> query_embedding) > match_threshold
+  order by memory_entries.embedding <=> query_embedding
+  limit match_count;
+$$;
+
+-- 2. Plugins
+create table if not exists public.plugins (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  version text default '1.0.0',
+  code text,
+  permissions jsonb default '{}',
+  enabled boolean default true,
+  tenant_id text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 3. Feature Flags
+create table if not exists public.feature_flags (
+  id uuid default gen_random_uuid() primary key,
+  flag_name text not null unique,
+  enabled boolean default false,
+  tenant_id text,
+  rollout_percent integer default 0
+);
+
+-- 4. Agent Traces (Observability)
+create table if not exists public.agent_traces (
+  id uuid default gen_random_uuid() primary key,
+  request_id text not null,
+  tenant_id text,
+  agent_name text,
+  input jsonb,
+  output jsonb,
+  duration_ms integer,
+  tokens_used integer,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);

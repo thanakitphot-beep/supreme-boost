@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Login - INDICATOR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: #05050f; color: white; font-family: 'Prompt', sans-serif; overflow: hidden; }
+        .hero-glow {
+            position: absolute; top: -10%; left: 50%; transform: translateX(-50%);
+            width: 80vw; height: 50vh; background: radial-gradient(circle, rgba(139,92,246,0.15) 0%, rgba(5,5,15,0) 70%); z-index: -1;
+        }
+        .glass-card {
+            background: rgba(15, 15, 30, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(139,92,246,0.2);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-purple-500 selection:text-white flex items-center justify-center min-h-screen">
+    <div class="hero-glow"></div>
+    
+    <div class="w-full max-w-md mx-4 p-8 glass-card rounded-2xl relative z-10">
+        <div class="text-center mb-8">
+            <img src="logo.png" alt="Indicator Dashboard Logo" class="h-20 w-auto mx-auto" style="mix-blend-mode: screen; filter: drop-shadow(0 0 5px rgba(255,255,255,0.2));">
+            <p class="text-slate-400 mt-2">จัดการแชทบอทของร้านคุณ</p>
+        </div>
+
+        <form id="login-form" class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">ชื่อผู้ใช้ (Username)</label>
+                <div class="relative">
+                    <input type="text" id="username" required
+                        class="w-full bg-slate-900/50 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition pl-10"
+                        placeholder="Company Name">
+                    <i class="fa-solid fa-user absolute left-3 top-3.5 text-slate-400"></i>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">รหัสผ่าน (Password)</label>
+                <div class="relative">
+                    <input type="password" id="password" required
+                        class="w-full bg-slate-900/50 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition pl-10"
+                        placeholder="••••••••">
+                    <i class="fa-solid fa-key absolute left-3 top-3.5 text-slate-400"></i>
+                </div>
+            </div>
+
+            <div id="error-msg" class="text-red-400 text-sm hidden text-center bg-red-900/20 p-3 rounded-xl border border-red-500/30"></div>
+
+            <button type="submit" id="btn-submit"
+                class="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-xl hover:scale-105 transition shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2">
+                <span>เข้าสู่ระบบ</span>
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </form>
+    </div>
+
+    <script>
+        // Check if already logged in
+        if (localStorage.getItem('tenant_data')) {
+            window.location.href = '/dashboard';
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-submit');
+            const err = document.getElementById('error-msg');
+            
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบ...';
+            btn.disabled = true;
+            btn.classList.add('opacity-70');
+            err.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/customer-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'login',
+                        username: document.getElementById('username').value,
+                        password: document.getElementById('password').value
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok && data.success) {
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> สำเร็จ!';
+                    btn.classList.remove('from-purple-600', 'to-indigo-600');
+                    btn.classList.add('bg-green-500');
+                    
+                    localStorage.setItem('tenant_data', JSON.stringify(data.tenant));
+                    setTimeout(() => window.location.href = '/dashboard', 1000);
+                } else {
+                    throw new Error(data.error || 'Invalid credentials');
+                }
+            } catch (error) {
+                err.textContent = error.message;
+                err.classList.remove('hidden');
+                btn.innerHTML = '<span>เข้าสู่ระบบ</span><i class="fa-solid fa-arrow-right"></i>';
+                btn.disabled = false;
+                btn.classList.remove('opacity-70');
+            }
+        });
+    </script>
+</body>
+</html>

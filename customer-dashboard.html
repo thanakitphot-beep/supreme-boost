@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INDICATOR — My Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --bg:#09090f; --bg2:#0f0f1a; --bg3:#141426;
+            --b1:rgba(255,255,255,0.06); --b2:rgba(255,255,255,0.12);
+            --s1:rgba(255,255,255,0.03); --s2:rgba(255,255,255,0.06);
+            --t1:#f1f5f9; --t2:#94a3b8; --t3:#475569;
+            --v1:#7c3aed; --v2:#8b5cf6; --v3:#a78bfa;
+            --c1:#06b6d4; --c2:#22d3ee;
+            --g1:#10b981; --g2:#34d399;
+            --a1:#f59e0b; --a2:#fbbf24;
+            --r1:#f43f5e; --r2:#fb7185;
+        }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--t1);height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
+        ::-webkit-scrollbar{width:5px;height:5px}
+        ::-webkit-scrollbar-thumb{background:rgba(139,92,246,.3);border-radius:99px}
+        .app{display:flex;height:100vh}
+
+        /* SIDEBAR */
+        .sidebar{width:240px;min-width:240px;background:var(--bg2);border-right:1px solid var(--b1);display:flex;flex-direction:column}
+        .sb-brand{padding:20px 16px;border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:10px}
+        .sb-logo{width:38px;height:38px;background:linear-gradient(135deg,var(--v1),#4f46e5);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.95rem;color:#fff;flex-shrink:0}
+        .sb-name{font-size:.9rem;font-weight:700;color:var(--t1)}
+        .sb-sub{font-size:.62rem;color:var(--v3);font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+        .sb-nav{flex:1;padding:12px 8px;overflow-y:auto}
+        .nav-label{font-size:.58rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);padding:0 8px;margin:14px 0 4px;display:block}
+        .nav-label:first-child{margin-top:0}
+        .nav-btn{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;cursor:pointer;transition:all .18s;margin-bottom:2px;border:1px solid transparent;font-size:.84rem;color:var(--t2);font-weight:500;background:none;width:100%;text-align:left;font-family:'Sarabun',sans-serif}
+        .nav-btn:hover{color:var(--t1);background:var(--s2);border-color:var(--b1)}
+        .nav-btn.active{color:var(--v3);background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.2)}
+        .nv-ic{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:.72rem;background:var(--s1);flex-shrink:0;transition:all .18s}
+        .nav-btn.active .nv-ic{background:rgba(139,92,246,.15);color:var(--v2)}
+        .sb-foot{padding:12px;border-top:1px solid var(--b1)}
+        .tenant-pill{background:var(--s1);border:1px solid var(--b1);border-radius:9px;padding:10px 12px;margin-bottom:9px}
+        .tenant-name{font-size:.8rem;font-weight:700;color:var(--t1);margin-bottom:2px}
+        .tenant-pkg{font-size:.68rem;color:var(--v3)}
+        .logout-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;border-radius:8px;border:1px solid rgba(244,63,94,.2);background:rgba(244,63,94,.05);color:var(--r2);font-size:.78rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:'Sarabun',sans-serif}
+        .logout-btn:hover{background:rgba(244,63,94,.12);border-color:rgba(244,63,94,.4)}
+
+        /* MAIN */
+        .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+        .topbar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--b1);background:rgba(9,9,15,.8);backdrop-filter:blur(20px);flex-shrink:0}
+        .tp-title{font-size:.92rem;font-weight:700}
+        .tp-sub{font-size:.68rem;color:var(--t3);margin-top:1px}
+        .content{flex:1;overflow-y:auto;padding:22px 24px}
+        .tab-pane{display:none}
+        .tab-pane.active{display:block;animation:slideUp .25s ease}
+        @keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+        /* CARD */
+        .card{background:var(--s1);border:1px solid var(--b1);border-radius:14px;padding:20px}
+        .card+.card{margin-top:16px}
+        .card-title{font-size:.88rem;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+        .card-title i{color:var(--v3)}
+
+        /* CODE BOX */
+        .code-box{background:#030310;border:1px solid rgba(139,92,246,.2);border-radius:12px;padding:18px;position:relative;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:#7ee787;line-height:1.8;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+        .copy-btn{position:absolute;top:10px;right:10px;padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--t2);font-size:.65rem;cursor:pointer;transition:all .18s;font-family:'Sarabun',sans-serif}
+        .copy-btn:hover{color:var(--t1);background:rgba(255,255,255,.12)}
+
+        /* FORM */
+        .fg{margin-bottom:14px}
+        .fl{display:block;font-size:.74rem;font-weight:600;color:var(--t2);margin-bottom:6px}
+        .fi{width:100%;background:rgba(0,0,0,.3);border:1px solid var(--b2);border-radius:8px;padding:9px 13px;color:var(--t1);font-family:'Sarabun',sans-serif;font-size:.85rem;outline:none;transition:border-color .18s}
+        .fi:focus{border-color:var(--v2);box-shadow:0 0 0 3px rgba(139,92,246,.1)}
+        textarea.fi{resize:vertical;min-height:100px}
+
+        /* BTN */
+        .btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;border:none;transition:all .18s;font-family:'Sarabun',sans-serif}
+        .btn-vl{background:linear-gradient(135deg,var(--v1),var(--v2));color:#fff;box-shadow:0 4px 14px rgba(124,58,237,.35)}
+        .btn-vl:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(124,58,237,.5)}
+        .btn-gh{background:var(--s2);color:var(--t2);border:1px solid var(--b1)}
+        .btn-gh:hover{color:var(--t1);border-color:var(--b2)}
+        .btn-rs{background:rgba(244,63,94,.08);color:var(--r2);border:1px solid rgba(244,63,94,.2)}
+        .btn-rs:hover{background:rgba(244,63,94,.15)}
+
+        /* KNOWLEDGE */
+        .kn-item{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:9px;border:1px solid var(--b1);background:var(--s1);margin-bottom:8px;transition:border-color .18s}
+        .kn-item:hover{border-color:var(--b2)}
+        .kn-ic{width:32px;height:32px;background:rgba(139,92,246,.1);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:.75rem;color:var(--v3);flex-shrink:0}
+        .kn-text{flex:1;font-size:.8rem;color:var(--t2);line-height:1.5}
+        .kn-del{width:28px;height:28px;border-radius:6px;border:1px solid rgba(244,63,94,.2);background:rgba(244,63,94,.05);color:var(--r2);font-size:.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .18s}
+        .kn-del:hover{background:rgba(244,63,94,.15)}
+
+        /* LOG */
+        .log-item{padding:10px 14px;border-radius:9px;border-bottom:1px solid rgba(255,255,255,.03);font-size:.78rem}
+        .log-meta{font-size:.66rem;color:var(--t3);margin-top:3px}
+
+        /* BADGE */
+        .badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:99px;font-size:.65rem;font-weight:700;text-transform:uppercase}
+        .badge-active{background:rgba(16,185,129,.1);color:var(--g2);border:1px solid rgba(16,185,129,.2)}
+
+        /* TOAST */
+        #twrap{position:fixed;top:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:7px}
+        .toast{display:flex;align-items:center;gap:9px;padding:11px 16px;border-radius:11px;font-size:.8rem;font-weight:500;min-width:260px;box-shadow:0 8px 25px rgba(0,0,0,.4);animation:tIn .3s ease}
+        .t-ok{background:linear-gradient(135deg,#064e3b,#065f46);border:1px solid rgba(16,185,129,.3);color:var(--g2)}
+        .t-err{background:linear-gradient(135deg,#450a0a,#7f1d1d);border:1px solid rgba(244,63,94,.3);color:var(--r2)}
+        @keyframes tIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+
+        /* OVERVIEW STAT */
+        .stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px}
+        .stat{padding:16px 18px;border-radius:12px;border:1px solid var(--b1);background:var(--s1)}
+        .stat-val{font-size:1.8rem;font-weight:800;margin-bottom:2px}
+        .stat-lbl{font-size:.68rem;color:var(--t3);text-transform:uppercase;font-weight:600;letter-spacing:.06em}
+
+        /* MOBILE */
+        @media(max-width:768px){
+            .app{flex-direction:column;height:auto;min-height:100vh;overflow-y:auto}
+            body{overflow-y:auto;height:auto}
+            .sidebar{width:100%;min-width:100%;border-right:none;border-bottom:1px solid var(--b1);height:auto}
+            .sb-nav{display:flex;padding:8px;white-space:nowrap;overflow-x:auto}
+            .nav-label{display:none}
+            .main{overflow-y:visible}
+            .content{padding:14px}
+            .stat-row{grid-template-columns:1fr 1fr}
+        }
+    </style>
+</head>
+<body>
+<div id="twrap"></div>
+<div class="app">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="sb-brand">
+        <img src="logo.png" alt="INDICATOR" style="height: 42px; width: auto; mix-blend-mode: screen; filter: drop-shadow(0 0 5px rgba(255,255,255,0.2));">
+        <div>
+            <div class="sb-sub">My Dashboard</div>
+        </div>
+    </div>
+    <nav class="sb-nav">
+        <span class="nav-label">ภาพรวม</span>
+        <button onclick="sw('overview')" id="nav-overview" class="nav-btn active">
+            <span class="nv-ic"><i class="fa-solid fa-chart-simple"></i></span>ภาพรวม
+        </button>
+        <span class="nav-label">จัดการ</span>
+        <button onclick="sw('code')" id="nav-code" class="nav-btn">
+            <span class="nv-ic"><i class="fa-solid fa-code"></i></span>Plugin Code ของฉัน
+        </button>
+        <button onclick="sw('settings')" id="nav-settings" class="nav-btn">
+            <span class="nv-ic"><i class="fa-solid fa-sliders"></i></span>ตั้งค่าบอท
+        </button>
+        <button onclick="sw('knowledge')" id="nav-knowledge" class="nav-btn">
+            <span class="nv-ic"><i class="fa-solid fa-brain"></i></span>ข้อมูลความรู้
+        </button>
+        <button onclick="sw('logs')" id="nav-logs" class="nav-btn">
+            <span class="nv-ic"><i class="fa-solid fa-comments"></i></span>ประวัติแชท
+        </button>
+    </nav>
+    <div class="sb-foot">
+        <div class="tenant-pill" id="tenantPill">
+            <div class="tenant-name" id="tenantName">—</div>
+            <div class="tenant-pkg" id="tenantPkg">—</div>
+        </div>
+        <button class="logout-btn" onclick="logout()">
+            <i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ
+        </button>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+    <div class="topbar">
+        <div>
+            <div class="tp-title" id="topTitle">ภาพรวม</div>
+            <div class="tp-sub">จัดการแชทบอทของร้านคุณ</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+            <span class="badge badge-active"><i class="fa-solid fa-circle" style="font-size:.4rem"></i>&nbsp;ออนไลน์</span>
+        </div>
+    </div>
+
+    <div class="content">
+
+        <!-- OVERVIEW TAB -->
+        <div class="tab-pane active" id="pane-overview">
+            <div class="stat-row">
+                <div class="stat">
+                    <div class="stat-val" id="statExpiry" style="font-size:1rem;padding-top:6px">—</div>
+                    <div class="stat-lbl">วันหมดอายุ</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-val" id="statPkg" style="color:#a78bfa">—</div>
+                    <div class="stat-lbl">แพ็กเกจ</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-val" id="statKnowledge" style="color:#34d399">0</div>
+                    <div class="stat-lbl">ชุดข้อมูล</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-circle-info"></i> วิธีเริ่มใช้งาน</div>
+                <div style="font-size:.84rem;color:var(--t2);line-height:1.9">
+                    <p>1. ไปที่เมนู <strong style="color:var(--v3)">Plugin Code ของฉัน</strong> คัดลอกโค้ด 2 บรรทัด</p>
+                    <p>2. นำโค้ดไปวางก่อน <code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">&lt;/body&gt;</code> ในเว็บของคุณ</p>
+                    <p>3. ไปที่เมนู <strong style="color:var(--v3)">ข้อมูลความรู้</strong> เพิ่มข้อมูลสินค้า/บริการของร้านคุณ</p>
+                    <p>4. ไปที่เมนู <strong style="color:var(--v3)">ตั้งค่าบอท</strong> ปรับแต่งสีและคำทักทาย</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- CODE TAB -->
+        <div class="tab-pane" id="pane-code">
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-code"></i> โค้ดสำหรับติดตั้งแชทบอทในเว็บของคุณ</div>
+                <p style="font-size:.82rem;color:var(--t2);margin-bottom:14px">คัดลอกโค้ดด้านล่างไปวางก่อนปิด <code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">&lt;/body&gt;</code> ในทุกหน้าที่ต้องการให้มีแชทบอท</p>
+                <div class="code-box" id="codeBox">
+                    <button class="copy-btn" onclick="copyCode()"><i class="fa-solid fa-copy"></i> คัดลอก</button>
+                    <span id="codeContent">กำลังโหลด...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS TAB -->
+        <div class="tab-pane" id="pane-settings">
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-sliders"></i> ตั้งค่าแชทบอท</div>
+                <div class="fg">
+                    <label class="fl">สีหลักของแชทบอท (Theme Color)</label>
+                    <select class="fi" id="setTheme">
+                        <option value="blue">🔵 น้ำเงิน (Blue)</option>
+                        <option value="purple">🟣 ม่วง (Purple)</option>
+                        <option value="green">🟢 เขียว (Green)</option>
+                        <option value="teal">🩵 ฟ้าน้ำทะเล (Teal)</option>
+                        <option value="orange">🟠 ส้ม (Orange)</option>
+                        <option value="dark">⚫ ดำ (Dark)</option>
+                    </select>
+                </div>
+                <div class="fg">
+                    <label class="fl">โมเดล AI</label>
+                    <select class="fi" id="setModel">
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (แนะนำ)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                    </select>
+                </div>
+                <div class="fg">
+                    <label class="fl">คำสั่งให้บอท (System Prompt)</label>
+                    <textarea class="fi" id="setPrompt" rows="5" placeholder="เช่น: คุณคือผู้ช่วยร้านค้าชื่อ... ตอบเป็นภาษาไทยเสมอ..."></textarea>
+                </div>
+                <div class="fg">
+                    <label class="fl">ความคิดสร้างสรรค์ของบอท (Temperature: 0 = แม่นยำ, 1 = สร้างสรรค์)</label>
+                    <input type="range" class="fi" id="setTemp" min="0" max="1" step="0.1" value="0.3" style="padding:4px">
+                    <span id="setTempVal" style="font-size:.78rem;color:var(--t3)">0.3</span>
+                </div>
+                <button class="btn btn-vl" onclick="saveSettings()">
+                    <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า
+                </button>
+            </div>
+        </div>
+
+        <!-- KNOWLEDGE TAB -->
+        <div class="tab-pane" id="pane-knowledge">
+            <div class="card" style="margin-bottom:16px">
+                <div class="card-title"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูลให้บอท</div>
+                <div class="fg">
+                    <label class="fl">ใส่ข้อความ (สินค้า, บริการ, FAQ ฯลฯ)</label>
+                    <textarea class="fi" id="knText" rows="4" placeholder="เช่น: ร้านเราขายเสื้อผ้าแฟชั่น ราคา 299-999 บาท สีที่มี ดำ ขาว แดง..."></textarea>
+                </div>
+                <button class="btn btn-vl" onclick="addKnowledge()">
+                    <i class="fa-solid fa-brain"></i> เพิ่มข้อมูล
+                </button>
+            </div>
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-database"></i> ข้อมูลที่บอทรู้แล้ว (<span id="knCount">0</span> ชุด)</div>
+                <div id="knList"><div style="text-align:center;padding:30px;color:var(--t3);font-size:.8rem">ยังไม่มีข้อมูล</div></div>
+            </div>
+        </div>
+
+        <!-- LOGS TAB -->
+        <div class="tab-pane" id="pane-logs">
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-comments"></i> ประวัติแชทล่าสุด</div>
+                <div id="logList"><div style="text-align:center;padding:30px;color:var(--t3);font-size:.8rem">ยังไม่มีประวัติแชท</div></div>
+            </div>
+        </div>
+
+    </div><!-- /.content -->
+</div><!-- /.main -->
+</div><!-- /.app -->
+
+<script>
+    // ---- Auth ----
+    let tenant = null;
+
+    // Check for admin preview token in URL (?preview=base64_encoded_tenant_data)
+    const urlParams = new URLSearchParams(window.location.search);
+    const previewToken = urlParams.get('preview');
+    if (previewToken) {
+        try {
+            const decoded = decodeURIComponent(previewToken);
+            tenant = JSON.parse(decodeURIComponent(escape(atob(decoded))));
+            // Show admin preview badge
+            const previewBadge = document.createElement('div');
+            previewBadge.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;padding:6px 16px;border-radius:999px;font-size:.72rem;font-weight:700;letter-spacing:.05em;box-shadow:0 4px 12px rgba(245,158,11,.4);pointer-events:none;';
+            previewBadge.innerHTML = '<i class="fa-solid fa-shield-halved" style="margin-right:5px"></i>Admin Preview Mode — กำลังดูในฐานะแอดมิน';
+            document.body.appendChild(previewBadge);
+        } catch(e) { tenant = null; }
+    }
+
+    // Fall back to localStorage (normal customer login)
+    if (!tenant) {
+        try { tenant = JSON.parse(localStorage.getItem('tenant_data')); } catch(e) {}
+    }
+
+    if (!tenant || !tenant.api_key) { window.location.href = '/customer-login'; }
+
+    const AUTH = { Authorization: `Bearer ${tenant.api_key}`, 'Content-Type': 'application/json' };
+
+    document.getElementById('tenantName').textContent = tenant.company_name || tenant.username || '—';
+    document.getElementById('tenantPkg').textContent = tenant.package_type || '—';
+    document.getElementById('statPkg').textContent = (tenant.package_type || '—').toUpperCase();
+    const exp = tenant.expires_at ? new Date(tenant.expires_at).toLocaleDateString('th-TH') : 'ไม่จำกัด';
+    document.getElementById('statExpiry').textContent = exp;
+
+    // Generate plugin code
+    const origin = 'https://test-mu-cyan-21.vercel.app';
+    const pluginCode = `<!-- INDICATOR WEB CHAT -->\n<script type="module">\n  import { init } from "${origin}/plugins/chat.js";\n  init(document.body, "${tenant.api_key}", "", "${origin}/api/chat");\n<\/script>`;
+    document.getElementById('codeContent').textContent = pluginCode;
+
+    // ---- Tab switching ----
+    function sw(tab) {
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('pane-' + tab).classList.add('active');
+        document.getElementById('nav-' + tab).classList.add('active');
+        const titles = { overview:'ภาพรวม', code:'Plugin Code ของฉัน', settings:'ตั้งค่าบอท', knowledge:'ข้อมูลความรู้', logs:'ประวัติแชท' };
+        document.getElementById('topTitle').textContent = titles[tab] || tab;
+        if (tab === 'knowledge') loadKnowledge();
+        if (tab === 'logs') loadLogs();
+        if (tab === 'settings') loadSettings();
+    }
+
+    // ---- Copy code ----
+    function copyCode() {
+        const code = document.getElementById('codeContent').textContent;
+        navigator.clipboard.writeText(code).then(() => toast('คัดลอกโค้ดแล้ว! ✅', 'ok')).catch(() => toast('กรุณาคัดลอกด้วยมือ', 'err'));
+    }
+
+    // ---- Settings ----
+    document.getElementById('setTemp').addEventListener('input', function() {
+        document.getElementById('setTempVal').textContent = this.value;
+    });
+
+    async function loadSettings() {
+        try {
+            const res = await fetch('/api/tenant?action=settings', { headers: AUTH });
+            const data = await res.json();
+            const s = data.settings || {};
+            if (s.theme_color) document.getElementById('setTheme').value = s.theme_color;
+            if (s.system_model) document.getElementById('setModel').value = s.system_model;
+            if (s.system_prompt) document.getElementById('setPrompt').value = s.system_prompt;
+            if (s.temperature !== undefined) {
+                document.getElementById('setTemp').value = s.temperature;
+                document.getElementById('setTempVal').textContent = s.temperature;
+            }
+        } catch(e) {}
+    }
+
+    async function saveSettings() {
+        try {
+            const res = await fetch('/api/tenant?action=save_settings', {
+                method: 'POST',
+                headers: AUTH,
+                body: JSON.stringify({
+                    theme_color: document.getElementById('setTheme').value,
+                    system_model: document.getElementById('setModel').value,
+                    system_prompt: document.getElementById('setPrompt').value,
+                    temperature: parseFloat(document.getElementById('setTemp').value)
+                })
+            });
+            const data = await res.json();
+            if (data.success) toast('บันทึกการตั้งค่าแล้ว ✅', 'ok');
+            else throw new Error(data.error);
+        } catch(e) {
+            toast('เกิดข้อผิดพลาด: ' + e.message, 'err');
+        }
+    }
+
+    // ---- Knowledge ----
+    async function loadKnowledge() {
+        try {
+            const res = await fetch('/api/tenant?action=knowledge', { headers: AUTH });
+            const data = await res.json();
+            const list = data.data || [];
+            document.getElementById('statKnowledge').textContent = list.length;
+            document.getElementById('knCount').textContent = list.length;
+
+            if (list.length === 0) {
+                document.getElementById('knList').innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3);font-size:.8rem">ยังไม่มีข้อมูล ลองเพิ่มสักชุดดูนะครับ</div>';
+                return;
+            }
+
+            document.getElementById('knList').innerHTML = list.map(k => `
+                <div class="kn-item">
+                    <div class="kn-ic"><i class="fa-solid fa-${k.type === 'url' ? 'link' : 'align-left'}"></i></div>
+                    <div class="kn-text">${escHtml(k.content || '').slice(0, 200)}${(k.content||'').length > 200 ? '...' : ''}</div>
+                    <button class="kn-del" onclick="deleteKnowledge('${k.id}')"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `).join('');
+        } catch(e) {
+            toast('โหลดข้อมูลความรู้ไม่สำเร็จ', 'err');
+        }
+    }
+
+    async function addKnowledge() {
+        const text = document.getElementById('knText').value.trim();
+        if (!text) return toast('กรุณาใส่ข้อความก่อนครับ', 'err');
+        try {
+            const res = await fetch('/api/tenant?action=add_knowledge', {
+                method: 'POST',
+                headers: AUTH,
+                body: JSON.stringify({ text })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast('เพิ่มข้อมูลแล้ว ✅', 'ok');
+                document.getElementById('knText').value = '';
+                loadKnowledge();
+            } else throw new Error(data.error);
+        } catch(e) {
+            toast('เกิดข้อผิดพลาด: ' + e.message, 'err');
+        }
+    }
+
+    async function deleteKnowledge(id) {
+        if (!confirm('ลบข้อมูลชุดนี้?')) return;
+        try {
+            const res = await fetch('/api/tenant?action=delete_knowledge', {
+                method: 'POST',
+                headers: AUTH,
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (data.success) { toast('ลบแล้ว ✅', 'ok'); loadKnowledge(); }
+            else throw new Error(data.error);
+        } catch(e) {
+            toast('เกิดข้อผิดพลาด: ' + e.message, 'err');
+        }
+    }
+
+    // ---- Logs ----
+    async function loadLogs() {
+        try {
+            const res = await fetch('/api/tenant?action=logs', { headers: AUTH });
+            const data = await res.json();
+            const logs = data.logs || [];
+            if (logs.length === 0) {
+                document.getElementById('logList').innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3);font-size:.8rem">ยังไม่มีประวัติแชท</div>';
+                return;
+            }
+            document.getElementById('logList').innerHTML = logs.map(l => `
+                <div class="log-item">
+                    <div>${escHtml(l.message || '').slice(0, 300)}</div>
+                    <div class="log-meta">${new Date(l.timestamp || l.created_at).toLocaleString('th-TH')}</div>
+                </div>
+            `).join('');
+        } catch(e) {
+            toast('โหลด Logs ไม่สำเร็จ', 'err');
+        }
+    }
+
+    // ---- Logout ----
+    function logout() {
+        localStorage.removeItem('tenant_data');
+        window.location.href = '/customer-login';
+    }
+
+    // ---- Toast ----
+    function toast(msg, type = 'ok') {
+        const t = document.createElement('div');
+        t.className = `toast t-${type}`;
+        t.innerHTML = `<i class="fa-solid fa-${type === 'ok' ? 'check-circle' : 'circle-exclamation'}"></i> ${escHtml(msg)}`;
+        document.getElementById('twrap').appendChild(t);
+        setTimeout(() => t.remove(), 3000);
+    }
+
+    function escHtml(s) {
+        return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+</script>
+</body>
+</html>

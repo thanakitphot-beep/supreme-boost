@@ -1,4 +1,4 @@
-const db = require('./db.js');
+const db = require("./_db.js");
 
 module.exports = async function handler(req, res) {
     if (req.method === 'OPTIONS') {
@@ -11,7 +11,7 @@ module.exports = async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');
 
-    const auth = require('./auth.js');
+    const auth = require("./_auth.js");
     const authHeader = req.headers['authorization'];
     let token = '';
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -38,7 +38,7 @@ module.exports = async function handler(req, res) {
 
     if (method === 'POST') {
         const body = req.body || {};
-        const result = await db.saveSettings(body);
+        const result = await db.saveSettings('global', body);
         if (!result) {
             return res.status(500).json({ success: false, message: 'Failed to save settings' });
         }
