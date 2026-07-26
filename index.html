@@ -392,44 +392,31 @@
                     </div>
                 </div>
 
-                <!-- Widget Code Options -->
-                <div class="space-y-4">
-                    <!-- Standard Version -->
-                    <div class="bg-slate-800/40 p-6 rounded-xl border border-slate-700/80 hover:border-cyan-500/50 transition relative overflow-hidden group">
-                        <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-cyan-500/20 transition"></div>
-                        <div class="relative z-10">
-                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
-                                <div>
-                                    <h3 class="font-bold text-white flex items-center text-lg mb-1"><i class="fa-solid fa-code text-cyan-400 mr-2"></i> โค้ดรูปแบบมาตรฐาน (Standard)</h3>
-                                    <p class="text-sm text-slate-400">สำหรับเว็บไซต์ทั่วไป ติดตั้งง่ายที่สุด ใช้งานได้ทันที</p>
-                                </div>
-                            </div>
-                            <div class="relative p-5 rounded-xl overflow-x-auto whitespace-pre-wrap break-all shadow-inner mt-2 group/codebox transition-colors duration-300" style="background:#030310; border:1px solid rgba(139,92,246,0.3);">
-                                <button onclick="copyCodeElement('widget-code-standard')" class="absolute top-3 right-3 text-xs flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition shadow-sm opacity-100" style="background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.1); color:#94a3b8;" onmouseover="this.style.background='rgba(255,255,255,0.12)'; this.style.color='#f1f5f9';" onmouseout="this.style.background='rgba(255,255,255,0.06)'; this.style.color='#94a3b8';">
-                                    <i class="fa-regular fa-copy"></i> <span class="font-semibold">คัดลอกโค้ด</span>
-                                </button>
-                                <pre class="text-xs sm:text-sm pt-2 whitespace-pre-wrap break-all pr-24" style="color:#7ee787; font-family:'JetBrains Mono',monospace; line-height:1.8;" id="widget-code-standard"></pre>
-                            </div>
-                        </div>
+                <!-- Widget Code Section with Format Tabs -->
+                <div class="bg-slate-800/40 p-6 rounded-xl border border-slate-700/80">
+                    <h3 class="font-bold text-white flex items-center text-lg mb-1"><i class="fa-solid fa-code text-cyan-400 mr-2"></i> โค้ดติดตั้งสำหรับเว็บไซต์</h3>
+                    <p class="text-sm text-slate-400 mb-4">เลือกรูปแบบโค้ดที่เหมาะกับเว็บไซต์ของคุณ แล้ววางไว้ก่อนแท็ก <code style="background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px">&lt;/body&gt;</code> ในเว็บคุณ</p>
+
+                    <!-- Format Buttons -->
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+                        <button onclick="setModalEmbedFmt('smart',this)" id="modal-efmt-smart" style="background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;border:none;font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">⚡ Smart Async (แนะนำ)</button>
+                        <button onclick="setModalEmbedFmt('single',this)" id="modal-efmt-single" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">➖ One Line</button>
+                        <button onclick="setModalEmbedFmt('simple',this)" id="modal-efmt-simple" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">📝 Simple Script</button>
+                        <button onclick="setModalEmbedFmt('gtm',this)" id="modal-efmt-gtm" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">🏷️ Google Tag Manager</button>
+                        <button onclick="setModalEmbedFmt('wp',this)" id="modal-efmt-wp" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">🌐 WordPress / PHP</button>
                     </div>
 
-                    <!-- Customized Version -->
-                    <div class="bg-slate-800/40 p-6 rounded-xl border border-slate-700/80 hover:border-blue-500/50 transition relative overflow-hidden group">
-                        <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-blue-500/20 transition"></div>
-                        <div class="relative z-10">
-                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
-                                <div>
-                                    <h3 class="font-bold text-white flex items-center text-lg mb-1"><i class="fa-solid fa-palette text-blue-400 mr-2"></i> โค้ดรูปแบบกำหนดค่าเอง (Customized)</h3>
-                                    <p class="text-sm text-slate-400">ตั้งค่าสี <code class="text-blue-300">data-primary</code> และตำแหน่ง <code class="text-blue-300">data-position="right"</code> ให้ตรงกับแบรนด์ของคุณ</p>
-                                </div>
-                            </div>
-                            <div class="relative p-5 rounded-xl overflow-x-auto whitespace-pre-wrap break-all shadow-inner mt-2 group/codebox transition-colors duration-300" style="background:#030310; border:1px solid rgba(139,92,246,0.3);">
-                                <button onclick="copyCodeElement('widget-code-custom')" class="absolute top-3 right-3 text-xs flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition shadow-sm opacity-100" style="background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.1); color:#94a3b8;" onmouseover="this.style.background='rgba(255,255,255,0.12)'; this.style.color='#f1f5f9';" onmouseout="this.style.background='rgba(255,255,255,0.06)'; this.style.color='#94a3b8';">
-                                    <i class="fa-regular fa-copy"></i> <span class="font-semibold">คัดลอกโค้ด</span>
-                                </button>
-                                <pre class="text-xs sm:text-sm pt-2 whitespace-pre-wrap break-all pr-24" style="color:#7ee787; font-family:'JetBrains Mono',monospace; line-height:1.8;" id="widget-code-custom"></pre>
-                            </div>
-                        </div>
+                    <!-- Description -->
+                    <div id="modal-embed-desc" style="font-size:.72rem;color:#64748b;margin-bottom:10px;padding:8px 12px;background:rgba(124,58,237,.05);border-radius:7px;border-left:3px solid rgba(139,92,246,.5)">
+                        ⚡ โหลดแบบ Async ไม่ชะลอเว็บ รองรับทุก Platform (Netlify, Wix, Shopify, Squarespace, GitHub Pages ฯลฯ)
+                    </div>
+
+                    <!-- Code Display -->
+                    <div class="relative p-5 rounded-xl shadow-inner" style="background:#030310; border:1px solid rgba(139,92,246,0.3);">
+                        <button onclick="copyCodeElement('modal-widget-code')" class="absolute top-3 right-3 text-xs flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition" style="background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.1); color:#94a3b8;" onmouseover="this.style.background='rgba(255,255,255,0.12)';this.style.color='#f1f5f9';" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='#94a3b8';">
+                            <i class="fa-regular fa-copy"></i> <span class="font-semibold">คัดลอกโค้ด</span>
+                        </button>
+                        <pre id="modal-widget-code" class="text-xs sm:text-sm pt-2 pr-24 whitespace-pre-wrap break-all" style="color:#7ee787; font-family:'JetBrains Mono',monospace; line-height:1.8;"></pre>
                     </div>
                 </div>
             </div>
@@ -719,19 +706,53 @@
         }
 
         // === My Products Modal logic ===
+        let _modalEmbedCodes = {};
+        const _modalEmbedDescs = {
+            smart:  '⚡ โหลดแบบ Async ไม่ชะลอเว็บ รองรับทุก Platform (Netlify, Wix, Shopify, Squarespace, GitHub Pages ฯลฯ)',
+            single: '➖ โค้ดบรรทัดเดียว เหมาะกับระบบที่รับ HTML สั้นๆ หรือ Custom Footer/Header',
+            simple: '📝 Script Tag แบบเรียบง่าย เหมาะกับเว็บ HTML ธรรมดา หรือ Bootstrap Template',
+            gtm:    '🏷️ สำหรับใส่ใน Google Tag Manager — Custom HTML Tag',
+            wp:     '🌐 สำหรับ WordPress / PHP — ใส่ใน functions.php หรือ Theme Footer'
+        };
+
         function openMyProductsModal() {
             const tenantStr = localStorage.getItem('customer_data');
             if (tenantStr) {
                 const tenant = JSON.parse(tenantStr);
-                const baseUrl = window.location.origin;
-                
-                const standardCode = `<script src="${baseUrl}/supreme-boost/boost.js" data-api-key="${tenant.api_key}" defer><\/script>`;
-                const customCode = `<script src="${baseUrl}/supreme-boost/boost.js"\n        data-api-key="${tenant.api_key}"\n        data-primary="#7c3aed"\n        data-position="right"\n        defer><\/script>`;
-                
-                document.getElementById('widget-code-standard').innerText = standardCode;
-                document.getElementById('widget-code-custom').innerText = customCode;
+                const or = window.location.origin;
+                const boostSrc = or + '/supreme-boost/boost.js';
+                const chatUrl  = or + '/api/chat';
+                const apiKey   = tenant.api_key;
+                const title    = (tenant.company_name || tenant.username || 'My Shop') + ' AI';
+
+                _modalEmbedCodes = {
+                    smart:  `<!-- INDICATOR Smart AI Widget -->\n<script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    primaryColor:"#7c3aed",\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n<\/script>`,
+                    single: `<script>window.IndicatorConfig={apiKey:"${apiKey}",backendUrl:"${chatUrl}",title:"${title}",lang:"auto"};(function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));<\/script>`,
+                    simple: `<!-- INDICATOR AI Widget -->\n<script src="${boostSrc}"\n  data-api-key="${apiKey}"\n  data-backend-url="${chatUrl}"\n  data-title="${title}"\n  data-primary="#7c3aed"\n  data-lang="auto"\n  defer>\n<\/script>`,
+                    gtm:    `<!-- Custom HTML Tag สำหรับ Google Tag Manager -->\n<script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    lang:"auto"\n  };\n  var s=document.createElement('script');\n  s.src="${boostSrc}";\n  s.async=true;\n  document.head.appendChild(s);\n<\/script>`,
+                    wp:     `<?php\n// ใส่ใน functions.php หรือ Plugin\nfunction add_indicator_ai_widget() {\n  ?>\n  <script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n  <\/script>\n  <?php\n}\nadd_action('wp_footer', 'add_indicator_ai_widget');`
+                };
+
+                // Set default to smart
+                document.getElementById('modal-widget-code').innerText = _modalEmbedCodes.smart;
                 document.getElementById('my-products-modal').classList.remove('hidden');
             }
+        }
+
+        function setModalEmbedFmt(fmt, btn) {
+            // Reset all buttons
+            document.querySelectorAll('[id^="modal-efmt-"]').forEach(b => {
+                b.style.background = 'rgba(255,255,255,.06)';
+                b.style.color = '#94a3b8';
+                b.style.border = '1px solid rgba(255,255,255,.1)';
+            });
+            // Activate clicked
+            btn.style.background = 'linear-gradient(135deg,#7c3aed,#8b5cf6)';
+            btn.style.color = '#fff';
+            btn.style.border = 'none';
+            // Update desc & code
+            document.getElementById('modal-embed-desc').innerText = _modalEmbedDescs[fmt] || '';
+            document.getElementById('modal-widget-code').innerText = _modalEmbedCodes[fmt] || '';
         }
 
         function closeMyProductsModal() {
