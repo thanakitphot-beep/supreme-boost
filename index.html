@@ -392,21 +392,43 @@
                     </div>
                 </div>
 
-                <!-- Widget Code -->
-                <div class="bg-slate-800/40 p-6 rounded-xl border border-slate-700/80 hover:border-cyan-500/50 transition relative overflow-hidden group">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-cyan-500/20 transition"></div>
-                    <div class="relative z-10">
-                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
-                            <div>
-                                <h3 class="font-bold text-white flex items-center text-lg mb-1"><i class="fa-solid fa-code text-cyan-400 mr-2"></i> โค้ดติดตั้งสำหรับเว็บไซต์ (Widget)</h3>
-                                <p class="text-sm text-slate-400">คัดลอกโค้ดด้านล่างนี้ไปวางไว้ก่อนแท็ก <code>&lt;/body&gt;</code> ในทุกหน้าของเว็บคุณ</p>
+                <!-- Widget Code Options -->
+                <div class="space-y-4">
+                    <!-- Standard Version -->
+                    <div class="bg-slate-800/40 p-6 rounded-xl border border-slate-700/80 hover:border-cyan-500/50 transition relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-cyan-500/20 transition"></div>
+                        <div class="relative z-10">
+                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
+                                <div>
+                                    <h3 class="font-bold text-white flex items-center text-lg mb-1"><i class="fa-solid fa-code text-cyan-400 mr-2"></i> โค้ดรูปแบบมาตรฐาน (Standard)</h3>
+                                    <p class="text-sm text-slate-400">สำหรับเว็บไซต์ทั่วไป ติดตั้งง่ายที่สุด ใช้งานได้ทันที</p>
+                                </div>
+                            </div>
+                            <div class="relative p-5 rounded-xl overflow-x-auto whitespace-pre-wrap break-all shadow-inner mt-2 group/codebox transition-colors duration-300" style="background:#030310; border:1px solid rgba(139,92,246,0.3);">
+                                <button onclick="copyCodeElement('widget-code-standard')" class="absolute top-3 right-3 text-xs flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition shadow-sm opacity-100" style="background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.1); color:#94a3b8;" onmouseover="this.style.background='rgba(255,255,255,0.12)'; this.style.color='#f1f5f9';" onmouseout="this.style.background='rgba(255,255,255,0.06)'; this.style.color='#94a3b8';">
+                                    <i class="fa-regular fa-copy"></i> <span class="font-semibold">คัดลอกโค้ด</span>
+                                </button>
+                                <pre class="text-xs sm:text-sm pt-2 whitespace-pre-wrap break-all pr-24" style="color:#7ee787; font-family:'JetBrains Mono',monospace; line-height:1.8;" id="widget-code-standard"></pre>
                             </div>
                         </div>
-                        <div class="relative p-5 rounded-xl overflow-x-auto whitespace-pre-wrap break-all shadow-inner mt-2 group/codebox transition-colors duration-300" style="background:#030310; border:1px solid rgba(139,92,246,0.3);">
-                            <button onclick="copyWidgetCode()" class="absolute top-3 right-3 text-xs flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition shadow-sm opacity-100" style="background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.1); color:#94a3b8;" onmouseover="this.style.background='rgba(255,255,255,0.12)'; this.style.color='#f1f5f9';" onmouseout="this.style.background='rgba(255,255,255,0.06)'; this.style.color='#94a3b8';">
-                                <i class="fa-regular fa-copy"></i> <span class="font-semibold">คัดลอกโค้ด</span>
-                            </button>
-                            <pre class="text-sm pt-2 whitespace-pre-wrap break-all pr-24" style="color:#7ee787; font-family:'JetBrains Mono',monospace; line-height:1.8;" id="widget-code-display"></pre>
+                    </div>
+
+                    <!-- Customized Version -->
+                    <div class="bg-slate-800/40 p-6 rounded-xl border border-slate-700/80 hover:border-blue-500/50 transition relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-blue-500/20 transition"></div>
+                        <div class="relative z-10">
+                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
+                                <div>
+                                    <h3 class="font-bold text-white flex items-center text-lg mb-1"><i class="fa-solid fa-palette text-blue-400 mr-2"></i> โค้ดรูปแบบกำหนดค่าเอง (Customized)</h3>
+                                    <p class="text-sm text-slate-400">ตั้งค่าสี <code class="text-blue-300">data-primary</code> และตำแหน่ง <code class="text-blue-300">data-position="right"</code> ให้ตรงกับแบรนด์ของคุณ</p>
+                                </div>
+                            </div>
+                            <div class="relative p-5 rounded-xl overflow-x-auto whitespace-pre-wrap break-all shadow-inner mt-2 group/codebox transition-colors duration-300" style="background:#030310; border:1px solid rgba(139,92,246,0.3);">
+                                <button onclick="copyCodeElement('widget-code-custom')" class="absolute top-3 right-3 text-xs flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition shadow-sm opacity-100" style="background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.1); color:#94a3b8;" onmouseover="this.style.background='rgba(255,255,255,0.12)'; this.style.color='#f1f5f9';" onmouseout="this.style.background='rgba(255,255,255,0.06)'; this.style.color='#94a3b8';">
+                                    <i class="fa-regular fa-copy"></i> <span class="font-semibold">คัดลอกโค้ด</span>
+                                </button>
+                                <pre class="text-xs sm:text-sm pt-2 whitespace-pre-wrap break-all pr-24" style="color:#7ee787; font-family:'JetBrains Mono',monospace; line-height:1.8;" id="widget-code-custom"></pre>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -702,8 +724,12 @@
             if (tenantStr) {
                 const tenant = JSON.parse(tenantStr);
                 const baseUrl = window.location.origin;
-                const code = `<script src="${baseUrl}/supreme-boost/boost.js" data-api-key="${tenant.api_key}" defer><\/script>`;
-                document.getElementById('widget-code-display').innerText = code;
+                
+                const standardCode = `<script src="${baseUrl}/supreme-boost/boost.js" data-api-key="${tenant.api_key}" defer><\/script>`;
+                const customCode = `<script src="${baseUrl}/supreme-boost/boost.js"\n        data-api-key="${tenant.api_key}"\n        data-primary="#7c3aed"\n        data-position="right"\n        defer><\/script>`;
+                
+                document.getElementById('widget-code-standard').innerText = standardCode;
+                document.getElementById('widget-code-custom').innerText = customCode;
                 document.getElementById('my-products-modal').classList.remove('hidden');
             }
         }
@@ -712,8 +738,8 @@
             document.getElementById('my-products-modal').classList.add('hidden');
         }
 
-        function copyWidgetCode() {
-            const code = document.getElementById('widget-code-display').innerText;
+        function copyCodeElement(elementId) {
+            const code = document.getElementById(elementId).innerText;
             navigator.clipboard.writeText(code);
             alert('คัดลอกโค้ดติดตั้งเรียบร้อยแล้ว');
         }
