@@ -401,12 +401,12 @@
                                 <h3 class="font-bold text-white flex items-center text-lg mb-1"><i class="fa-solid fa-code text-cyan-400 mr-2"></i> โค้ดติดตั้งสำหรับเว็บไซต์ (Widget)</h3>
                                 <p class="text-sm text-slate-400">คัดลอกโค้ดด้านล่างนี้ไปวางไว้ก่อนแท็ก <code>&lt;/body&gt;</code> ในทุกหน้าของเว็บคุณ</p>
                             </div>
-                            <button onclick="copyWidgetCode()" class="shrink-0 text-sm text-cyan-400 hover:text-white hover:bg-cyan-500 flex items-center justify-center space-x-2 bg-cyan-500/10 px-4 py-2 rounded-lg border border-cyan-500/30 transition shadow-sm">
+                        </div>
+                        <div class="relative p-5 rounded-xl overflow-x-auto whitespace-pre-wrap break-all shadow-inner mt-2 group/codebox transition-colors duration-300" style="background:#030310; border:1px solid rgba(139,92,246,0.3);">
+                            <button onclick="copyWidgetCode()" class="absolute top-3 right-3 text-xs flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition shadow-sm opacity-100" style="background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.1); color:#94a3b8;" onmouseover="this.style.background='rgba(255,255,255,0.12)'; this.style.color='#f1f5f9';" onmouseout="this.style.background='rgba(255,255,255,0.06)'; this.style.color='#94a3b8';">
                                 <i class="fa-regular fa-copy"></i> <span class="font-semibold">คัดลอกโค้ด</span>
                             </button>
-                        </div>
-                        <div class="bg-slate-950 p-5 rounded-xl border border-slate-800/80 shadow-inner">
-                            <pre class="text-xs sm:text-sm text-cyan-200 font-mono whitespace-pre-wrap break-all" id="widget-code-display"></pre>
+                            <pre class="text-sm pt-2 whitespace-pre-wrap break-all pr-24" style="color:#7ee787; font-family:'JetBrains Mono',monospace; line-height:1.8;" id="widget-code-display"></pre>
                         </div>
                     </div>
                 </div>
