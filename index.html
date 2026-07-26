@@ -360,6 +360,60 @@
         </div>
     </div>
 
+    <!-- My Products Modal -->
+    <div id="my-products-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onclick="closeMyProductsModal()"></div>
+        <div class="glass-nav border border-slate-700 p-8 rounded-2xl w-full max-w-2xl relative z-10 shadow-2xl shadow-cyan-900/20">
+            <button onclick="closeMyProductsModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            
+            <div class="flex items-center space-x-4 mb-8 border-b border-slate-700 pb-4">
+                <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center shadow-lg shadow-cyan-500/10">
+                    <i class="fa-solid fa-box-open text-2xl text-cyan-400"></i>
+                </div>
+                <div>
+                    <h2 class="text-2xl font-bold text-white">สินค้าของฉัน</h2>
+                    <p class="text-slate-400 text-sm mt-1">ตั้งค่าแชทบอทและนำไปติดตั้งบนเว็บไซต์ของคุณ</p>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Admin Dashboard Link -->
+                <div class="bg-slate-800/40 p-6 rounded-xl border border-slate-700/80 hover:border-purple-500/50 transition relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-purple-500/20 transition"></div>
+                    <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h3 class="font-bold text-white flex items-center text-lg mb-1"><i class="fa-solid fa-gauge-high text-purple-400 mr-2"></i> หน้าจัดการแชทบอท (Dashboard)</h3>
+                            <p class="text-sm text-slate-400 max-w-md">เข้าสู่ระบบหลังบ้านเพื่อสอน AI, เพิ่มข้อมูลสินค้า, ตั้งค่าสีสัน และดูประวัติการสนทนา</p>
+                        </div>
+                        <a href="/customer-dashboard.html" class="inline-flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white px-6 py-3 rounded-lg font-bold transition shadow-lg shadow-purple-500/25 whitespace-nowrap">
+                            <span>เข้าสู่ระบบหลังบ้าน</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Widget Code -->
+                <div class="bg-slate-800/40 p-6 rounded-xl border border-slate-700/80 hover:border-cyan-500/50 transition relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-cyan-500/20 transition"></div>
+                    <div class="relative z-10">
+                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
+                            <div>
+                                <h3 class="font-bold text-white flex items-center text-lg mb-1"><i class="fa-solid fa-code text-cyan-400 mr-2"></i> โค้ดติดตั้งสำหรับเว็บไซต์ (Widget)</h3>
+                                <p class="text-sm text-slate-400">คัดลอกโค้ดด้านล่างนี้ไปวางไว้ก่อนแท็ก <code>&lt;/body&gt;</code> ในทุกหน้าของเว็บคุณ</p>
+                            </div>
+                            <button onclick="copyWidgetCode()" class="shrink-0 text-sm text-cyan-400 hover:text-white hover:bg-cyan-500 flex items-center justify-center space-x-2 bg-cyan-500/10 px-4 py-2 rounded-lg border border-cyan-500/30 transition shadow-sm">
+                                <i class="fa-regular fa-copy"></i> <span class="font-semibold">คัดลอกโค้ด</span>
+                            </button>
+                        </div>
+                        <div class="bg-slate-950 p-5 rounded-xl border border-slate-800/80 shadow-inner">
+                            <pre class="text-xs sm:text-sm text-cyan-200 font-mono whitespace-pre-wrap break-all" id="widget-code-display"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // === Auth logic ===
         let authMode = 'login'; // 'login' or 'register'
@@ -569,6 +623,17 @@
                                 
                                 <!-- Categories Section -->
                                 <div class="p-4 space-y-5">
+                                    <!-- My Products Button -->
+                                    <button onclick="openMyProductsModal()" class="w-full flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 hover:border-cyan-400 hover:from-cyan-500/20 hover:to-blue-500/20 transition group/btn shadow-[0_0_15px_rgba(6,182,212,0.15)] hover:shadow-[0_0_20px_rgba(6,182,212,0.3)]">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center border border-cyan-500/40">
+                                                <i class="fa-solid fa-box-open text-cyan-400 text-sm"></i>
+                                            </div>
+                                            <span class="font-bold text-white group-hover/btn:text-cyan-300 transition">สินค้าของฉัน (My Products)</span>
+                                        </div>
+                                        <i class="fa-solid fa-arrow-right text-cyan-500/50 group-hover/btn:text-cyan-400 transition transform group-hover/btn:translate-x-1"></i>
+                                    </button>
+                                    
                                     <!-- API Key Section -->
                                     <div>
                                         <div class="flex justify-between items-center mb-2">
@@ -629,6 +694,28 @@
         function copyKeyFromText(key) {
             navigator.clipboard.writeText(key);
             alert('คัดลอก API Key แล้ว');
+        }
+
+        // === My Products Modal logic ===
+        function openMyProductsModal() {
+            const tenantStr = localStorage.getItem('customer_data');
+            if (tenantStr) {
+                const tenant = JSON.parse(tenantStr);
+                const baseUrl = window.location.origin;
+                const code = `<script src="${baseUrl}/supreme-boost/boost.js" data-api-key="${tenant.api_key}" defer><\/script>`;
+                document.getElementById('widget-code-display').innerText = code;
+                document.getElementById('my-products-modal').classList.remove('hidden');
+            }
+        }
+
+        function closeMyProductsModal() {
+            document.getElementById('my-products-modal').classList.add('hidden');
+        }
+
+        function copyWidgetCode() {
+            const code = document.getElementById('widget-code-display').innerText;
+            navigator.clipboard.writeText(code);
+            alert('คัดลอกโค้ดติดตั้งเรียบร้อยแล้ว');
         }
 
         // Initialize auth status on load
