@@ -216,13 +216,30 @@
         <div class="tab-pane" id="pane-code">
             <div class="card">
                 <div class="card-title"><i class="fa-solid fa-code"></i> โค้ดสำหรับติดตั้งแชทบอทในเว็บของคุณ</div>
-                <p style="font-size:.82rem;color:var(--t2);margin-bottom:14px">คัดลอกโค้ดด้านล่างไปวางก่อนปิด <code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">&lt;/body&gt;</code> ในทุกหน้าที่ต้องการให้มีแชทบอท</p>
+                <p style="font-size:.82rem;color:var(--t2);margin-bottom:14px">เลือกรูปแบบโค้ดที่เหมาะกับเว็บไซต์ของคุณ แล้วนำไปวางก่อนปิด <code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">&lt;/body&gt;</code> ในทุกหน้าที่ต้องการให้มีแชทบอท</p>
+
+                <!-- Format Selector Buttons -->
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+                    <button onclick="setEmbedFmt('smart',this)" class="btn btn-vl" style="font-size:.72rem;padding:5px 14px" id="efmt-smart">⚡ Smart Async (แนะนำ)</button>
+                    <button onclick="setEmbedFmt('single',this)" class="btn btn-gh" style="font-size:.72rem;padding:5px 14px" id="efmt-single">➖ One Line</button>
+                    <button onclick="setEmbedFmt('simple',this)" class="btn btn-gh" style="font-size:.72rem;padding:5px 14px" id="efmt-simple">📝 Simple Script</button>
+                    <button onclick="setEmbedFmt('gtm',this)" class="btn btn-gh" style="font-size:.72rem;padding:5px 14px" id="efmt-gtm">🏷️ Google Tag Manager</button>
+                    <button onclick="setEmbedFmt('wp',this)" class="btn btn-gh" style="font-size:.72rem;padding:5px 14px" id="efmt-wp">🌐 WordPress / PHP</button>
+                </div>
+
+                <!-- Description -->
+                <div id="embed-desc" style="font-size:.72rem;color:var(--t3);margin-bottom:10px;padding:8px 12px;background:rgba(124,58,237,.05);border-radius:7px;border-left:3px solid var(--v2)">
+                    ⚡ โหลดแบบ Async ไม่ชะลอเว็บ รองรับทุก Platform (Netlify, Wix, Shopify, Squarespace, GitHub Pages ฯลฯ)
+                </div>
+
+                <!-- Code Block -->
                 <div class="code-box" id="codeBox">
                     <button class="copy-btn" onclick="copyCode()"><i class="fa-solid fa-copy"></i> คัดลอก</button>
                     <span id="codeContent">กำลังโหลด...</span>
                 </div>
             </div>
         </div>
+
 
         <!-- SETTINGS TAB -->
         <div class="tab-pane" id="pane-settings">
@@ -325,10 +342,50 @@
     const exp = tenant.expires_at ? new Date(tenant.expires_at).toLocaleDateString('th-TH') : 'ไม่จำกัด';
     document.getElementById('statExpiry').textContent = exp;
 
-    // Generate plugin code
-    const origin = 'https://test-mu-cyan-21.vercel.app';
-    const pluginCode = `<!-- INDICATOR WEB CHAT -->\n<script type="module">\n  import { init } from "${origin}/plugins/chat.js";\n  init(document.body, "${tenant.api_key}", "", "${origin}/api/chat");\n<\/script>`;
-    document.getElementById('codeContent').textContent = pluginCode;
+    // Generate plugin code (multi-format, synced with admin dashboard logic)
+    const origin = window.location.origin;
+    const boostSrc = origin + '/supreme-boost/boost.js';
+    const chatUrl  = origin + '/api/chat';
+    const apiKey   = tenant.api_key;
+    const title    = (tenant.company_name || tenant.username || 'My Shop') + ' AI';
+
+    const embedCodes = {
+        smart: `<!-- INDICATOR Smart AI Widget -->\n<script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    primaryColor:"#7c3aed",\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n<\/script>`,
+        single: `<script>window.IndicatorConfig={apiKey:"${apiKey}",backendUrl:"${chatUrl}",title:"${title}",lang:"auto"};(function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));<\/script>`,
+        simple: `<!-- INDICATOR AI Widget -->\n<script src="${boostSrc}"\n  data-api-key="${apiKey}"\n  data-backend-url="${chatUrl}"\n  data-title="${title}"\n  data-primary="#7c3aed"\n  data-lang="auto"\n  defer>\n<\/script>`,
+        gtm: `<!-- Custom HTML Tag สำหรับ Google Tag Manager -->\n<script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    lang:"auto"\n  };\n  var s=document.createElement('script');\n  s.src="${boostSrc}";\n  s.async=true;\n  document.head.appendChild(s);\n<\/script>`,
+        wp: `<?php\n// ใส่ใน functions.php ของ Theme หรือ Plugin\nfunction add_indicator_ai_widget() {\n  ?>\n  <script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n  <\/script>\n  <?php\n}\nadd_action('wp_footer', 'add_indicator_ai_widget');`
+    };
+
+    const embedDescs = {
+        smart:  '⚡ โหลดแบบ Async ไม่ชะลอเว็บ รองรับทุก Platform (Netlify, Wix, Shopify, Squarespace, GitHub Pages ฯลฯ)',
+        single: '➖ โค้ดบรรทัดเดียว เหมาะกับระบบที่รับ HTML สั้นๆ หรือ Custom Footer/Header',
+        simple: '📝 Script Tag แบบเรียบง่าย เหมาะกับเว็บ HTML ธรรมดา หรือ Bootstrap Template',
+        gtm:    '🏷️ สำหรับใส่ใน Google Tag Manager — Custom HTML Tag',
+        wp:     '🌐 สำหรับ WordPress / PHP — ใส่ใน functions.php หรือ Theme Footer'
+    };
+
+    let _embedFmt = 'smart';
+    // Set initial code
+    document.getElementById('codeContent').textContent = embedCodes.smart;
+
+    function setEmbedFmt(fmt, btn) {
+        _embedFmt = fmt;
+        // Reset all buttons
+        document.querySelectorAll('[id^="efmt-"]').forEach(b => {
+            b.className = 'btn btn-gh';
+            b.style.fontSize = '.72rem';
+            b.style.padding = '5px 14px';
+        });
+        // Activate clicked button
+        btn.className = 'btn btn-vl';
+        btn.style.fontSize = '.72rem';
+        btn.style.padding = '5px 14px';
+        // Update description
+        document.getElementById('embed-desc').textContent = embedDescs[fmt] || '';
+        // Update code
+        document.getElementById('codeContent').textContent = embedCodes[fmt] || embedCodes.smart;
+    }
 
     // ---- Tab switching ----
     function sw(tab) {
