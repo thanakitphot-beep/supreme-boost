@@ -46,9 +46,9 @@ module.exports = async function handler(req, res) {
                     email: email || '',
                     password: hashedPassword,
                     api_key: newApiKey,
-                    status: 'active',
-                    package_type: 'basic',
-                    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+                    status: 'pending',
+                    package_type: 'none',
+                    expires_at: null,
                     created_at: new Date().toISOString()
                 };
 
