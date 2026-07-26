@@ -392,31 +392,50 @@
                     </div>
                 </div>
 
-                <!-- Widget Code Section with Format Tabs -->
-                <div class="bg-slate-800/40 p-6 rounded-xl border border-slate-700/80">
-                    <h3 class="font-bold text-white flex items-center text-lg mb-1"><i class="fa-solid fa-code text-cyan-400 mr-2"></i> โค้ดติดตั้งสำหรับเว็บไซต์</h3>
-                    <p class="text-sm text-slate-400 mb-4">เลือกรูปแบบโค้ดที่เหมาะกับเว็บไซต์ของคุณ แล้ววางไว้ก่อนแท็ก <code style="background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px">&lt;/body&gt;</code> ในเว็บคุณ</p>
-
-                    <!-- Format Buttons -->
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-                        <button onclick="setModalEmbedFmt('smart',this)" id="modal-efmt-smart" style="background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;border:none;font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">⚡ Smart Async (แนะนำ)</button>
-                        <button onclick="setModalEmbedFmt('single',this)" id="modal-efmt-single" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">➖ One Line</button>
-                        <button onclick="setModalEmbedFmt('simple',this)" id="modal-efmt-simple" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">📝 Simple Script</button>
-                        <button onclick="setModalEmbedFmt('gtm',this)" id="modal-efmt-gtm" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">🏷️ Google Tag Manager</button>
-                        <button onclick="setModalEmbedFmt('wp',this)" id="modal-efmt-wp" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">🌐 WordPress / PHP</button>
+                <!-- Widget Code Section — Gated by active status -->
+                <div id="modal-code-section">
+                    <!-- LOCKED STATE (shown if no active package) -->
+                    <div id="modal-locked" class="hidden bg-slate-800/40 p-8 rounded-xl border border-slate-700/80 text-center">
+                        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+                            <i class="fa-solid fa-lock text-2xl text-amber-400"></i>
+                        </div>
+                        <h3 class="font-bold text-white text-xl mb-2">ยังไม่มีแพ็กเกจที่ใช้งานอยู่</h3>
+                        <p class="text-slate-400 text-sm mb-6 max-w-sm mx-auto">คุณยังไม่ได้ซื้อแพ็กเกจ หรือแพ็กเกจของคุณหมดอายุแล้ว กรุณาซื้อแพ็กเกจเพื่อใช้งานตัว Widget และเข้าถึงโค้ดติดตั้ง</p>
+                        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                            <a href="https://lin.ee/O1Oa0p5" target="_blank" onclick="closeMyProductsModal()" class="inline-flex items-center justify-center space-x-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg shadow-amber-500/25">
+                                <i class="fa-solid fa-crown"></i>
+                                <span>ติดต่อแอดมินเพื่อซื้อแพ็กเกจ</span>
+                            </a>
+                            <button onclick="closeMyProductsModal()" class="inline-flex items-center justify-center space-x-2 bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-xl font-bold transition">
+                                <span>ปิดหน้าต่างนี้</span>
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-4"><i class="fa-solid fa-circle-info mr-1"></i>ซื้อแพ็กเกจแล้วส่งหลักฐาน แอดมินจะอนุมัติและเปิด API Key ให้ภายใน 15 นาที</p>
                     </div>
 
-                    <!-- Description -->
-                    <div id="modal-embed-desc" style="font-size:.72rem;color:#64748b;margin-bottom:10px;padding:8px 12px;background:rgba(124,58,237,.05);border-radius:7px;border-left:3px solid rgba(139,92,246,.5)">
-                        ⚡ โหลดแบบ Async ไม่ชะลอเว็บ รองรับทุก Platform (Netlify, Wix, Shopify, Squarespace, GitHub Pages ฯลฯ)
-                    </div>
-
-                    <!-- Code Display -->
-                    <div class="relative p-5 rounded-xl shadow-inner" style="background:#030310; border:1px solid rgba(139,92,246,0.3);">
-                        <button onclick="copyCodeElement('modal-widget-code')" class="absolute top-3 right-3 text-xs flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition" style="background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.1); color:#94a3b8;" onmouseover="this.style.background='rgba(255,255,255,0.12)';this.style.color='#f1f5f9';" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='#94a3b8';">
-                            <i class="fa-regular fa-copy"></i> <span class="font-semibold">คัดลอกโค้ด</span>
-                        </button>
-                        <pre id="modal-widget-code" class="text-xs sm:text-sm pt-2 pr-24 whitespace-pre-wrap break-all" style="color:#7ee787; font-family:'JetBrains Mono',monospace; line-height:1.8;"></pre>
+                    <!-- ACTIVE STATE (shown if paid) -->
+                    <div id="modal-code-active" class="hidden bg-slate-800/40 p-6 rounded-xl border border-slate-700/80">
+                        <h3 class="font-bold text-white flex items-center text-lg mb-1"><i class="fa-solid fa-code text-cyan-400 mr-2"></i> โค้ดติดตั้งสำหรับเว็บไซต์</h3>
+                        <p class="text-sm text-slate-400 mb-4">เลือกรูปแบบโค้ดที่เหมาะกับเว็บไซต์ของคุณ แล้ววางไว้ก่อนแท็ก <code style="background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px">&lt;/body&gt;</code> ในเว็บคุณ</p>
+                        <!-- Format Buttons -->
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+                            <button onclick="setModalEmbedFmt('smart',this)" id="modal-efmt-smart" style="background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;border:none;font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">⚡ Smart Async (แนะนำ)</button>
+                            <button onclick="setModalEmbedFmt('single',this)" id="modal-efmt-single" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">➖ One Line</button>
+                            <button onclick="setModalEmbedFmt('simple',this)" id="modal-efmt-simple" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">📝 Simple Script</button>
+                            <button onclick="setModalEmbedFmt('gtm',this)" id="modal-efmt-gtm" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">🏷️ Google Tag Manager</button>
+                            <button onclick="setModalEmbedFmt('wp',this)" id="modal-efmt-wp" style="background:rgba(255,255,255,.06);color:#94a3b8;border:1px solid rgba(255,255,255,.1);font-size:.7rem;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600">🌐 WordPress / PHP</button>
+                        </div>
+                        <!-- Description -->
+                        <div id="modal-embed-desc" style="font-size:.72rem;color:#64748b;margin-bottom:10px;padding:8px 12px;background:rgba(124,58,237,.05);border-radius:7px;border-left:3px solid rgba(139,92,246,.5)">
+                            ⚡ โหลดแบบ Async ไม่ชะลอเว็บ รองรับทุก Platform (Netlify, Wix, Shopify, Squarespace, GitHub Pages ฯลฯ)
+                        </div>
+                        <!-- Code Display -->
+                        <div class="relative p-5 rounded-xl shadow-inner" style="background:#030310; border:1px solid rgba(139,92,246,0.3);">
+                            <button onclick="copyCodeElement('modal-widget-code')" class="absolute top-3 right-3 text-xs flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition" style="background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.1); color:#94a3b8;" onmouseover="this.style.background='rgba(255,255,255,0.12)';this.style.color='#f1f5f9';" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='#94a3b8';">
+                                <i class="fa-regular fa-copy"></i> <span class="font-semibold">คัดลอกโค้ด</span>
+                            </button>
+                            <pre id="modal-widget-code" class="text-xs sm:text-sm pt-2 pr-24 whitespace-pre-wrap break-all" style="color:#7ee787; font-family:'JetBrains Mono',monospace; line-height:1.8;"></pre>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -705,6 +724,17 @@
             alert('คัดลอก API Key แล้ว');
         }
 
+        // === Check if user has active paid package ===
+        function isActiveUser(tenant) {
+            if (!tenant) return false;
+            if (tenant.status !== 'active') return false;
+            if (tenant.expires_at) {
+                const expiry = new Date(tenant.expires_at);
+                if (expiry < new Date()) return false; // expired
+            }
+            return true;
+        }
+
         // === My Products Modal logic ===
         let _modalEmbedCodes = {};
         const _modalEmbedDescs = {
@@ -717,8 +747,18 @@
 
         function openMyProductsModal() {
             const tenantStr = localStorage.getItem('customer_data');
-            if (tenantStr) {
-                const tenant = JSON.parse(tenantStr);
+            if (!tenantStr) return;
+            const tenant = JSON.parse(tenantStr);
+            const active = isActiveUser(tenant);
+
+            // Show/hide sections based on status
+            document.getElementById('modal-locked').classList.toggle('hidden', active);
+            document.getElementById('modal-code-active').classList.toggle('hidden', !active);
+            // Also lock the admin dashboard button if not active
+            const adminBtn = document.getElementById('modal-admin-btn');
+            if (adminBtn) adminBtn.classList.toggle('hidden', !active);
+
+            if (active) {
                 const or = window.location.origin;
                 const boostSrc = or + '/supreme-boost/boost.js';
                 const chatUrl  = or + '/api/chat';
@@ -732,11 +772,10 @@
                     gtm:    `<!-- Custom HTML Tag สำหรับ Google Tag Manager -->\n<script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    lang:"auto"\n  };\n  var s=document.createElement('script');\n  s.src="${boostSrc}";\n  s.async=true;\n  document.head.appendChild(s);\n<\/script>`,
                     wp:     `<?php\n// ใส่ใน functions.php หรือ Plugin\nfunction add_indicator_ai_widget() {\n  ?>\n  <script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n  <\/script>\n  <?php\n}\nadd_action('wp_footer', 'add_indicator_ai_widget');`
                 };
-
-                // Set default to smart
                 document.getElementById('modal-widget-code').innerText = _modalEmbedCodes.smart;
-                document.getElementById('my-products-modal').classList.remove('hidden');
             }
+
+            document.getElementById('my-products-modal').classList.remove('hidden');
         }
 
         function setModalEmbedFmt(fmt, btn) {

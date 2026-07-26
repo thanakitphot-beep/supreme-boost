@@ -334,6 +334,37 @@
 
     if (!tenant || !tenant.api_key) { window.location.href = '/customer-login'; }
 
+    // === Check active status (paid & not expired) ===
+    function isActiveTenant(t) {
+        if (!t || t.status !== 'active') return false;
+        if (t.expires_at && new Date(t.expires_at) < new Date()) return false;
+        return true;
+    }
+
+    if (!isActiveTenant(tenant)) {
+        // Show locked overlay
+        document.body.style.overflow = 'hidden';
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(9,9,15,0.97);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;';
+        overlay.innerHTML = `
+            <div style="width:72px;height:72px;border-radius:50%;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);display:flex;align-items:center;justify-content:center;margin-bottom:20px;">
+                <i class="fa-solid fa-lock" style="font-size:2rem;color:#f59e0b;"></i>
+            </div>
+            <h2 style="font-size:1.5rem;font-weight:800;color:#f1f5f9;margin-bottom:10px;">\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e41\u0e1e\u0e47\u0e01\u0e40\u0e01\u0e08\u0e17\u0e35\u0e48\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19\u0e2d\u0e22\u0e39\u0e48</h2>
+            <p style="color:#64748b;font-size:.9rem;max-width:360px;line-height:1.7;margin-bottom:28px;">\u0e04\u0e38\u0e13\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e0b\u0e37\u0e49\u0e2d\u0e41\u0e1e\u0e47\u0e01\u0e40\u0e01\u0e08 \u0e2b\u0e23\u0e37\u0e2d\u0e41\u0e1e\u0e47\u0e01\u0e40\u0e01\u0e08\u0e02\u0e2d\u0e07\u0e04\u0e38\u0e13\u0e2b\u0e21\u0e14\u0e2d\u0e32\u0e22\u0e38\u0e41\u0e25\u0e49\u0e27<br>\u0e01\u0e23\u0e38\u0e13\u0e32\u0e0b\u0e37\u0e49\u0e2d\u0e41\u0e1e\u0e47\u0e01\u0e40\u0e01\u0e08\u0e40\u0e1e\u0e37\u0e48\u0e2d\u0e40\u0e02\u0e49\u0e32\u0e16\u0e36\u0e07\u0e1f\u0e35\u0e40\u0e08\u0e2d\u0e23\u0e4c\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14</p>
+            <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;">
+                <a href="/" style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff;padding:12px 24px;border-radius:12px;font-weight:700;font-size:.9rem;text-decoration:none;box-shadow:0 4px 14px rgba(245,158,11,.35);">
+                    <i class="fa-solid fa-crown"></i> \u0e14\u0e39\u0e41\u0e1e\u0e47\u0e01\u0e40\u0e01\u0e08 \u0e41\u0e25\u0e30\u0e0b\u0e37\u0e49\u0e2d\u0e40\u0e25\u0e22
+                </a>
+                <button onclick="logout()" style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.06);color:#94a3b8;padding:12px 24px;border-radius:12px;font-weight:700;font-size:.9rem;border:1px solid rgba(255,255,255,0.1);cursor:pointer;font-family:'Sarabun',sans-serif;">
+                    <i class="fa-solid fa-right-from-bracket"></i> \u0e2d\u0e2d\u0e01\u0e08\u0e32\u0e01\u0e23\u0e30\u0e1a\u0e1a
+                </button>
+            </div>
+            <p style="color:#475569;font-size:.7rem;margin-top:20px;"><i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>\u0e0b\u0e37\u0e49\u0e2d\u0e41\u0e1e\u0e47\u0e01\u0e40\u0e01\u0e08\u0e41\u0e25\u0e49\u0e27\u0e2a\u0e48\u0e07\u0e2b\u0e25\u0e31\u0e01\u0e10\u0e32\u0e19 \u0e41\u0e2d\u0e14\u0e21\u0e34\u0e19\u0e08\u0e30\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34\u0e41\u0e25\u0e30\u0e40\u0e1b\u0e34\u0e14\u0e2a\u0e34\u0e17\u0e18\u0e34\u0e4c\u0e43\u0e2b\u0e49\u0e20\u0e32\u0e22\u0e43\u0e19 15 \u0e19\u0e32\u0e17\u0e35</p>
+        `;
+        document.body.appendChild(overlay);
+    }
+
     const AUTH = { Authorization: `Bearer ${tenant.api_key}`, 'Content-Type': 'application/json' };
 
     document.getElementById('tenantName').textContent = tenant.company_name || tenant.username || '—';
