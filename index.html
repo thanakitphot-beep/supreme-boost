@@ -261,55 +261,7 @@
     <!-- Try INDICATOR WEB CHAT Widget on its own landing page! -->
     <script src="/supreme-boost/boost.js?v=20260711_3" data-backend-url="/api/chat" data-lang="auto" data-shop-prompt="นี่คือหน้าเว็บขายโปรแกรม INDICATOR WEB CHAT ระบบ AI อัจฉริยะระดับ God-Tier สำหรับธุรกิจ มีแพ็กเกจ Starter (990), Pro (2490) และ Enterprise แนะนำผู้ใช้ให้สมัคร Pro เพราะคุ้มค่าที่สุด มีฟีเจอร์ Telekinesis Warp และ Edge Glow" defer></script>
 
-    <!-- Customer Dashboard -->
-    <section id="customer-dashboard" class="py-24 bg-slate-900 hidden relative z-10 border-t border-slate-800">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
-                <div>
-                    <h2 class="text-3xl font-bold">บัญชีของฉัน</h2>
-                    <p class="text-slate-400 mt-1">ยินดีต้อนรับ, <span id="dash-username" class="text-cyan-400">User</span></p>
-                </div>
-                <button onclick="logoutCustomer()" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/40 transition">
-                    <i class="fa-solid fa-right-from-bracket mr-2"></i>ออกจากระบบ
-                </button>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- API Key Card -->
-                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
-                    <div class="flex items-center space-x-3 mb-4">
-                        <div class="p-3 bg-cyan-500/20 rounded-lg"><i class="fa-solid fa-key text-cyan-400"></i></div>
-                        <h3 class="text-xl font-bold">API Key ของคุณ</h3>
-                    </div>
-                    <div class="bg-slate-950 p-4 rounded-lg flex items-center justify-between border border-slate-800">
-                        <code id="dash-apikey" class="text-sm text-slate-300 blur-sm hover:blur-none transition cursor-pointer">sk_live_xxxxx</code>
-                        <button onclick="copyKey()" class="text-slate-400 hover:text-white"><i class="fa-regular fa-copy"></i></button>
-                    </div>
-                    <p class="text-xs text-slate-500 mt-2">* นำ API Key นี้ไปใส่ใน Widget Code หรือระบบของคุณ</p>
-                </div>
-                <!-- Status Card -->
-                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
-                    <div class="flex items-center space-x-3 mb-4">
-                        <div class="p-3 bg-blue-500/20 rounded-lg"><i class="fa-solid fa-box-open text-blue-400"></i></div>
-                        <h3 class="text-xl font-bold">สถานะแพ็กเกจ</h3>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="flex justify-between border-b border-slate-700 pb-2">
-                            <span class="text-slate-400">แพ็กเกจ</span>
-                            <span id="dash-pkg" class="font-bold text-white uppercase px-2 py-1 bg-slate-900 rounded border border-slate-700">...</span>
-                        </div>
-                        <div class="flex justify-between border-b border-slate-700 pb-2">
-                            <span class="text-slate-400">สถานะ</span>
-                            <span id="dash-status" class="font-bold text-green-400">...</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-slate-400">หมดอายุ</span>
-                            <span id="dash-expire" class="font-mono text-white">...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+    <!-- Customer Dashboard (Removed, moved to Nav Dropdown) -->
 
     <!-- Auth Modal (Login / Register) -->
     <div id="auth-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
@@ -587,27 +539,74 @@
             if (tenantStr) {
                 try {
                     const tenant = JSON.parse(tenantStr);
-                    // Update Nav
+                    const expireDate = tenant.expires_at ? new Date(tenant.expires_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : 'ไม่มีวันหมดอายุ';
+                    const statusText = tenant.status === 'active' ? 'ใช้งานปกติ (Active)' : 'ระงับ (Suspended)';
+                    const statusColor = tenant.status === 'active' ? 'text-green-400' : 'text-red-400';
+
+                    // Update Nav with Dropdown
                     document.getElementById('nav-login-btn').classList.add('hidden');
                     document.getElementById('nav-action-container').innerHTML = `
-                        <a href="#customer-dashboard" class="bg-slate-800 border border-slate-700 text-white px-6 py-2.5 rounded-full font-semibold hover:bg-slate-700 transition flex items-center space-x-2">
-                            <i class="fa-solid fa-user-astronaut text-cyan-400"></i>
-                            <span>${tenant.username || tenant.company_name}</span>
-                        </a>
+                        <div class="relative group">
+                            <a href="javascript:void(0)" class="bg-slate-800 border border-slate-700 text-white px-6 py-2.5 rounded-full font-semibold hover:bg-slate-700 transition flex items-center space-x-2 cursor-pointer">
+                                <i class="fa-solid fa-user-astronaut text-cyan-400"></i>
+                                <span>${tenant.username || tenant.company_name}</span>
+                                <i class="fa-solid fa-chevron-down text-xs ml-2"></i>
+                            </a>
+                            
+                            <!-- Dropdown Menu -->
+                            <div class="absolute right-0 mt-2 w-80 bg-slate-800/95 backdrop-blur-md border border-slate-700 rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 overflow-hidden transform origin-top-right scale-95 group-hover:scale-100">
+                                
+                                <!-- User Info Header -->
+                                <div class="p-4 border-b border-slate-700 bg-slate-900/50 flex items-center space-x-3">
+                                    <div class="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center border border-cyan-500/30">
+                                        <i class="fa-solid fa-user text-cyan-400"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-white leading-tight">${tenant.username || tenant.company_name}</p>
+                                        <p class="text-xs text-slate-400 mt-0.5">สถานะบัญชี: <span class="${statusColor}">${statusText}</span></p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Categories Section -->
+                                <div class="p-4 space-y-5">
+                                    <!-- API Key Section -->
+                                    <div>
+                                        <div class="flex justify-between items-center mb-2">
+                                            <p class="text-xs font-semibold tracking-wider text-slate-400 uppercase"><i class="fa-solid fa-key text-cyan-400 mr-1.5"></i> การเชื่อมต่อ API</p>
+                                        </div>
+                                        <div class="bg-slate-950 p-3 rounded-lg flex items-center justify-between border border-slate-700/80 hover:border-cyan-500/50 transition">
+                                            <code class="text-sm text-slate-300 blur-sm hover:blur-none transition cursor-pointer font-mono">${tenant.api_key}</code>
+                                            <button onclick="copyKeyFromText('${tenant.api_key}')" class="text-slate-400 hover:text-white p-1" title="คัดลอก API Key"><i class="fa-regular fa-copy"></i></button>
+                                        </div>
+                                        <p class="text-[10px] text-slate-500 mt-1.5">* นำ API Key นี้ไปใส่ใน Widget Code หรือระบบของคุณ</p>
+                                    </div>
+                                    
+                                    <!-- Package Status Section -->
+                                    <div>
+                                        <p class="text-xs font-semibold tracking-wider text-slate-400 uppercase mb-2"><i class="fa-solid fa-box-open text-blue-400 mr-1.5"></i> ข้อมูลแพ็กเกจ</p>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                                                <p class="text-[10px] text-slate-500 mb-0.5">แพ็กเกจปัจจุบัน</p>
+                                                <p class="font-bold text-white uppercase text-sm">${tenant.package_type}</p>
+                                            </div>
+                                            <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                                                <p class="text-[10px] text-slate-500 mb-0.5">หมดอายุ</p>
+                                                <p class="font-bold text-white text-xs">${expireDate}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Logout Section -->
+                                <div class="border-t border-slate-700/80 bg-slate-900/30">
+                                    <button onclick="logoutCustomer()" class="w-full text-left px-5 py-3 text-red-400 hover:text-red-300 hover:bg-slate-800 transition flex items-center space-x-3 text-sm font-medium">
+                                        <i class="fa-solid fa-right-from-bracket"></i>
+                                        <span>ออกจากระบบ</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     `;
-                    
-                    // Show Dashboard
-                    document.getElementById('customer-dashboard').classList.remove('hidden');
-                    document.getElementById('dash-username').innerText = tenant.username || tenant.company_name;
-                    document.getElementById('dash-apikey').innerText = tenant.api_key;
-                    document.getElementById('dash-pkg').innerText = tenant.package_type;
-                    
-                    const statusEl = document.getElementById('dash-status');
-                    statusEl.innerText = tenant.status === 'active' ? 'ใช้งานปกติ (Active)' : 'ระงับการใช้งาน (Suspended)';
-                    statusEl.className = tenant.status === 'active' ? 'font-bold text-green-400' : 'font-bold text-red-400';
-
-                    const expireDate = tenant.expires_at ? new Date(tenant.expires_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : 'ไม่มีวันหมดอายุ';
-                    document.getElementById('dash-expire').innerText = expireDate;
                 } catch (e) {
                     logoutCustomer();
                 }
@@ -619,7 +618,6 @@
                         สมัครสมาชิก
                     </a>
                 `;
-                document.getElementById('customer-dashboard').classList.add('hidden');
             }
         }
 
@@ -628,8 +626,7 @@
             checkAuthStatus();
         }
 
-        function copyKey() {
-            const key = document.getElementById('dash-apikey').innerText;
+        function copyKeyFromText(key) {
             navigator.clipboard.writeText(key);
             alert('คัดลอก API Key แล้ว');
         }
