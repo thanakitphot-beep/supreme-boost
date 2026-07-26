@@ -1,9 +1,7 @@
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
-// In-memory OTP storage (for development/mock purposes)
-// Format: { 'email@example.com': { otp: '123456', expiresAt: 167... } }
-const otpStorage = {};
+const { saveOtp, getOtp, deleteOtp } = require('./_db.js');
 
 function setCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -40,11 +38,9 @@ module.exports = async function handler(req, res) {
                 // Generate a 6-digit OTP
                 const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
                 
-                // Store OTP with 5 minutes expiration
-                otpStorage[email] = {
-                    otp: generatedOtp,
-                    expiresAt: Date.now() + 5 * 60 * 1000 // 5 mins
-                };
+                // Store OTP with 5 minutes expiration in MongoDB
+                const expiresAt = Date.now() + 5 * 60 * 1000;
+                await saveOtp(email, generatedOtp, expiresAt);
 
                 // Send email
                 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
@@ -89,14 +85,14 @@ module.exports = async function handler(req, res) {
                     return res.status(400).json({ error: "OTP is required for verification" });
                 }
 
-                const storedData = otpStorage[email];
+                const storedData = await getOtp(email);
                 
                 if (!storedData) {
                     return res.status(400).json({ error: "No OTP requested for this email" });
                 }
 
                 if (Date.now() > storedData.expiresAt) {
-                    delete otpStorage[email];
+                    await deleteOtp(email);
                     return res.status(400).json({ error: "OTP has expired. Please request a new one." });
                 }
 
@@ -105,7 +101,7 @@ module.exports = async function handler(req, res) {
                 }
 
                 // OTP is correct
-                delete otpStorage[email]; // Clear OTP after successful verification
+                await deleteOtp(email); // Clear OTP after successful verification
 
                 return res.status(200).json({
                     success: true,

@@ -177,5 +177,30 @@ module.exports = {
         if (!db) return [];
         const data = await db.collection('logs').find({}).sort({ timestamp: -1 }).limit(limit).toArray();
         return data.reverse();
+    },
+
+    // ─── OTPs ───────────────────────────────────────────────────
+    saveOtp: async (email, otp, expiresAt) => {
+        const db = await connectToDatabase();
+        if (!db) return false;
+        await db.collection('otps').updateOne(
+            { email },
+            { $set: { otp, expiresAt, created_at: new Date().toISOString() } },
+            { upsert: true }
+        );
+        return true;
+    },
+
+    getOtp: async (email) => {
+        const db = await connectToDatabase();
+        if (!db) return null;
+        return await db.collection('otps').findOne({ email });
+    },
+
+    deleteOtp: async (email) => {
+        const db = await connectToDatabase();
+        if (!db) return false;
+        await db.collection('otps').deleteOne({ email });
+        return true;
     }
 };
