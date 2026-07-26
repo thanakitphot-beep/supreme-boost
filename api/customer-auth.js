@@ -25,6 +25,7 @@ module.exports = async function handler(req, res) {
 
             // 1. Register Action
             if (action === 'register') {
+                const { email } = body;
                 if (!username || !password) {
                     return res.status(400).json({ error: "Username and Password are required" });
                 }
@@ -42,6 +43,7 @@ module.exports = async function handler(req, res) {
                     id: crypto.randomUUID(),
                     company_name: username,
                     username: username,
+                    email: email || '',
                     password: hashedPassword,
                     api_key: newApiKey,
                     status: 'active',

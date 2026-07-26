@@ -194,6 +194,7 @@ function handleRequest(req, res) {
         '/api/settings': require('./api/settings.js'),
         '/api/auth': require('./api/auth.js'),
         '/api/customer-auth': require('./api/customer-auth.js'),
+        '/api/otp': require('./api/otp.js'),
         '/api/knowledge': require('./api/knowledge.js'),
         '/api/knowledge/crawl': require('./api/knowledge.js'),
         '/api/knowledge/search': require('./api/knowledge.js'),

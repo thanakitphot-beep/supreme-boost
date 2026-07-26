@@ -324,9 +324,28 @@
                     <label class="block text-sm font-medium text-slate-300 mb-1">ชื่อผู้ใช้ (Username)</label>
                     <input type="text" id="auth-username" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-cyan-400 focus:outline-none" required>
                 </div>
+                <div id="auth-email-group" class="hidden">
+                    <label class="block text-sm font-medium text-slate-300 mb-1">อีเมล (Email)</label>
+                    <input type="email" id="auth-email" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-cyan-400 focus:outline-none" placeholder="example@email.com">
+                </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-300 mb-1">รหัสผ่าน (Password)</label>
                     <input type="password" id="auth-password" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-cyan-400 focus:outline-none" required>
+                </div>
+                <div id="auth-confirm-group" class="hidden">
+                    <label class="block text-sm font-medium text-slate-300 mb-1">ยืนยันรหัสผ่าน (Confirm Password)</label>
+                    <input type="password" id="auth-password-confirm" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-cyan-400 focus:outline-none">
+                </div>
+                <div id="auth-otp-group" class="hidden">
+                    <label class="block text-sm font-medium text-slate-300 mb-1 flex justify-between">
+                        <span>รหัส OTP (ถูกส่งไปที่อีเมล)</span>
+                        <a href="javascript:void(0)" onclick="resetOtp()" class="text-cyan-400 text-xs hover:underline">ขอ OTP ใหม่</a>
+                    </label>
+                    <input type="text" id="auth-otp" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-cyan-400 focus:outline-none" placeholder="123456" maxlength="6">
+                </div>
+                <div id="auth-terms-group" class="hidden flex items-start space-x-2 mt-2">
+                    <input type="checkbox" id="auth-terms" class="mt-1 bg-slate-800 border-slate-600 rounded text-cyan-400 focus:ring-cyan-400">
+                    <label for="auth-terms" class="text-xs text-slate-400">ฉันยอมรับ <a href="#" class="text-cyan-400 hover:underline">ข้อตกลงและเงื่อนไข</a> และ <a href="#" class="text-cyan-400 hover:underline">นโยบายความเป็นส่วนตัว</a></label>
                 </div>
                 <div id="auth-error" class="text-red-400 text-sm hidden text-center"></div>
                 <button type="submit" id="auth-btn-submit" class="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl hover:scale-105 transition mt-4">
@@ -392,6 +411,7 @@
     <script>
         // === Auth logic ===
         let authMode = 'login'; // 'login' or 'register'
+        let otpRequested = false;
 
         function openAuthModal(mode) {
             authMode = mode;
@@ -409,19 +429,46 @@
             updateAuthModalUI();
         }
 
+        function resetOtp() {
+            otpRequested = false;
+            document.getElementById('auth-otp-group').classList.add('hidden');
+            document.getElementById('auth-otp').required = false;
+            document.getElementById('auth-otp').value = '';
+            document.getElementById('auth-btn-submit').innerText = 'รับ OTP';
+        }
+
         function updateAuthModalUI() {
+            otpRequested = false;
+            document.getElementById('auth-otp-group').classList.add('hidden');
+            document.getElementById('auth-otp').required = false;
+            document.getElementById('auth-otp').value = '';
+
             if (authMode === 'login') {
                 document.getElementById('auth-title').innerText = 'เข้าสู่ระบบ';
                 document.getElementById('auth-subtitle').innerText = 'จัดการบัญชีและดูสถานะแพ็กเกจของคุณ';
                 document.getElementById('auth-btn-submit').innerText = 'เข้าสู่ระบบ';
                 document.getElementById('auth-switch-text').innerText = 'ยังไม่มีบัญชี?';
                 document.getElementById('auth-switch-link').innerText = 'สมัครสมาชิก';
+                
+                document.getElementById('auth-email-group').classList.add('hidden');
+                document.getElementById('auth-confirm-group').classList.add('hidden');
+                document.getElementById('auth-terms-group').classList.add('hidden');
+                document.getElementById('auth-email').required = false;
+                document.getElementById('auth-password-confirm').required = false;
+                document.getElementById('auth-terms').required = false;
             } else {
                 document.getElementById('auth-title').innerText = 'สมัครสมาชิก';
                 document.getElementById('auth-subtitle').innerText = 'สร้างบัญชีใหม่เพื่อรับ API Key';
-                document.getElementById('auth-btn-submit').innerText = 'สมัครสมาชิก';
+                document.getElementById('auth-btn-submit').innerText = 'รับ OTP';
                 document.getElementById('auth-switch-text').innerText = 'มีบัญชีแล้ว?';
                 document.getElementById('auth-switch-link').innerText = 'เข้าสู่ระบบ';
+
+                document.getElementById('auth-email-group').classList.remove('hidden');
+                document.getElementById('auth-confirm-group').classList.remove('hidden');
+                document.getElementById('auth-terms-group').classList.remove('hidden');
+                document.getElementById('auth-email').required = true;
+                document.getElementById('auth-password-confirm').required = true;
+                document.getElementById('auth-terms').required = true;
             }
         }
 
@@ -431,16 +478,92 @@
             const errorMsg = document.getElementById('auth-error');
             const username = document.getElementById('auth-username').value.trim();
             const password = document.getElementById('auth-password').value.trim();
+            const email = document.getElementById('auth-email').value.trim();
+            const passwordConfirm = document.getElementById('auth-password-confirm').value.trim();
+            const otp = document.getElementById('auth-otp').value.trim();
 
+            errorMsg.classList.add('hidden');
+
+            if (authMode === 'register') {
+                if (password !== passwordConfirm) {
+                    errorMsg.innerText = 'รหัสผ่านไม่ตรงกัน';
+                    errorMsg.classList.remove('hidden');
+                    return;
+                }
+                if (password.length < 6) {
+                    errorMsg.innerText = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+                    errorMsg.classList.remove('hidden');
+                    return;
+                }
+
+                if (!otpRequested) {
+                    // 1. Request OTP
+                    btn.innerText = 'กำลังขอ OTP...';
+                    btn.disabled = true;
+                    try {
+                        const res = await fetch('/api/otp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'request', email })
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                            otpRequested = true;
+                            document.getElementById('auth-otp-group').classList.remove('hidden');
+                            document.getElementById('auth-otp').required = true;
+                            btn.innerText = 'ยืนยัน OTP และสมัครสมาชิก';
+                            // แสดง OTP จำลองให้ผู้ใช้เห็น (เพื่อความสะดวกตอนทดสอบ)
+                            alert('Mock OTP สำหรับ ' + email + ' คือ: ' + data.mockOtp);
+                        } else {
+                            errorMsg.innerText = data.error || 'ไม่สามารถขอ OTP ได้';
+                            errorMsg.classList.remove('hidden');
+                            btn.innerText = 'รับ OTP';
+                        }
+                    } catch (err) {
+                        errorMsg.innerText = 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
+                        errorMsg.classList.remove('hidden');
+                        btn.innerText = 'รับ OTP';
+                    }
+                    btn.disabled = false;
+                    return; // Stop here, wait for user to enter OTP
+                }
+
+                // 2. If OTP is requested, verify OTP first
+                btn.innerText = 'กำลังตรวจสอบ OTP...';
+                btn.disabled = true;
+                try {
+                    const resOtp = await fetch('/api/otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'verify', email, otp })
+                    });
+                    const dataOtp = await resOtp.json();
+                    
+                    if (!resOtp.ok || !dataOtp.success) {
+                        errorMsg.innerText = dataOtp.error || 'OTP ไม่ถูกต้อง';
+                        errorMsg.classList.remove('hidden');
+                        btn.innerText = 'ยืนยัน OTP และสมัครสมาชิก';
+                        btn.disabled = false;
+                        return; // Stop here, OTP invalid
+                    }
+                } catch (err) {
+                    errorMsg.innerText = 'เกิดข้อผิดพลาดในการตรวจสอบ OTP';
+                    errorMsg.classList.remove('hidden');
+                    btn.innerText = 'ยืนยัน OTP และสมัครสมาชิก';
+                    btn.disabled = false;
+                    return;
+                }
+            } // End Register OTP Check
+
+            // 3. Login or Final Register
             btn.innerText = 'กำลังตรวจสอบ...';
             btn.disabled = true;
-            errorMsg.classList.add('hidden');
 
             try {
                 const res = await fetch('/api/customer-auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: authMode, username, password })
+                    body: JSON.stringify({ action: authMode, username, password, email })
                 });
                 const data = await res.json();
                 
@@ -457,7 +580,7 @@
                 errorMsg.classList.remove('hidden');
             }
 
-            btn.innerText = authMode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก';
+            btn.innerText = authMode === 'login' ? 'เข้าสู่ระบบ' : (otpRequested ? 'ยืนยัน OTP และสมัครสมาชิก' : 'รับ OTP');
             btn.disabled = false;
         });
 
