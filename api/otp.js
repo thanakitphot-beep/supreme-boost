@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 // In-memory OTP storage (for development/mock purposes)
 // Format: { 'email@example.com': { otp: '123456', expiresAt: 167... } }
@@ -9,6 +10,17 @@ function setCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
+
+// Nodemailer transporter setup
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_PORT == '465', // true for 465, false for other ports
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+    },
+});
 
 module.exports = async function handler(req, res) {
     setCorsHeaders(res);
@@ -34,13 +46,40 @@ module.exports = async function handler(req, res) {
                     expiresAt: Date.now() + 5 * 60 * 1000 // 5 mins
                 };
 
-                // For mock purposes, we log it and return it in the response so frontend can show it
-                console.log(`[OTP] Generated OTP for ${email}: ${generatedOtp}`);
+                // Send email
+                if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+                    try {
+                        await transporter.sendMail({
+                            from: process.env.SMTP_FROM || `"INDICATOR WEB CHAT" <${process.env.SMTP_USER}>`,
+                            to: email,
+                            subject: "รหัสยืนยันตัวตน (OTP) สำหรับการสมัครสมาชิก INDICATOR",
+                            text: `รหัส OTP ของคุณคือ: ${generatedOtp}\n\nรหัสนี้จะหมดอายุภายใน 5 นาที\nหากคุณไม่ได้ทำการสมัครสมาชิก กรุณาเพิกเฉยต่ออีเมลฉบับนี้`,
+                            html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; text-align: center;">
+                                    <h2 style="color: #0ea5e9;">INDICATOR WEB CHAT</h2>
+                                    <p style="color: #475569; font-size: 16px;">รหัสยืนยันตัวตน (OTP) ของคุณสำหรับการสมัครสมาชิกคือ</p>
+                                    <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                                        <h1 style="margin: 0; font-size: 32px; letter-spacing: 5px; color: #1e293b;">${generatedOtp}</h1>
+                                    </div>
+                                    <p style="color: #64748b; font-size: 14px;">รหัสนี้จะหมดอายุภายใน 5 นาที</p>
+                                    <p style="color: #94a3b8; font-size: 12px; margin-top: 30px;">หากคุณไม่ได้ทำรายการนี้ กรุณาเพิกเฉยต่ออีเมลฉบับนี้</p>
+                                   </div>`
+                        });
+                        console.log(`[OTP] Email sent to ${email}`);
+                    } catch (emailError) {
+                        console.error("[OTP] Email send failed:", emailError);
+                        return res.status(500).json({ error: "ไม่สามารถส่งอีเมลได้ กรุณาตรวจสอบการตั้งค่าอีเมลของเซิร์ฟเวอร์" });
+                    }
+                } else {
+                    // Fallback to console log if no SMTP configured (useful for local dev before setup)
+                    console.log(`[OTP-WARNING] SMTP not configured. Generated OTP for ${email}: ${generatedOtp}`);
+                    // return res.status(500).json({ error: "SMTP not configured on server" }); 
+                    // Uncomment above line to force failure if no SMTP, or keep logging for dev
+                }
 
                 return res.status(200).json({
                     success: true,
-                    message: "OTP sent successfully (Mock mode)",
-                    mockOtp: generatedOtp // Remove this in production when real email is used
+                    message: "OTP sent successfully"
+                    // removed mockOtp to prevent exposing it to frontend
                 });
             }
 

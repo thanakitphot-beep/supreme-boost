@@ -512,8 +512,6 @@
                             document.getElementById('auth-otp-group').classList.remove('hidden');
                             document.getElementById('auth-otp').required = true;
                             btn.innerText = 'ยืนยัน OTP และสมัครสมาชิก';
-                            // แสดง OTP จำลองให้ผู้ใช้เห็น (เพื่อความสะดวกตอนทดสอบ)
-                            alert('Mock OTP สำหรับ ' + email + ' คือ: ' + data.mockOtp);
                         } else {
                             errorMsg.innerText = data.error || 'ไม่สามารถขอ OTP ได้';
                             errorMsg.classList.remove('hidden');
