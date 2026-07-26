@@ -361,9 +361,9 @@
     </div>
 
     <!-- My Products Modal -->
-    <div id="my-products-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
+    <div id="my-products-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden p-4">
         <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onclick="closeMyProductsModal()"></div>
-        <div class="glass-nav border border-slate-700 p-8 rounded-2xl w-full max-w-2xl relative z-10 shadow-2xl shadow-cyan-900/20">
+        <div class="glass-nav border border-slate-700 p-6 md:p-8 rounded-2xl w-full max-w-2xl relative z-10 shadow-2xl shadow-cyan-900/20 max-h-[90vh] overflow-y-auto scrollbar-hide">
             <button onclick="closeMyProductsModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
             
             <div class="flex items-center space-x-4 mb-8 border-b border-slate-700 pb-4">
