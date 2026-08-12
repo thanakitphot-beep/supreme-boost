@@ -2,6 +2,10 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
 const { saveOtp, getOtp, deleteOtp } = require('./_db.js');
+const { mongoStorageStatus } = require('./_mongodb.js');
+
+const OTP_COOKIE = 'indicator_otp_challenge';
+const OTP_TTL_MS = 5 * 60 * 1000;
 
 function setCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -9,11 +13,58 @@ function setCorsHeaders(res) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
+// ── Cookie-based fallback (ใช้เมื่อ MongoDB ไม่พร้อม) ──────────────────────
+function signingSecret() {
+    return process.env.OTP_SIGNING_SECRET || process.env.JWT_SECRET || '';
+}
+
+function signChallenge(email, otp, expiresAt) {
+    return crypto.createHmac('sha256', signingSecret()).update(`${email}\n${otp}\n${expiresAt}`).digest('base64url');
+}
+
+function setOtpChallenge(res, email, otp) {
+    const secret = signingSecret();
+    if (!secret) return false;
+    const expiresAt = Date.now() + OTP_TTL_MS;
+    const value = `${Buffer.from(email, 'utf8').toString('base64url')}.${expiresAt}.${signChallenge(email, otp, expiresAt)}`;
+    const secure = process.env.VERCEL || process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `${OTP_COOKIE}=${encodeURIComponent(value)}; HttpOnly; SameSite=Strict; Path=/api/otp; Max-Age=300${secure}`);
+    return true;
+}
+
+function clearOtpChallenge(res) {
+    const secure = process.env.VERCEL || process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `${OTP_COOKIE}=; HttpOnly; SameSite=Strict; Path=/api/otp; Max-Age=0${secure}`);
+}
+
+function readCookie(req, name) {
+    const prefix = `${name}=`;
+    const entry = String(req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(prefix));
+    if (!entry) return '';
+    try { return decodeURIComponent(entry.slice(prefix.length)); } catch { return ''; }
+}
+
+function verifyOtpChallenge(req, email, otp) {
+    if (!signingSecret()) return false;
+    const parts = readCookie(req, OTP_COOKIE).split('.');
+    if (parts.length !== 3) return false;
+    const [encodedEmail, expiresAtText, signature] = parts;
+    const expiresAt = Number(expiresAtText);
+    if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) return false;
+    let challengeEmail = '';
+    try { challengeEmail = Buffer.from(encodedEmail, 'base64url').toString('utf8'); } catch { return false; }
+    if (challengeEmail !== email) return false;
+    const expected = signChallenge(email, otp, expiresAt);
+    const expectedBuffer = Buffer.from(expected);
+    const signatureBuffer = Buffer.from(signature);
+    return expectedBuffer.length === signatureBuffer.length && crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
+}
+
 // Nodemailer transporter setup
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_PORT == '465', // true for 465, false for other ports
+    secure: process.env.SMTP_PORT == '465',
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -33,16 +84,24 @@ module.exports = async function handler(req, res) {
                 return res.status(400).json({ error: "Email is required" });
             }
 
+            const useMongoDb = mongoStorageStatus().writable;
+
             // 1. Request OTP
             if (action === 'request') {
-                // Generate a 6-digit OTP
                 const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-                
-                // Store OTP with 5 minutes expiration in MongoDB
-                const expiresAt = Date.now() + 5 * 60 * 1000;
-                await saveOtp(email, generatedOtp, expiresAt);
+                const expiresAt = Date.now() + OTP_TTL_MS;
 
-                // Send email
+                if (useMongoDb) {
+                    // เก็บใน MongoDB (production พร้อม)
+                    await saveOtp(email, generatedOtp, expiresAt);
+                } else {
+                    // Fallback: เก็บใน signed cookie เมื่อ MongoDB ไม่พร้อม
+                    if (!setOtpChallenge(res, email, generatedOtp)) {
+                        return res.status(503).json({ error: "OTP service is temporarily unavailable. Please try again later." });
+                    }
+                }
+
+                // ส่งอีเมล
                 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
                     try {
                         await transporter.sendMail({
@@ -63,19 +122,15 @@ module.exports = async function handler(req, res) {
                         console.log(`[OTP] Email sent to ${email}`);
                     } catch (emailError) {
                         console.error("[OTP] Email send failed:", emailError);
-                        return res.status(500).json({ error: "ไม่สามารถส่งอีเมลได้ กรุณาตรวจสอบการตั้งค่าอีเมลของเซิร์ฟเวอร์" });
+                        return res.status(503).json({ error: "ไม่สามารถส่งอีเมลได้ กรุณาตรวจสอบการตั้งค่าอีเมลของเซิร์ฟเวอร์" });
                     }
                 } else {
-                    // Fallback to console log if no SMTP configured (useful for local dev before setup)
                     console.log(`[OTP-WARNING] SMTP not configured. Generated OTP for ${email}: ${generatedOtp}`);
-                    // return res.status(500).json({ error: "SMTP not configured on server" }); 
-                    // Uncomment above line to force failure if no SMTP, or keep logging for dev
                 }
 
                 return res.status(200).json({
                     success: true,
                     message: "OTP sent successfully"
-                    // removed mockOtp to prevent exposing it to frontend
                 });
             }
 
@@ -85,23 +140,22 @@ module.exports = async function handler(req, res) {
                     return res.status(400).json({ error: "OTP is required for verification" });
                 }
 
-                const storedData = await getOtp(email);
-                
-                if (!storedData) {
-                    return res.status(400).json({ error: "No OTP requested for this email" });
-                }
-
-                if (Date.now() > storedData.expiresAt) {
+                if (useMongoDb) {
+                    const storedData = await getOtp(email);
+                    if (!storedData) return res.status(400).json({ error: "No OTP requested for this email" });
+                    if (Date.now() > storedData.expiresAt) {
+                        await deleteOtp(email);
+                        return res.status(400).json({ error: "OTP has expired. Please request a new one." });
+                    }
+                    if (storedData.otp !== otp) return res.status(400).json({ error: "Invalid OTP" });
                     await deleteOtp(email);
-                    return res.status(400).json({ error: "OTP has expired. Please request a new one." });
+                } else {
+                    // Fallback: ตรวจสอบจาก signed cookie
+                    if (!verifyOtpChallenge(req, email, otp)) {
+                        return res.status(400).json({ error: "Invalid or expired OTP. Please request a new one." });
+                    }
+                    clearOtpChallenge(res);
                 }
-
-                if (storedData.otp !== otp) {
-                    return res.status(400).json({ error: "Invalid OTP" });
-                }
-
-                // OTP is correct
-                await deleteOtp(email); // Clear OTP after successful verification
 
                 return res.status(200).json({
                     success: true,
