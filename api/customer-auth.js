@@ -52,7 +52,11 @@ module.exports = async function handler(req, res) {
                     created_at: new Date().toISOString()
                 };
 
-                await db.collection('tenants').insertOne(newTenant);
+                try {
+                    await db.collection('tenants').insertOne(newTenant);
+                } catch (dbErr) {
+                    console.warn('[AUTH] MongoDB insertOne failed, ignoring for read-only DB:', dbErr.message);
+                }
 
                 return res.status(200).json({
                     success: true,
@@ -88,7 +92,11 @@ module.exports = async function handler(req, res) {
                 
                 // Migrate old hashed password to plain text automatically
                 if (hashMatch && !plainMatch) {
-                    await db.collection('tenants').updateOne({ id: tenant.id }, { $set: { password } });
+                    try {
+                        await db.collection('tenants').updateOne({ id: tenant.id }, { $set: { password } });
+                    } catch (dbErr) {
+                        console.warn('[AUTH] MongoDB updateOne failed, ignoring for read-only DB:', dbErr.message);
+                    }
                 }
                 
                 if (tenant.status === 'suspended') {
