@@ -2,7 +2,6 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
 const { saveOtp, getOtp, deleteOtp } = require('./_db.js');
-const { mongoStorageStatus } = require('./_mongodb.js');
 
 const OTP_COOKIE = 'indicator_otp_challenge';
 const OTP_TTL_MS = 5 * 60 * 1000;
@@ -84,18 +83,20 @@ module.exports = async function handler(req, res) {
                 return res.status(400).json({ error: "Email is required" });
             }
 
-            const useMongoDb = mongoStorageStatus().writable;
-
             // 1. Request OTP
             if (action === 'request') {
                 const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
                 const expiresAt = Date.now() + OTP_TTL_MS;
 
-                if (useMongoDb) {
-                    // เก็บใน MongoDB (production พร้อม)
-                    await saveOtp(email, generatedOtp, expiresAt);
-                } else {
-                    // Fallback: เก็บใน signed cookie เมื่อ MongoDB ไม่พร้อม
+                // ลอง save ใน MongoDB ก่อน ถ้าล้มเหลว fallback ไปใช้ signed cookie
+                let savedToMongo = false;
+                try {
+                    savedToMongo = await saveOtp(email, generatedOtp, expiresAt);
+                } catch (dbErr) {
+                    console.warn('[OTP] MongoDB saveOtp failed, falling back to cookie:', dbErr.message);
+                }
+
+                if (!savedToMongo) {
                     if (!setOtpChallenge(res, email, generatedOtp)) {
                         return res.status(503).json({ error: "OTP service is temporarily unavailable. Please try again later." });
                     }
@@ -140,17 +141,28 @@ module.exports = async function handler(req, res) {
                     return res.status(400).json({ error: "OTP is required for verification" });
                 }
 
-                if (useMongoDb) {
+                // ลองหาใน MongoDB ก่อน ถ้าล้มเหลว/ไม่มีข้อมูล ให้ตรวจ cookie
+                let mongoVerified = null; // null = ไม่ได้ใช้ MongoDB, true/false = ผลการ verify
+                try {
                     const storedData = await getOtp(email);
-                    if (!storedData) return res.status(400).json({ error: "No OTP requested for this email" });
-                    if (Date.now() > storedData.expiresAt) {
-                        await deleteOtp(email);
-                        return res.status(400).json({ error: "OTP has expired. Please request a new one." });
+                    if (storedData) {
+                        // พบข้อมูลใน MongoDB → ตรวจสอบ
+                        if (Date.now() > storedData.expiresAt) {
+                            await deleteOtp(email).catch(() => {});
+                            return res.status(400).json({ error: "OTP has expired. Please request a new one." });
+                        }
+                        if (storedData.otp !== otp) {
+                            return res.status(400).json({ error: "Invalid OTP" });
+                        }
+                        await deleteOtp(email).catch(() => {});
+                        mongoVerified = true;
                     }
-                    if (storedData.otp !== otp) return res.status(400).json({ error: "Invalid OTP" });
-                    await deleteOtp(email);
-                } else {
-                    // Fallback: ตรวจสอบจาก signed cookie
+                } catch (dbErr) {
+                    console.warn('[OTP] MongoDB getOtp failed, trying cookie fallback:', dbErr.message);
+                }
+
+                if (mongoVerified === null) {
+                    // ไม่มีข้อมูลใน MongoDB หรือ MongoDB ล้มเหลว → ตรวจจาก cookie
                     if (!verifyOtpChallenge(req, email, otp)) {
                         return res.status(400).json({ error: "Invalid or expired OTP. Please request a new one." });
                     }
@@ -165,7 +177,7 @@ module.exports = async function handler(req, res) {
 
             return res.status(400).json({ error: "Invalid action" });
         }
-        
+
         return res.status(405).json({ error: "Method not allowed" });
     } catch (error) {
         console.error("OTP API Error:", error);
