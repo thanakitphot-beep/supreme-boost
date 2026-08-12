@@ -345,6 +345,7 @@
         // Show locked overlay
         document.body.style.overflow = 'hidden';
         const overlay = document.createElement('div');
+        overlay.id = 'locked-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(9,9,15,0.97);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;';
         overlay.innerHTML = `
             <div style="width:72px;height:72px;border-radius:50%;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);display:flex;align-items:center;justify-content:center;margin-bottom:20px;">
@@ -367,11 +368,32 @@
 
     const AUTH = { Authorization: `Bearer ${tenant.api_key}`, 'Content-Type': 'application/json' };
 
-    document.getElementById('tenantName').textContent = tenant.company_name || tenant.username || '—';
-    document.getElementById('tenantPkg').textContent = tenant.package_type || '—';
-    document.getElementById('statPkg').textContent = (tenant.package_type || '—').toUpperCase();
-    const exp = tenant.expires_at ? new Date(tenant.expires_at).toLocaleDateString('th-TH') : 'ไม่จำกัด';
-    document.getElementById('statExpiry').textContent = exp;
+    function updateTenantUI() {
+        document.getElementById('tenantName').textContent = tenant.company_name || tenant.username || '—';
+        document.getElementById('tenantPkg').textContent = tenant.package_type || '—';
+        document.getElementById('statPkg').textContent = (tenant.package_type || '—').toUpperCase();
+        const exp = tenant.expires_at ? new Date(tenant.expires_at).toLocaleDateString('th-TH') : 'ไม่จำกัด';
+        document.getElementById('statExpiry').textContent = exp;
+    }
+
+    updateTenantUI();
+
+    // Fetch fresh profile in background
+    fetch('/api/tenant?action=profile', { headers: AUTH })
+        .then(res => res.json())
+        .then(data => {
+            if (data.tenant) {
+                tenant = data.tenant;
+                localStorage.setItem('tenant_data', JSON.stringify(tenant));
+                updateTenantUI();
+                if (isActiveTenant(tenant)) {
+                    const overlay = document.getElementById('locked-overlay');
+                    if (overlay) overlay.remove();
+                    document.body.style.overflow = 'auto';
+                }
+            }
+        })
+        .catch(err => console.error('Profile sync failed', err));
 
     // Generate plugin code (multi-format, synced with admin dashboard logic)
     const origin = window.location.origin;

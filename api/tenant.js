@@ -40,6 +40,20 @@ module.exports = async function handler(req, res) {
                 const settings = await db.collection('settings').findOne({ id: tenant.id });
                 return res.status(200).json({ settings: settings || {} });
             }
+            if (action === 'profile') {
+                return res.status(200).json({
+                    tenant: {
+                        id: tenant.id,
+                        username: tenant.username,
+                        company_name: tenant.company_name,
+                        api_key: tenant.api_key,
+                        status: tenant.status,
+                        package_type: tenant.package_type,
+                        expires_at: tenant.expires_at,
+                        created_at: tenant.created_at
+                    }
+                });
+            }
             if (action === 'knowledge') {
                 const data = await db.collection('knowledge_chunks').find({ tenant_id: tenant.id }).sort({ created_at: -1 }).toArray();
                 return res.status(200).json({ data: data || [] });
