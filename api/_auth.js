@@ -4,8 +4,13 @@
 
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { checkRateLimit } = require('../services/rateLimit');
+const { setCorsHeaders } = require('../services/cors');
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.ADMIN_PASSWORD || 'omega-jarvis-secret-2026';
+const JWT_SECRET = process.env.JWT_SECRET || process.env.ADMIN_PASSWORD;
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+    console.error('[FATAL] JWT_SECRET environment variable is not set. Auth will be disabled.');
+}
 const JWT_EXPIRY = process.env.JWT_EXPIRY || '24h';
 const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
 
@@ -50,9 +55,8 @@ function verifyToken(token) {
     // Try JWT first
     const decoded = verifyJWT(token);
     if (decoded && decoded.role) return true;
-    // Static admin token (backward compat)
-    if (token === 'ADMIN_SUPREME_TOKEN_12345') return true;
-    // Legacy HMAC timestamp token
+    // NOTE: Hardcoded static bypass token 'ADMIN_SUPREME_TOKEN_12345' has been REMOVED (security fix).
+    // Legacy HMAC timestamp token (kept for backward compat with old admin sessions)
     return verifyLegacyToken(token);
 }
 
@@ -64,19 +68,17 @@ function decodeToken(token) {
     try { return jwt.decode(token); } catch { return null; }
 }
 
-// ─── CORS Helpers ────────────────────────────────────────────────────────────
-
-function setCors(res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
+// ─── CORS Helpers (Now using centralized service) ────────────────────────────
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 module.exports = async function handler(req, res) {
-    setCors(res);
+    setCorsHeaders(req, res);
     if (req.method === 'OPTIONS') return res.status(200).end();
+
+    if (!checkRateLimit(req, res, 'auth')) {
+        return; // checkRateLimit already sent the 429 response
+    }
 
     const adminPassword = process.env.ADMIN_PASSWORD || 'indicator2026';
 
@@ -141,8 +143,8 @@ module.exports = async function handler(req, res) {
             });
         }
 
-        // Legacy fallback
-        if (verifyLegacyToken(token) || token === 'ADMIN_SUPREME_TOKEN_12345') {
+        // Legacy fallback (HMAC timestamp tokens only)
+        if (verifyLegacyToken(token)) {
             return res.status(200).json({ success: true, valid: true, role: 'admin', legacy: true });
         }
 

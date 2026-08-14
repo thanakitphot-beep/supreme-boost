@@ -1,6 +1,7 @@
 const db = require("./_db.js");
 const auth = require("./_auth.js");
 const cheerio = require('cheerio');
+const { isSafeUrl } = require('../services/ssrfBlocker');
 
 // ============================================================
 // SUPREME INTELLIGENCE CRAWLER — Enterprise RAG Engine v3.0
@@ -210,6 +211,10 @@ async function discoverUrls(baseUrl, html, $, maxPages = 15) {
 
 // Fetch and extract one page
 async function fetchPage(url) {
+    if (!isSafeUrl(url)) {
+        console.warn(`[SSRF Block] Refused to crawl unsafe URL: ${url}`);
+        return null;
+    }
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), 8000);
     try {
@@ -239,12 +244,24 @@ module.exports = async function handler(req, res) {
     const authHeader = req.headers['authorization'];
     let token = '';
     if (authHeader && authHeader.startsWith('Bearer ')) token = authHeader.substring(7);
+    
+    // Check global valid token first
     if (!auth.verifyToken(token)) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    // Validate tenant ownership
+    const decoded = auth.verifyJWT(token);
+    const isGlobalAdmin = decoded?.role === 'admin' || auth.verifyToken(token) && !decoded; // HMAC fallback is admin
 
     try {
         if (req.method === 'GET') {
             const tenantId = req.query ? req.query.tenantId : (req.url.split('tenantId=')[1] || '').split('&')[0];
             if (!tenantId) return res.status(400).json({ success: false, message: 'Missing tenantId' });
+            
+            // Tenant Check
+            if (!isGlobalAdmin && decoded?.tenantId !== tenantId) {
+                return res.status(403).json({ success: false, message: 'Forbidden: Tenant mismatch' });
+            }
+
             const chunks = await db.getKnowledge(tenantId);
             return res.status(200).json({ success: true, data: chunks });
         }
@@ -265,6 +282,11 @@ module.exports = async function handler(req, res) {
                 const body = req.body || {};
                 const { tenantId, url, deepCrawl = true } = body;
                 if (!tenantId || !url) return res.status(400).json({ success: false, message: 'Missing tenantId or url' });
+
+                // Tenant Check
+                if (!isGlobalAdmin && decoded?.tenantId !== tenantId) {
+                    return res.status(403).json({ success: false, message: 'Forbidden: Tenant mismatch' });
+                }
 
                 const geminiKey = process.env.GEMINI_API_KEY;
                 if (!geminiKey) return res.status(500).json({ success: false, message: 'Missing GEMINI_API_KEY' });
@@ -337,6 +359,11 @@ module.exports = async function handler(req, res) {
                 const body = req.body || {};
                 const { tenantId, text, title } = body;
                 if (!tenantId || !text) return res.status(400).json({ success: false, message: 'Missing tenantId or text' });
+
+                // Tenant Check
+                if (!isGlobalAdmin && decoded?.tenantId !== tenantId) {
+                    return res.status(403).json({ success: false, message: 'Forbidden: Tenant mismatch' });
+                }
 
                 const geminiKey = process.env.GEMINI_API_KEY;
                 if (!geminiKey) return res.status(500).json({ success: false, message: 'Missing GEMINI_API_KEY' });

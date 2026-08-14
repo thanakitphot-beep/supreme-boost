@@ -31,7 +31,8 @@ COPY --from=builder /usr/src/app/api ./api
 COPY --from=builder /usr/src/app/services ./services
 COPY --from=builder /usr/src/app/server.js ./server.js
 COPY --from=builder /usr/src/app/supreme-boost ./supreme-boost
-COPY --from=builder /usr/src/app/client ./client
+COPY --from=builder /usr/src/app/plugins ./plugins
+COPY --from=builder /usr/src/app/data ./data
 COPY --from=builder /usr/src/app/*.html ./
 
 # Set environment

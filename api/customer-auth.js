@@ -1,19 +1,20 @@
 const crypto = require('crypto');
 const { connectToDatabase } = require("./_mongodb.js");
 
-function setCorsHeaders(res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
+const { checkRateLimit } = require('../services/rateLimit');
+const { setCorsHeaders } = require('../services/cors');
 
 function hashPassword(password) {
-    return password; // Plain text per admin request
+    return crypto.createHash('sha256').update(password).digest('hex');
 }
 
 module.exports = async function handler(req, res) {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     if (req.method === "OPTIONS") return res.status(200).end();
+
+    if (!checkRateLimit(req, res, 'auth')) {
+        return;
+    }
 
     const db = await connectToDatabase();
     if (!db) return res.status(500).json({ error: "Database not configured" });
@@ -84,16 +85,18 @@ module.exports = async function handler(req, res) {
                     return res.status(401).json({ error: "Invalid Username or Password" });
                 }
 
-                const plainMatch = tenant.password === password;
                 const hashMatch = tenant.password === crypto.createHash('sha256').update(password).digest('hex');
+                const plainMatch = tenant.password === password;
+
                 if (!plainMatch && !hashMatch) {
                     return res.status(401).json({ error: "Invalid Username or Password" });
                 }
                 
-                // Migrate old hashed password to plain text automatically
-                if (hashMatch && !plainMatch) {
+                // Migrate old plain text password to hashed password automatically
+                if (plainMatch && !hashMatch) {
                     try {
-                        await db.collection('tenants').updateOne({ id: tenant.id }, { $set: { password } });
+                        const newHash = hashPassword(password);
+                        await db.collection('tenants').updateOne({ id: tenant.id }, { $set: { password: newHash } });
                     } catch (dbErr) {
                         console.warn('[AUTH] MongoDB updateOne failed, ignoring for read-only DB:', dbErr.message);
                     }

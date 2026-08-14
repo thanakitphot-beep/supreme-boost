@@ -5,6 +5,8 @@ const { semanticCache } = require('../services/cache');
 const { getRagContext } = require('../services/rag');
 const { multiAgentPipeline } = require('../services/llm');
 const { maskPII, maskDOMSnapshot } = require('../services/safety');
+const { checkRateLimit } = require('../services/rateLimit');
+const { setCorsHeaders } = require('../services/cors');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -18,11 +20,7 @@ const MAX_PAGE_CHARS = 6000;
 const MAX_SELECTED_CHARS = 1200;
 const MAX_HISTORY_ITEMS = 8;
 
-function setCorsHeaders(res) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-}
+// Using centralized CORS service
 
 function parseBody(body) {
     if (!body) return {};
@@ -65,9 +63,13 @@ function sanitizeDNA(dna) {
 }
 
 module.exports = async function handler(req, res) {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     if (req.method === "OPTIONS") return res.status(200).end();
     if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+    if (!checkRateLimit(req, res, 'chat')) {
+        return; // checkRateLimit already sent the 429 response
+    }
 
     try {
         const body = parseBody(req.body);

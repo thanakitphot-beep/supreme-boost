@@ -1,4 +1,6 @@
 // Crawl Handler Service
+const { isSafeUrl } = require('../services/ssrfBlocker');
+
 
 function parseBody(body) {
     if (!body) return {};
@@ -78,6 +80,10 @@ module.exports = async function crawlHandler(req, res) {
 
         async function fetchPage(url) {
             if (seen.has(url)) return null;
+            if (!isSafeUrl(url)) {
+                console.warn(`[SSRF Block] Refused to crawl unsafe URL: ${url}`);
+                return null;
+            }
             seen.add(url);
             try {
                 const ctrl = new AbortController();

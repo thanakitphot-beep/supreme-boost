@@ -1,14 +1,11 @@
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const { connectToDatabase } = require("./_mongodb.js");
+const { setCorsHeaders } = require('../services/cors');
+const { checkRateLimit } = require('../services/rateLimit');
 
 function hashPassword(password) {
-    return password;
-}
-
-function setCorsHeaders(res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return crypto.createHash('sha256').update(password).digest('hex');
 }
 
 async function authenticateUser(req) {
@@ -16,13 +13,11 @@ async function authenticateUser(req) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
     const token = authHeader.split(' ')[1];
     
-    if (token === 'ADMIN_SUPREME_TOKEN_12345') {
-        return { role: 'admin' };
-    }
+    // NOTE: Hardcoded bypass token 'ADMIN_SUPREME_TOKEN_12345' has been REMOVED (security fix).
 
     try {
-        const jwt = require('jsonwebtoken');
-        const secret = process.env.JWT_SECRET || process.env.ADMIN_PASSWORD || 'omega-jarvis-secret-2026';
+        const secret = process.env.JWT_SECRET || process.env.ADMIN_PASSWORD;
+        if (!secret) return null;
         const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
         if (decoded && decoded.role) {
             return { role: decoded.role };
@@ -33,8 +28,10 @@ async function authenticateUser(req) {
 }
 
 module.exports = async function handler(req, res) {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     if (req.method === "OPTIONS") return res.status(200).end();
+
+    if (!checkRateLimit(req, res, 'admin')) return;
 
     const db = await connectToDatabase();
     if (!db) return res.status(500).json({ error: "Database not configured" });
@@ -98,9 +95,15 @@ module.exports = async function handler(req, res) {
 
             if (action === 'login') {
                 const { code } = body;
-                const adminSecret = process.env.ADMIN_PASSWORD || 'INDICOR 911';
+                const adminSecret = process.env.ADMIN_PASSWORD;
+                if (!adminSecret) {
+                    return res.status(500).json({ error: "Server misconfiguration: ADMIN_PASSWORD not set" });
+                }
                 if (code === adminSecret) {
-                    return res.status(200).json({ success: true, token: 'ADMIN_SUPREME_TOKEN_12345' });
+                    // Issue a real JWT — never return a static token
+                    const secret = process.env.JWT_SECRET || adminSecret;
+                    const token = jwt.sign({ role: 'admin' }, secret, { expiresIn: '24h', algorithm: 'HS256' });
+                    return res.status(200).json({ success: true, token });
                 }
                 return res.status(401).json({ error: "Invalid admin code" });
             }

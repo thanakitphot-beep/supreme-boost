@@ -1,14 +1,10 @@
 const db = require("./_db.js");
+const { setCorsHeaders } = require('../services/cors');
 
 module.exports = async function handler(req, res) {
-    if (req.method === 'OPTIONS') {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-        return res.status(200).end();
-    }
+    setCorsHeaders(req, res);
+    if (req.method === 'OPTIONS') return res.status(200).end();
 
-    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');
 
     const auth = require("./_auth.js");
@@ -17,8 +13,16 @@ module.exports = async function handler(req, res) {
     if (authHeader && authHeader.startsWith('Bearer ')) {
         token = authHeader.substring(7);
     }
+    
     if (!auth.verifyToken(token)) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const decoded = auth.verifyJWT(token);
+    const isGlobalAdmin = decoded?.role === 'admin' || auth.verifyToken(token) && !decoded;
+
+    if (req.method === 'POST' && !isGlobalAdmin) {
+        return res.status(403).json({ success: false, message: 'Forbidden: Admin access required' });
     }
 
     const method = req.method;

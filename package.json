@@ -5,6 +5,8 @@
   "scripts": {
     "build": "node build.js",
     "check": "node --check api/chat.js && node --check src/widget/main.js",
+    "test": "jest --testPathPattern=tests/contracts --forceExit --detectOpenHandles",
+    "test:watch": "jest --testPathPattern=tests/contracts --watch",
     "dev": "nodemon server.js",
     "start": "node server.js",
     "prod": "pm2 start server.js --name supreme-boost --watch --ignore-watch=\"node_modules\"",
@@ -27,7 +29,9 @@
   },
   "devDependencies": {
     "esbuild": "^0.28.1",
-    "nodemon": "^3.1.14"
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2"
   },
   "description": "โปรเจคนี้เป็นตัวอย่าง widget แชท AI สำหรับเว็บไซต์ โดยใช้สคริปต์ฝังหน้าเว็บเดียวและ backend serverless API เพื่อเชื่อมต่อกับ Gemini API.",
   "main": "server.js",

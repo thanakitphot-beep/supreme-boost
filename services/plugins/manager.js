@@ -1,5 +1,7 @@
 // OMEGA-JARVIS v3.0.0 — Plugin System Manager
-// Dynamic plugin loading with permission sandboxing
+// Secure static plugin registry (new Function() RCE removed — Phase 1 security fix)
+// Dynamic code execution from DB is no longer supported. Plugins must be registered
+// at startup via registerPlugin() with a pre-approved handler function.
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -100,30 +102,33 @@ async function loadPluginsFromDB(tenantId = null) {
 }
 
 /**
- * Execute a plugin hook safely
+ * Execute a plugin hook safely.
+ * SECURITY FIX: Removed new Function() dynamic code execution (RCE risk).
+ * Plugins must now register pre-approved handler functions at startup.
+ * DB-stored 'code' strings are intentionally ignored.
  */
 async function executePlugin(name, hook, context = {}) {
     const plugin = getPlugin(name);
     if (!plugin) throw new Error(`Plugin not found: ${name}`);
-    if (!plugin.code) throw new Error(`Plugin has no code: ${name}`);
 
-    // Basic sandbox — wrap in async function with limited context
-    try {
-        // NOTE: In production, use vm2 or a proper sandbox for security
-        // This is a simplified version for demonstration
-        const fn = new Function('context', 'hook', `
-            "use strict";
-            ${plugin.code}
-            if (typeof hooks !== 'undefined' && hooks[hook]) {
-                return Promise.resolve(hooks[hook](context));
-            }
-            return Promise.resolve(null);
-        `);
-        return await fn(context, hook);
-    } catch (e) {
-        console.error(`[Plugins] Execute error in ${name}.${hook}:`, e.message);
+    // Check for a registered static handler (the only safe execution path)
+    if (typeof plugin.handlers?.[hook] === 'function') {
+        try {
+            return await Promise.resolve(plugin.handlers[hook](context));
+        } catch (e) {
+            console.error(`[Plugins] Execute error in ${name}.${hook}:`, e.message);
+            return null;
+        }
+    }
+
+    // If the plugin only has DB 'code', refuse to execute it
+    if (plugin.code) {
+        console.warn(`[Plugins] BLOCKED: Plugin '${name}' tried to run DB-stored code. Register a static handler instead.`);
         return null;
     }
+
+    console.warn(`[Plugins] No handler registered for ${name}.${hook}`);
+    return null;
 }
 
 module.exports = {

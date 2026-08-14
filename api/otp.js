@@ -1,16 +1,12 @@
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const { checkRateLimit } = require('../services/rateLimit');
+const { setCorsHeaders } = require('../services/cors');
 
 const { saveOtp, getOtp, deleteOtp } = require('./_db.js');
 
 const OTP_COOKIE = 'indicator_otp_challenge';
 const OTP_TTL_MS = 5 * 60 * 1000;
-
-function setCorsHeaders(res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
 
 // ── Cookie-based fallback (ใช้เมื่อ MongoDB ไม่พร้อม) ──────────────────────
 function signingSecret() {
@@ -71,8 +67,10 @@ const transporter = nodemailer.createTransport({
 });
 
 module.exports = async function handler(req, res) {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     if (req.method === "OPTIONS") return res.status(200).end();
+
+    if (!checkRateLimit(req, res, 'auth')) return;
 
     try {
         if (req.method === "POST") {
