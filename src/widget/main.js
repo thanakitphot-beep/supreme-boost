@@ -795,6 +795,9 @@
                         console.warn("[SupremeBoost] Plugin not found or not executable:", act.pluginName);
                     }
                     break;
+                case "handoff":
+                    triggerHandoff(_st ? _st.locale : "en", "User requested human agent via chat.");
+                    break;
                 case "warp": if (!act.targetText) return; var t = findEl(act.targetText, act.keywords || []); if (t) { warpEl(t); } else if (_st && _cfg && _msgs) { var kw = (act.keywords || []).length ? act.keywords : act.targetText.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').split(/\s+/).filter(function(w){return w.length>1;}).slice(0,10); crossSearch(kw,_cfg,_msgs,_st.locale).then(function(r){if(r&&r.length){var a=Array.from(new Set([act.targetText].concat(kw))).join(',');if(r[0].score>0){navigate(r[0].url,a,_msgs,_st.locale);}else{showCross(r,_msgs,a,_st.locale);}}else{addMsg(_msgs,"assistant","🔍 ไม่พบข้อมูลที่ต้องการในเว็บไซต์นี้");}}); } break;
                 case "warp_cross_page": 
                     if (act.url) {

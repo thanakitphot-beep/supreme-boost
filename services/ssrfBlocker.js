@@ -14,9 +14,16 @@ function isSafeUrl(urlStr) {
         
         // Block exact IPs (IPv4 and IPv6) if they correspond to internal ranges
         // Note: For robust protection, DNS resolution needs to be checked, but this catches basic attacks.
-        if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return false;
-        if (hostname.startsWith('10.')) return false;
-        if (hostname.startsWith('192.168.')) return false;
+        const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || 
+                        hostname.startsWith('10.') || hostname.startsWith('192.168.');
+
+        // Allow localhost for local development and testing
+        if (isLocal && process.env.NODE_ENV !== 'production') {
+            return true;
+        }
+
+        if (isLocal) return false;
+        
         if (hostname.startsWith('169.254.')) return false; // AWS metadata IP
         
         // Block internal metadata domains

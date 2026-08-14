@@ -114,7 +114,11 @@ async function callDirectGemini(payload) {
         UNIVERSAL_SAFETY_RULES ? String(UNIVERSAL_SAFETY_RULES).slice(0, 400) : '',
         ``,
         `You MUST return ONLY a valid JSON object (no markdown, no extra text):`,
-        `{ "reply": "your answer here", "cssCommand": "", "action": null, "interactive": null }`
+        `{ "reply": "your answer here", "cssCommand": "", "action": null, "interactive": null }`,
+        ``,
+        `SPECIAL ACTIONS (set in "action" field, otherwise null):`,
+        `- If user wants to find a product, person, or specific content on the page, use: { "type": "warp", "targetText": "keyword" }`,
+        `- If user wants to talk to a human agent, use: { "type": "handoff" }`
     ].filter(Boolean).join('\n');
 
     const historyText = Array.isArray(payload.history)
