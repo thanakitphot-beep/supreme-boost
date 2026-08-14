@@ -116,9 +116,11 @@ async function callDirectGemini(payload) {
         `You MUST return ONLY a valid JSON object (no markdown, no extra text):`,
         `{ "reply": "your answer here", "cssCommand": "", "action": null, "interactive": null }`,
         ``,
-        `SPECIAL ACTIONS (set in "action" field, otherwise null):`,
-        `- If user wants to find a product, person, or specific content on the page, use: { "type": "warp", "targetText": "keyword" }`,
-        `- If user wants to talk to a human agent, use: { "type": "handoff" }`
+        `CRITICAL RULES:`,
+        `1. DO NOT write javascript or code in "cssCommand". Leave it empty ("").`,
+        `2. SPECIAL ACTIONS (set in "action" field, otherwise null):`,
+        `   - If user wants to find a product, person, or specific content on the page, use: { "type": "warp", "targetText": "keyword" }`,
+        `   - If user wants to talk to a human agent, use: { "type": "handoff" }`
     ].filter(Boolean).join('\n');
 
     const historyText = Array.isArray(payload.history)
@@ -143,7 +145,13 @@ async function callDirectGemini(payload) {
             circuitBreaker.recordSuccess(pid);
             const parsed = safeJson(raw);
             if (parsed && parsed.reply) return parsed;
-            // Fallback: wrap plain text
+            // Fallback for broken/truncated JSON: try to extract just the "reply" value
+            const replyMatch = raw.match(/"reply"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+            if (replyMatch && replyMatch[1]) {
+                const extractedReply = replyMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                return { reply: extractedReply, cssCommand: '', action: null, interactive: null };
+            }
+            // Fallback: wrap plain text if it doesn't look like JSON
             return { reply: (raw || '').trim(), cssCommand: '', action: null, interactive: null };
         } catch (err) {
             lastErrorMsg = err.message;
