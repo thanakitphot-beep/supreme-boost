@@ -210,19 +210,30 @@ module.exports = async function handler(req, res) {
 
         let result;
         if (usesIndicatorAgent()) {
-            // The Python service is opt-in and fail-closed. Any timeout or
-            // validation error immediately falls back to the proven local
-            // Agent, so enabling RAG cannot take the widget offline.
-            result = intelligenceEnabled() ? await answerWithIntelligence(payload) : null;
-            if (!result) {
-                const draft = runIndicatorAgent(payload);
-                if (draft && draft.researchRequest) {
-                    const externalResearch = await researchExternal(draft.researchRequest);
-                    result = runIndicatorAgent({ ...payload, externalResearch });
-                } else {
-                    result = draft;
+            // 1. Always let the deterministic local Agent try to route or show a catalog first.
+            // This ensures our highly-accurate 'searchUnified' and 'live DOM match' take precedence
+            // over the LLM which tends to just chat instead of navigating.
+            let draft = runIndicatorAgent(payload);
+            if (draft && draft.researchRequest) {
+                const externalResearch = await researchExternal(draft.researchRequest);
+                draft = runIndicatorAgent({ ...payload, externalResearch });
+            }
+            
+            const hasAction = draft && draft.action && draft.action.type;
+            const hasCarousel = draft && draft.interactive && draft.interactive.type === 'carousel';
+
+            if (hasAction || hasCarousel) {
+                // The local agent successfully found a target to navigate to, or a catalog to show.
+                result = draft;
+            } else {
+                // 2. If it's just a general question (no action/carousel), let the LLM handle the chat.
+                // The Python service is opt-in and fail-closed.
+                result = intelligenceEnabled() ? await answerWithIntelligence(payload) : null;
+                if (!result) {
+                    result = draft; // Fallback to local agent's basic chat
                 }
             }
+            
             if (result && Object.prototype.hasOwnProperty.call(result, 'researchRequest')) delete result.researchRequest;
         } else {
             result = await multiAgentPipeline(payload);
