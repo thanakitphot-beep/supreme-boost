@@ -4,6 +4,12 @@ const { createClient } = require('@supabase/supabase-js');
 const { semanticCache } = require('../services/cache');
 const { getRagContext } = require('../services/rag');
 const { multiAgentPipeline } = require('../services/llm');
+const { runIndicatorAgent } = require('../services/indicatorAgent');
+const { resolveSiteProfile, originIsAllowed } = require('../services/siteProfiles');
+const { learnPublicPage, getSiteKnowledge, getExpertiseStatus } = require('../services/siteExpertise');
+const { learnFromPublicPage } = require('../services/knowledgeLearning');
+const { research: researchExternal } = require('../services/externalResearch');
+const { enabled: intelligenceEnabled, answerWithIntelligence } = require('../services/intelligenceBridge');
 const { maskPII, maskDOMSnapshot } = require('../services/safety');
 const { checkRateLimit } = require('../services/rateLimit');
 const { setCorsHeaders } = require('../services/cors');
@@ -19,6 +25,12 @@ const MAX_PROMPT_CHARS = 1200;
 const MAX_PAGE_CHARS = 6000;
 const MAX_SELECTED_CHARS = 1200;
 const MAX_HISTORY_ITEMS = 8;
+
+// "owned" is the default: it uses the provider-independent INDICATOR Agent.
+// Set INDICATOR_AGENT_MODE=legacy only as an explicit rollback switch.
+function usesIndicatorAgent() {
+    return String(process.env.INDICATOR_AGENT_MODE || 'owned').toLowerCase() !== 'legacy';
+}
 
 // Using centralized CORS service
 
@@ -53,7 +65,10 @@ function sanitizeDNA(dna) {
     if (typeof dna.metaDescription === "string") result.metaDescription = maskPII(dna.metaDescription.slice(0, 500));
     if (typeof dna.metaKeywords === "string") result.metaKeywords = maskPII(dna.metaKeywords.slice(0, 500));
     if (Array.isArray(dna.headings)) result.headings = dna.headings.map(h => maskPII(String(h).slice(0, 200))).slice(0, 5);
-    if (Array.isArray(dna.entities)) result.entities = dna.entities.map(h => maskPII(String(h).slice(0, 200))).slice(0, 10);
+    // Product-heavy pages often render far more than ten public cards. Keep
+    // enough titles for an in-page product request before falling back to a
+    // whole-site crawl, while still bounding the browser payload.
+    if (Array.isArray(dna.entities)) result.entities = dna.entities.map(h => maskPII(String(h).slice(0, 240))).slice(0, 80);
     if (typeof dna.lang === "string") result.lang = dna.lang.slice(0, 10);
     if (typeof dna.ogType === "string") result.ogType = dna.ogType.slice(0, 100);
     if (typeof dna.activeSectionTag === "string") result.activeSectionTag = dna.activeSectionTag.slice(0, 50);
@@ -134,6 +149,18 @@ module.exports = async function handler(req, res) {
         }
 
         const rawPrompt = cleanText(body.prompt, MAX_PROMPT_CHARS);
+        // A browser key selects only a public site profile.  It never grants
+        // admin or connector permissions; those must remain server-side.
+        const siteProfile = resolveSiteProfile(cleanText(body.siteKey || body.apiKey, 300));
+        if (process.env.INDICATOR_STRICT_SITE_ORIGIN === 'true' && req.headers.origin && !originIsAllowed(siteProfile, req.headers.origin)) {
+            return res.status(403).json({
+                status: 'blocked',
+                reply: 'เว็บไซต์นี้ไม่ได้รับอนุญาตให้ใช้ Agent โปรไฟล์นี้',
+                cssCommand: '',
+                action: null,
+                interactive: null
+            });
+        }
 
         const payload = {
             prompt: maskPII(rawPrompt),
@@ -145,16 +172,32 @@ module.exports = async function handler(req, res) {
             history: maskHistory(body.history),
             url: cleanText(body.url, 500),
             title: maskPII(cleanText(body.title, 200)),
-            locale: normalizeLocale(body.locale)
+            locale: normalizeLocale(body.locale),
+            conversationId: cleanText(body.conversationId, 120),
+            siteProfile
         };
 
         if (!rawPrompt && !payload.isProactive) {
             return res.status(400).json({ error: "กรุณาพิมพ์ข้อความก่อนส่ง" });
         }
 
-        // ✅ FIX 9: RAG Context Retrieval ทำงานสำหรับ Demo users ด้วย
+        // Each approved website has a strictly separate, public knowledge
+        // notebook.  It learns the current public page only; DOM snapshots,
+        // query strings, cookies, and private routes are never persisted.
+        // This lets the Agent become better at that site over time without
+        // turning browser traffic into unreviewed model-training data.
+        payload.expertiseStatus = learnPublicPage(siteProfile, payload);
+        payload.expertKnowledge = getSiteKnowledge(siteProfile);
+        if (!payload.expertiseStatus) payload.expertiseStatus = getExpertiseStatus(siteProfile);
+        // Keep a separate, evidence-first learning ledger. It never lets a
+        // browser page or user message silently retrain the agent.
+        payload.learningStatus = learnFromPublicPage(siteProfile, payload);
+
+        // Gemini embeddings are needed only by the explicitly selected legacy
+        // pipeline. The INDICATOR Agent relies on its own knowledge registry
+        // and page context, so no Gemini request is made in owned mode.
         payload.ragContext = "";
-        if (rawPrompt && supabase && process.env.GEMINI_API_KEY) {
+        if (!usesIndicatorAgent() && rawPrompt && supabase && process.env.GEMINI_API_KEY) {
             const ragTenantId = tenantInfo ? tenantInfo.id : 'demo';
             payload.ragContext = await getRagContext(supabase, ragTenantId, rawPrompt, process.env.GEMINI_API_KEY);
         }
@@ -162,12 +205,32 @@ module.exports = async function handler(req, res) {
         let cached = semanticCache.get(payload);
         if (cached) {
             console.log("[Cache] HIT — returning cached response");
-            return res.status(200).json(cached);
+            return res.status(200).json({ ...cached, expertise: payload.expertiseStatus, learning: payload.learningStatus });
         }
 
-        const result = await multiAgentPipeline(payload);
+        let result;
+        if (usesIndicatorAgent()) {
+            // The Python service is opt-in and fail-closed. Any timeout or
+            // validation error immediately falls back to the proven local
+            // Agent, so enabling RAG cannot take the widget offline.
+            result = intelligenceEnabled() ? await answerWithIntelligence(payload) : null;
+            if (!result) {
+                const draft = runIndicatorAgent(payload);
+                if (draft && draft.researchRequest) {
+                    const externalResearch = await researchExternal(draft.researchRequest);
+                    result = runIndicatorAgent({ ...payload, externalResearch });
+                } else {
+                    result = draft;
+                }
+            }
+            if (result && Object.prototype.hasOwnProperty.call(result, 'researchRequest')) delete result.researchRequest;
+        } else {
+            result = await multiAgentPipeline(payload);
+        }
 
         if (result && result.status !== "silent_abort") {
+            result.expertise = payload.expertiseStatus;
+            result.learning = payload.learningStatus;
             semanticCache.set(payload, result);
         }
 

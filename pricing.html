@@ -217,13 +217,13 @@
             
             if (data.success && data.apiKey) {
                 document.getElementById('successSubtitle').textContent = companyName + ' พร้อมใช้งานแล้ว';
-                const code = \`<!-- INDICATOR AI Chat Widget -->
+                const code = `<!-- INDICATOR AI Chat Widget -->
 <script 
-  src="\${window.location.origin}/supreme-boost/boost.js"
-  data-api-key="\${data.apiKey}"
+  src="${window.location.origin}/supreme-boost/boost.js"
+  data-api-key="${data.apiKey}"
   data-title="AI Assistant"
   defer>
-<\/script>\`;
+<\/script>`;
                 document.getElementById('pluginCodeDisplay').textContent = code;
                 document.getElementById('pluginCodeBox').style.display = 'block';
             } else if (data.success) {

@@ -489,10 +489,34 @@
             window.speakText = function(text) {
                 if (!window.speechSynthesis) return;
                 window.speechSynthesis.cancel();
-                var ut = new SpeechSynthesisUtterance(text.replace(/[#*`_]/g, ''));
-                ut.lang = state.locale === "th" ? "th-TH" : "en-US";
-                ut.rate = 1.1;
-                window.speechSynthesis.speak(ut);
+                var clean = text.replace(/[#*`_]/g, '');
+                var isThai = state.locale === 'th';
+                var ut = new SpeechSynthesisUtterance(clean);
+                ut.lang = isThai ? 'th-TH' : (state.locale === 'ja' ? 'ja-JP' : state.locale === 'zh' ? 'zh-CN' : 'en-US');
+                ut.rate = isThai ? 1.0 : 1.1;
+                ut.pitch = 1.0;
+                if (isThai) {
+                    var voices = window.speechSynthesis.getVoices();
+                    var thaiVoice = voices.find(function(v) { return v.lang === 'th-TH'; })
+                        || voices.find(function(v) { return v.lang && v.lang.toLowerCase().startsWith('th'); });
+                    if (thaiVoice) {
+                        ut.voice = thaiVoice;
+                        window.speechSynthesis.speak(ut);
+                    } else {
+                        // Chrome loads voices async — wait then speak
+                        var done = false;
+                        window.speechSynthesis.onvoiceschanged = function() {
+                            if (done) return; done = true;
+                            var v2 = window.speechSynthesis.getVoices();
+                            var tv = v2.find(function(v) { return v.lang === 'th-TH'; }) || v2.find(function(v) { return v.lang && v.lang.toLowerCase().startsWith('th'); });
+                            if (tv) ut.voice = tv;
+                            window.speechSynthesis.speak(ut);
+                            window.speechSynthesis.onvoiceschanged = null;
+                        };
+                    }
+                } else {
+                    window.speechSynthesis.speak(ut);
+                }
             };
 
             AmbientUI.init(root, shadow, pri);

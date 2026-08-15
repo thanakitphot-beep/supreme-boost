@@ -73,6 +73,8 @@ loadEnv();
 
 const chatHandler = require('./api/chat.js');
 const crawlHandler = require('./api/crawl.js');
+const learnHandler = require('./api/learn.js');
+const learningFeedbackHandler = require('./api/learning-feedback.js');
 const adminHandler = require('./api/admin.js');
 
 const MIME = {
@@ -190,6 +192,8 @@ function handleRequest(req, res) {
         '/api/chat': chatHandler,
         '/api/v1/chat': chatHandler, // New v1 endpoint
         '/api/crawl': crawlHandler,
+        '/api/learn': learnHandler,
+        '/api/learning-feedback': learningFeedbackHandler,
         '/api/admin': adminHandler,
         '/api/settings': require('./api/settings.js'),
         '/api/auth': require('./api/auth.js'),
@@ -269,9 +273,11 @@ if (require.main === module) {
         console.log(`\n✅ INDICATOR WEB CHAT Server is running!`);
         console.log(`📍 Open: http://localhost:${PORT}`);
         console.log(`📍 API:  http://localhost:${PORT}/api/chat`);
-        console.log(`\n🔑 Gemini Key: ${process.env.GEMINI_API_KEY ? '✅ Loaded' : '❌ Missing'}`);
-        console.log(`🔑 Groq Key:   ${process.env.GROQ_API_KEY ? '✅ Loaded' : '⚪ Not set'}`);
-        console.log(`🔑 Cohere Key: ${process.env.COHERE_API_KEY ? '✅ Loaded' : '⚪ Not set'}`);
+        const agentMode = String(process.env.INDICATOR_AGENT_MODE || 'owned').toLowerCase();
+        console.log(`\n🧠 INDICATOR Agent Mode: ${agentMode === 'legacy' ? 'legacy provider pipeline' : 'owned provider-independent agent'}`);
+        if (agentMode === 'legacy') {
+            console.log(`🔑 Gemini Key: ${process.env.GEMINI_API_KEY ? '✅ Loaded' : '❌ Missing'}`);
+        }
         console.log(`\nPress Ctrl+C to stop\n`);
     });
 }

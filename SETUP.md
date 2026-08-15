@@ -8,14 +8,8 @@ git clone https://github.com/thanakitphot-beep/supreme-boost.git
 cd supreme-boost
 ```
 
-### 2. Set Up Environment Variables
-Create a `.env` file in the project root:
-```
-GEMINI_API_KEY=your_actual_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
-```
-
-Get your API key from: https://ai.google.dev/
+### 2. Configure INDICATOR knowledge
+Edit `data/indicator-knowledge.json` with your permitted pages, products, FAQs, and glossary. The standard `owned` mode makes no request to Gemini or another model provider.
 
 ### 3. Install Dependencies
 ```bash
@@ -49,11 +43,9 @@ Open the URL shown in terminal (usually `http://127.0.0.1:3000`)
    - Click "New Project"
    - Import your GitHub repository
 
-2. **Set Environment Variables**
-   - In Vercel dashboard, go to Settings > Environment Variables
-   - Add:
-     - Name: `GEMINI_API_KEY`
-     - Value: `your_actual_gemini_api_key`
+2. **Configure application data**
+   - Commit the approved knowledge registry or connect it to your tenant database.
+   - Keep `INDICATOR_AGENT_MODE` unset or set it to `owned`.
 
 3. **Deploy**
    - Vercel will automatically deploy when you push to GitHub
@@ -112,10 +104,10 @@ Open the URL shown in terminal (usually `http://127.0.0.1:3000`)
 ### Widget doesn't appear
 - Check browser console (F12) for errors
 - Ensure the Vercel domain is correct
-- Check that GEMINI_API_KEY is set on Vercel
+- Check that `data/indicator-knowledge.json` contains the expected pages and products
 
 ### AI doesn't respond
-- Verify GEMINI_API_KEY is valid
+- Check Vercel logs for `INDICATOR Agent Mode: owned`
 - Check Vercel logs for API errors
 - Widget will fallback to page content if API fails
 
@@ -160,7 +152,7 @@ npm run check
 ```
 
 ### Modify AI behavior
-Edit `api/chat.js` → `buildSystemPrompt()` function
+Edit `services/indicatorAgent.js` for agent behavior and `data/indicator-knowledge.json` for approved business knowledge
 
 ### Change widget appearance
 Edit `supreme-boost/boost.js` → `injectStyle()` function and CSS variables
@@ -173,7 +165,7 @@ Edit the `I18N` object in `supreme-boost/boost.js`
 ## License & Attribution
 
 This project uses:
-- Google Gemini API for AI
+- INDICATOR owned agent core for website reasoning and actions
 - Vercel for hosting
 - Vanilla JavaScript (no dependencies)
 

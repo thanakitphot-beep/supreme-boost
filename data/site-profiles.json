@@ -1,0 +1,62 @@
+{
+  "profiles": [
+    {
+      "id": "local-demo-store",
+      "siteKey": "INDICATOR_TEST",
+      "status": "active",
+      "allowedOrigins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+      "identity": {
+        "name": "MegaStore Assistant",
+        "role": "ผู้ช่วยฝ่ายขายและบริการลูกค้า",
+        "purpose": "ช่วยลูกค้าค้นหาสินค้า ราคา สต็อก นโยบาย และพาไปยังหน้าเว็บที่เกี่ยวข้อง",
+        "tone": "สุภาพ กระชับ และอ้างอิงข้อมูลของร้านเท่านั้น"
+      },
+      "permissions": ["search_catalog", "search_public_content", "summarize_public_content", "navigate_same_origin", "handoff"],
+      "useDefaultKnowledge": true,
+      "knowledge": {
+        "pages": [],
+        "catalog": [],
+        "glossary": []
+      },
+      "updatedAt": "2026-08-15T00:00:00.000Z"
+    },
+    {
+      "id": "isolated-book-demo",
+      "siteKey": "INDICATOR_ISOLATED_DEMO",
+      "status": "active",
+      "allowedOrigins": ["https://books.example"],
+      "identity": {
+        "name": "Orbit Books Assistant",
+        "role": "ผู้ช่วยร้านหนังสือ",
+        "purpose": "ช่วยค้นหาหนังสือและข้อมูลที่เผยแพร่โดยร้าน Orbit Books",
+        "tone": "ให้ข้อมูลตรงตามแคตตาล็อกของร้าน"
+      },
+      "permissions": ["search_catalog", "search_public_content", "navigate_same_origin", "handoff"],
+      "knowledge": {
+        "pages": [
+          {
+            "id": "orbit-home",
+            "title": "Orbit Books",
+            "url": "/",
+            "headings": ["หนังสือคัดสรร"],
+            "keywords": ["หนังสือ", "orbit"],
+            "content": "ร้านหนังสือ Orbit Books"
+          }
+        ],
+        "catalog": [
+          {
+            "id": "orbit-design",
+            "name": "Designing Calm Interfaces",
+            "description": "หนังสือการออกแบบประสบการณ์ผู้ใช้",
+            "price": 650,
+            "inStock": true,
+            "url": "/books/designing-calm-interfaces",
+            "keywords": ["design", "interface", "หนังสือออกแบบ"]
+          }
+        ],
+        "glossary": []
+      },
+      "updatedAt": "2026-08-15T00:00:00.000Z"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 # Do not commit local secrets or generated dependencies.
 .env
 node_modules/
+data/site-expertise.json
 
 .vercel
 .env*

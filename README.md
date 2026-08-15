@@ -1,12 +1,14 @@
 # INDICATOR WEB CHAT
 
-โปรเจคนี้เป็นตัวอย่าง widget แชท AI สำหรับเว็บไซต์ โดยใช้สคริปต์ฝังหน้าเว็บเดียวและ backend serverless API เพื่อเชื่อมต่อกับ Gemini API.
+โปรเจคนี้เป็น widget AI Agent สำหรับเว็บไซต์ โดยใช้สคริปต์ฝังหน้าเว็บเดียวและ backend serverless API ของ INDICATOR เอง ไม่เรียก Gemini ในโหมดมาตรฐาน.
 
 ## โครงสร้าง
 
 - `index.html` - หน้าเดโมเว็บตัวอย่าง
 - `supreme-boost/boost.js` - สคริปต์ embed widget แชท AI, อ่านข้อมูลบนหน้าเว็บ, รองรับหลายภาษา
-- `api/chat.js` - API endpoint สำหรับส่ง prompt ไปยัง Gemini และคืนค่า reply + CSS command
+- `api/chat.js` - API endpoint ที่เรียก INDICATOR Agent และคืนค่า reply + action สำหรับ widget
+- `services/indicatorAgent.js` - Agent ของ INDICATOR สำหรับค้นสินค้า, นำทาง, คำศัพท์, สรุป และ handoff
+- `data/indicator-knowledge.json` - knowledge registry สำหรับหน้าเว็บ สินค้า และคำศัพท์
 - `plugins/chat.js` - widget แชท AI แบบปลั๊กอินแยกต่างหาก
 - `plugins/darkmode.js` - ปุ่มสลับโหมดมืดสำหรับหน้าเว็บ
 - `plugins/manager.js` - ตัวจัดการโหลดปลั๊กอิน
@@ -25,7 +27,7 @@
 ### สำหรับ Production (Deploy บน Vercel)
 
 1. สร้างโปรเจคบน Vercel และเชื่อมต่อ GitHub หรือโฟลเดอร์นี้
-2. ตั้งค่า environment variable `GEMINI_API_KEY` บน Vercel dashboard
+2. อัปเดต `data/indicator-knowledge.json` ด้วยข้อมูลสินค้าและหน้าเว็บของคุณ
 3. ฝังสคริปต์นี้ลงไปบนเว็บไซต์ใดก็ได้:
 
 ```html
@@ -39,21 +41,16 @@
 
 ### สำหรับ Development (ทดสอบในเครื่อง)
 
-1. ตั้งค่า environment variable:
-
-```bash
-GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash
-```
-
-2. รันในเครื่อง:
+1. รันในเครื่อง:
 
 ```bash
 npm install
 npm run dev
 ```
 
-3. เปิด `http://localhost:3000` (หรือตามที่ vercel dev กำหนด)
+2. เปิด `http://localhost:3000` (หรือตามที่ vercel dev กำหนด)
+
+ค่าเริ่มต้นคือ `INDICATOR_AGENT_MODE=owned` ซึ่งจะไม่เรียก Gemini หรือผู้ให้บริการโมเดลภายนอก หากต้อง rollback ชั่วคราว ให้ตั้ง `INDICATOR_AGENT_MODE=legacy` ก่อนเริ่ม server.
 
 ## ตัวอย่างการตั้งค่า Widget
 

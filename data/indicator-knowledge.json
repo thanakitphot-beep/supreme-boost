@@ -1,0 +1,117 @@
+{
+  "pages": [
+    {
+      "id": "indicator-home",
+      "title": "INDICATOR WEB CHAT",
+      "url": "/",
+      "headings": ["ฟีเจอร์ล้ำยุค ระดับ God-Tier", "แพ็กเกจการลงทุน", "Telekinesis Warp", "Edge Breathing Glow", "AI Widget"],
+      "keywords": ["indicator", "ai widget", "ฟีเจอร์", "ฟีเจอร์ล้ำ", "god-tier", "telekinesis", "warp", "edge", "breathing", "glow", "ระบบ", "แนะนำ", "เว็บไซต์", "บริการ"],
+      "content": "หน้าแนะนำ INDICATOR WEB CHAT และฟีเจอร์ AI สำหรับเว็บไซต์ ฟีเจอร์ล้ำยุคระดับ God-Tier ได้แก่ Telekinesis Warp ระบบเลื่อนหน้าเว็บอัตโนมัติ Edge Breathing Glow ระบบแสดงผลแบบ AI และ AI แชทอัจฉริยะ"
+    },
+    {
+      "id": "pricing",
+      "title": "สมัครใช้งาน AI Chat Widget — แพ็กเกจ Starter, Pro Matrix, Enterprise",
+      "url": "/pricing.html",
+      "headings": ["ติดตั้ง AI ฉลาดลงเว็บคุณ", "แพ็กเกจการลงทุน", "Starter", "Pro Matrix", "Enterprise", "ราคา", "สมัคร"],
+      "keywords": ["ราคา", "แพ็กเกจ", "สมัคร", "pricing", "starter", "pro", "pro matrix", "enterprise", "ติดต่อ", "ติดต่อเรา", "ค่าบริการ", "ค่าใช้จ่าย", "subscription", "plan", "990", "2490", "990 บาท", "2490 บาท"],
+      "content": "เปรียบเทียบแพ็กเกจ INDICATOR และเริ่มสมัครใช้งาน แพ็กเกจ Starter ราคา 990 บาทต่อเดือน สำหรับเว็บไซต์ขนาดเล็ก แพ็กเกจ Pro Matrix ราคา 2490 บาทต่อเดือน ปลดล็อกพลัง Sci-Fi เต็มรูปแบบ แพ็กเกจ Enterprise ราคาติดต่อเรา สำหรับองค์กรที่ต้องการปรับแต่ง AI และไม่จำกัดข้อความ มี Custom Widget Design และ SLA Support 24/7"
+    },
+    {
+      "id": "pricing-enterprise",
+      "title": "แพ็กเกจ Enterprise — ติดต่อเรา",
+      "url": "/pricing.html",
+      "anchor": "enterprise",
+      "headings": ["Enterprise", "ติดต่อทีมขาย", "Custom Widget Design", "SLA Support 24/7"],
+      "keywords": ["enterprise", "ติดต่อ", "ติดต่อเรา", "ไม่จำกัดข้อความ", "custom", "sla", "องค์กร", "บริษัท", "enterprise plan", "ปรับแต่ง"],
+      "content": "แพ็กเกจ Enterprise สำหรับองค์กรที่ต้องการปรับแต่ง AI และไม่จำกัดข้อความ ไม่จำกัดข้อความต่อเดือน ป้อนข้อมูล Knowledge Base (RAG) ขั้นสูง Custom Widget Design SLA Support 24/7 ราคาติดต่อเรา"
+    },
+    {
+      "id": "pricing-starter",
+      "title": "แพ็กเกจ Starter — 990 บาท/เดือน",
+      "url": "/pricing.html",
+      "anchor": "starter",
+      "headings": ["Starter", "990 บาท/เดือน", "เริ่มต้นใช้งาน"],
+      "keywords": ["starter", "990", "เริ่มต้น", "ราคาถูก", "ขนาดเล็ก", "1000 ข้อความ"],
+      "content": "แพ็กเกจ Starter ราคา 990 บาทต่อเดือน เหมาะสำหรับเว็บไซต์ขนาดเล็กที่ต้องการผู้ช่วยตอบคำถาม AI แชทตอบคำถาม 1000 ข้อความต่อเดือน เรียนรู้ข้อมูลเว็บไซต์อัตโนมัติ"
+    },
+    {
+      "id": "pricing-pro",
+      "title": "แพ็กเกจ Pro Matrix — 2,490 บาท/เดือน",
+      "url": "/pricing.html",
+      "anchor": "pro",
+      "headings": ["Pro Matrix", "2490 บาท/เดือน", "เลือกแพ็กเกจนี้"],
+      "keywords": ["pro", "pro matrix", "2490", "ยอดนิยม", "sci-fi", "10000 ข้อความ", "telekinesis warp", "edge breathing glow"],
+      "content": "แพ็กเกจ Pro Matrix ราคา 2490 บาทต่อเดือน ยอดนิยม ปลดล็อกพลัง Sci-Fi เต็มรูปแบบ AI แชท 10000 ข้อความต่อเดือน ระบบ Edge Breathing Glow ระบบ Telekinesis Warp รองรับ 2 ภาษาหลัก TH/EN"
+    },
+    {
+      "id": "megastore",
+      "title": "MegaStore 2026",
+      "url": "/megastore.html",
+      "anchor": "products",
+      "headings": ["สินค้าทั้งหมด", "ตารางเปรียบเทียบราคา", "คำถามที่พบบ่อย"],
+      "keywords": ["สินค้า", "megastore", "shop", "faq", "คืนสินค้า", "จัดส่ง"],
+      "content": "หน้าร้านตัวอย่างที่มีสินค้า 60 รายการ ตารางราคา FAQ และตะกร้าสินค้า"
+    }
+  ],
+  "catalog": [
+    {
+      "id": "nike-air",
+      "name": "รองเท้าวิ่ง Nike Air",
+      "description": "Air Max Cushioning รุ่นล่าสุด สำหรับการวิ่ง",
+      "price": 2790,
+      "inStock": true,
+      "url": "/megastore.html#products",
+      "keywords": ["รองเท้าวิ่ง", "nike", "air", "กีฬา"]
+    },
+    {
+      "id": "wireless-headphones",
+      "name": "หูฟังไร้สาย Premium",
+      "description": "หูฟัง Bluetooth สำหรับฟังเพลงและสนทนา",
+      "price": 2990,
+      "inStock": true,
+      "url": "/megastore.html#products",
+      "keywords": ["หูฟัง", "ไร้สาย", "bluetooth", "electronics"]
+    },
+    {
+      "id": "oxford-shirt",
+      "name": "เสื้อเชิ้ต Oxford สีขาว",
+      "description": "เสื้อเชิ้ตผ้าฝ้ายคุณภาพสูง ทรง Slim Fit",
+      "price": 790,
+      "inStock": true,
+      "url": "/megastore.html#products",
+      "keywords": ["เสื้อเชิ้ต", "oxford", "ผู้ชาย", "เสื้อ"]
+    },
+    {
+      "id": "investment-book",
+      "name": "หนังสือจิตวิทยาการลงทุน",
+      "description": "หนังสือ Best Seller เกี่ยวกับจิตวิทยาตลาดหุ้น",
+      "price": 380,
+      "inStock": true,
+      "url": "/megastore.html#products",
+      "keywords": ["หนังสือ", "ลงทุน", "จิตวิทยา", "หุ้น"]
+    }
+  ],
+  "glossary": [
+    {
+      "id": "rag",
+      "term": "RAG",
+      "definition": "วิธีให้ AI ค้นข้อมูลจากแหล่งความรู้ที่อนุญาตก่อนสร้างคำตอบ เพื่อให้ตอบตามข้อมูลจริงมากขึ้น",
+      "url": "/",
+      "aliases": ["retrieval augmented generation", "ระบบค้นข้อมูล"]
+    },
+    {
+      "id": "vector-db",
+      "term": "Vector Database",
+      "definition": "ฐานข้อมูลที่ช่วยค้นหาข้อมูลตามความหมายที่ใกล้เคียง ไม่ใช่ค้นหาเฉพาะคำที่ตรงตัว",
+      "url": "/",
+      "aliases": ["vector db", "ฐานข้อมูลเวกเตอร์"]
+    },
+    {
+      "id": "semantic-cache",
+      "term": "Semantic Cache",
+      "definition": "แคชที่จับคำถามซึ่งมีความหมายคล้ายกัน เพื่อคืนผลลัพธ์เดิมได้เร็วขึ้นโดยไม่ต้องประมวลผลใหม่ทุกครั้ง",
+      "url": "/",
+      "aliases": ["semantic caching", "แคชความหมาย"]
+    }
+  ]
+}

@@ -1,5 +1,10 @@
 // Semantic Cache Service
 const semanticCache = {
+    // Bump this whenever answer policy or the intelligence backend changes.
+    // Keeping it in every key prevents a reply produced by an older agent
+    // policy from being served after a deployment (the exact issue that can
+    // make a greeting appear to ignore a newly added conversational rule).
+    _answerPolicyVersion: '2026-08-15-intelligence-v2',
     _store: new Map(),
     _maxSize: 100,
     _ttlMs: 600000,
@@ -17,11 +22,23 @@ const semanticCache = {
     
     _makeKey: function (payload) {
         let parts = [
+            this._answerPolicyVersion,
             (payload.prompt || "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 200),
             (payload.title || "").toLowerCase().slice(0, 50),
             payload.isProactive ? "proactive" : "reactive",
-            payload.locale || "en"
+            payload.locale || "en",
+            payload.siteProfile && payload.siteProfile.id || "unregistered-site"
         ];
+        // Follow-up questions depend on recent chat context.  Include only a
+        // bounded context fingerprint in the cache key: no message text is
+        // stored in the cache index itself.
+        if (Array.isArray(payload.history)) {
+            parts.push(payload.history.slice(-4).map(item => {
+                const role = item && item.role === 'assistant' ? 'a' : 'u';
+                const text = String(item && item.text || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 240);
+                return `${role}:${text}`;
+            }).join('|'));
+        }
         if (payload.pageContent) {
             let words = payload.pageContent.toLowerCase().split(/\s+/).filter(w => w.length > 3);
             let freq = {};

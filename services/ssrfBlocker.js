@@ -17,11 +17,6 @@ function isSafeUrl(urlStr) {
         const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || 
                         hostname.startsWith('10.') || hostname.startsWith('192.168.');
 
-        // Allow localhost for local development and testing
-        if (isLocal && process.env.NODE_ENV !== 'production') {
-            return true;
-        }
-
         if (isLocal) return false;
         
         if (hostname.startsWith('169.254.')) return false; // AWS metadata IP
