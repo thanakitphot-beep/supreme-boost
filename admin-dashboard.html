@@ -13,7 +13,8 @@
         }
         async function fetchAPI(action, method='GET', body=null) {
             const token = localStorage.getItem('admin_token');
-            const opts = { method, headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } };
+            const authHeader = token.startsWith('Bearer ') ? token : 'Bearer ' + token;
+            const opts = { method, headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' } };
             if (body) opts.body = JSON.stringify(body);
             const res = await fetch(`/api/admin?action=${action}`, opts);
             if (res.status === 404) {
