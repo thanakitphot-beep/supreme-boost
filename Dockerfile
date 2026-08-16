@@ -3,20 +3,19 @@ FROM node:20-alpine AS builder
 
 WORKDIR /usr/src/app
 
-# Install dependencies needed for native modules (if any)
+# Install native build tools
 RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
+
+# Install ALL deps (including devDependencies for esbuild/build step)
 RUN npm ci
 
 # Copy source
 COPY . .
 
-# Build widget/UI bundle
+# Build widget bundle (requires esbuild devDependency)
 RUN npm run build
-
-# Prune dev dependencies for production
-RUN npm prune --production
 
 # ====================================================
 # Production Stage
@@ -24,9 +23,12 @@ FROM node:20-alpine AS production
 
 WORKDIR /usr/src/app
 
-# Only copy necessary files from builder
-COPY --from=builder /usr/src/app/package.json ./
-COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY package*.json ./
+
+# Install production dependencies only
+RUN npm ci --omit=dev
+
+# Copy built artifacts from builder
 COPY --from=builder /usr/src/app/api ./api
 COPY --from=builder /usr/src/app/services ./services
 COPY --from=builder /usr/src/app/server.js ./server.js
@@ -43,7 +45,7 @@ ENV PORT=3000
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s \
+HEALTHCHECK --interval=30s --timeout=5s \
   CMD wget -qO- http://localhost:3000/api/v1/health || exit 1
 
 # Start server
