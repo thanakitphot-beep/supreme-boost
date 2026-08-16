@@ -8,12 +8,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script>
-        const AUTH_TOKEN = 'Bearer ADMIN_SUPREME_TOKEN_12345';
         if (!localStorage.getItem('admin_token')) {
             window.location.href = '/admin-login.html';
         }
         async function fetchAPI(action, method='GET', body=null) {
-            const opts = { method, headers: { 'Authorization': AUTH_TOKEN, 'Content-Type': 'application/json' } };
+            const token = localStorage.getItem('admin_token');
+            const opts = { method, headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } };
             if (body) opts.body = JSON.stringify(body);
             const res = await fetch(`/api/admin?action=${action}`, opts);
             if (res.status === 404) {
@@ -34,7 +34,7 @@
     </script>
     <style>
         :root {
-            --bg:#09090f; --bg2:#0f0f1a; --bg3:#141426;
+            --bg:#0f172a; --bg2:#1e293b; --bg3:#334155;
             --s1:rgba(255,255,255,0.03); --s2:rgba(255,255,255,0.06);
             --b1:rgba(255,255,255,0.06); --b2:rgba(255,255,255,0.12);
             --t1:#f1f5f9; --t2:#94a3b8; --t3:#475569;
