@@ -1,15 +1,15 @@
 {
   "profiles": [
     {
-      "id": "local-demo-store",
+      "id": "indicator-main",
       "siteKey": "INDICATOR_TEST",
       "status": "active",
-      "allowedOrigins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+      "allowedOrigins": ["*"],
       "identity": {
-        "name": "MegaStore Assistant",
-        "role": "ผู้ช่วยฝ่ายขายและบริการลูกค้า",
-        "purpose": "ช่วยลูกค้าค้นหาสินค้า ราคา สต็อก นโยบาย และพาไปยังหน้าเว็บที่เกี่ยวข้อง",
-        "tone": "สุภาพ กระชับ และอ้างอิงข้อมูลของร้านเท่านั้น"
+        "name": "INDICATOR AI",
+        "role": "ผู้ช่วย AI อัจฉริยะประจำเว็บไซต์นี้",
+        "purpose": "ช่วยตอบคำถาม แนะนำฟีเจอร์ แพ็กเกจ และข้อมูลบนหน้าเว็บนี้",
+        "tone": "สุภาพ กระชับ เป็นมิตร และอ้างอิงข้อมูลของเว็บไซต์เท่านั้น"
       },
       "permissions": ["search_catalog", "search_public_content", "summarize_public_content", "navigate_same_origin", "handoff"],
       "useDefaultKnowledge": true,
@@ -18,7 +18,7 @@
         "catalog": [],
         "glossary": []
       },
-      "updatedAt": "2026-08-15T00:00:00.000Z"
+      "updatedAt": "2026-08-16T00:00:00.000Z"
     },
     {
       "id": "isolated-book-demo",
