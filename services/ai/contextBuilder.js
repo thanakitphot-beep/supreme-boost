@@ -24,8 +24,15 @@ function buildContext({
         tools.forEach(tool => {
             systemInstruction += `- ${tool.name}: ${tool.description} (Params: ${JSON.stringify(tool.parameters)})\n`;
         });
-        systemInstruction += `To use a tool, return ONLY JSON with the "action" field matching the tool name and parameters.\n`;
     }
+
+    systemInstruction += `\nCRITICAL OUTPUT FORMAT:
+You MUST ALWAYS respond with a SINGLE valid JSON object. Do not include markdown code blocks.
+The JSON object MUST conform to this schema:
+{
+  "reply": "Your conversation response to the user (REQUIRED)",
+  "action": { "type": "tool_name", ...params } (OPTIONAL, use only if calling a tool)
+}\n\n`;
 
     let memoryContext = '';
     if (memory && memory.length > 0) {
