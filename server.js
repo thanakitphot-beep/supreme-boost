@@ -231,8 +231,17 @@ function handleRequest(req, res) {
         return serveStatic(req, res, '/login');
     }
 
-    const extmap = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css' };
-    const ext = path.extname(pathname);
+    const extmap = { 
+        '.html': 'text/html', 
+        '.js': 'application/javascript', 
+        '.css': 'text/css',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.svg': 'image/svg+xml',
+        '.json': 'application/json'
+    };
+    const ext = path.extname(pathname).toLowerCase();
     if (ext && extmap[ext]) {
         const filePath = path.join(__dirname, pathname);
         if (fs.existsSync(filePath)) {

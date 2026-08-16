@@ -8,9 +8,9 @@
   "description": "INDICATOR WEB CHAT Backend Management",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/ICON.jpg",
       "sizes": "192x192 512x512",
-      "type": "image/svg+xml",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     }
   ]
