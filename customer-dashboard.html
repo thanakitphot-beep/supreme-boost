@@ -80,12 +80,12 @@
 
         /* BTN */
         .btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;border:none;transition:all .18s;font-family:'Sarabun',sans-serif}
-        .btn-vl{background:linear-gradient(135deg,var(--v1),var(--v2));color:#fff;box-shadow:0 4px 14px rgba(124,58,237,.35)}
+        .btn-vl{background:linear-gradient(135deg,var(--v1),var(--v2));color:#fff;box-shadow:0 4px 14px rgba(124,58,237,.35),inset 0 1px 0 rgba(255,255,255,.12)}
         .btn-vl:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(124,58,237,.5)}
-        .btn-gh{background:var(--s2);color:var(--t2);border:1px solid var(--b1)}
-        .btn-gh:hover{color:var(--t1);border-color:var(--b2)}
-        .btn-rs{background:rgba(244,63,94,.08);color:var(--r2);border:1px solid rgba(244,63,94,.2)}
-        .btn-rs:hover{background:rgba(244,63,94,.15)}
+        .btn-gh{background:var(--s2);color:var(--t2);border:1px solid var(--b1);box-shadow:0 2px 8px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.06)}
+        .btn-gh:hover{color:var(--t1);border-color:var(--b2);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.35)}
+        .btn-rs{background:rgba(244,63,94,.08);color:var(--r2);border:1px solid rgba(244,63,94,.2);box-shadow:0 2px 8px rgba(244,63,94,.15),inset 0 1px 0 rgba(251,113,133,.08)}
+        .btn-rs:hover{background:rgba(244,63,94,.15);transform:translateY(-1px);box-shadow:0 4px 12px rgba(244,63,94,.25)}
 
         /* KNOWLEDGE */
         .kn-item{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:9px;border:1px solid var(--b1);background:var(--s1);margin-bottom:8px;transition:border-color .18s}
@@ -139,12 +139,12 @@
 <!-- SIDEBAR -->
 <aside class="sidebar">
     <div class="sb-brand">
-        <div class="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center relative overflow-hidden shadow-[0_0_15px_rgba(34,211,238,0.3)] flex-shrink-0 bg-slate-900 p-[2px]">
-            <img src="/ICON.jpg" alt="Logo" class="w-full h-full object-cover rounded-full relative z-10">
+        <div style="width:38px;height:38px;border-radius:50%;border:1px solid rgba(71,85,105,0.8);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;background:#0f172a;padding:2px;box-shadow:0 0 15px rgba(34,211,238,0.3);">
+            <img src="/ICON.jpg" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
         </div>
-        <div class="hidden md:flex flex-col justify-center ml-2">
-            <span class="text-base font-black tracking-widest leading-none" style="background: linear-gradient(to bottom, #ffffff 0%, #a3a3a3 48%, #e0e0e0 52%, #ffffff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 4px rgba(255,255,255,0.2));">INDICATOR</span>
-            <span class="text-[0.55rem] font-bold tracking-[0.2em] text-cyan-400 uppercase mt-1" style="text-shadow: 0 0 8px rgba(34,211,238,0.5);">My Dashboard</span>
+        <div style="display:flex;flex-direction:column;justify-content:center;margin-left:8px;">
+            <span class="sb-name" style="background:linear-gradient(to bottom,#ffffff 0%,#a3a3a3 48%,#e0e0e0 52%,#ffffff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 4px rgba(255,255,255,0.2));">INDICATOR</span>
+            <span style="font-size:0.55rem;font-weight:700;letter-spacing:0.2em;color:#22d3ee;text-transform:uppercase;margin-top:2px;text-shadow:0 0 8px rgba(34,211,238,0.5);">My Dashboard</span>
         </div>
     </div>
     <nav class="sb-nav">
