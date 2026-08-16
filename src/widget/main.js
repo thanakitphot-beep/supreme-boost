@@ -688,7 +688,6 @@
                     if (data.action) { execAction(data.action); }
                     else if (data.reply) { autoWarpCheck(data.reply); }
                 } catch (err) {
-        } catch (err) {
             AmbientUI.setBrainPhase(null);
             console.error("Chat:", err);
             var fb = localReply(text, state.locale);
