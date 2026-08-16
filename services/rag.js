@@ -21,14 +21,45 @@ async function getRagContext(supabase, tenantId, query, geminiApiKey) {
     
     try {
         const queryEmbedding = await generateEmbedding(query, geminiApiKey);
-        const { data: chunks, error } = await supabase.rpc('match_knowledge_chunks', {
+        
+        // 1. Vector Similarity Search
+        const vectorSearch = supabase.rpc('match_knowledge_chunks', {
             query_embedding: queryEmbedding,
             match_threshold: 0.3,
             match_count: 5,
             filter_tenant_id: tenantId
         });
+
+        // 2. Keyword/Text Search (Fallback/Hybrid)
+        const keywordSearch = supabase
+            .from('knowledge_chunks')
+            .select('*')
+            .eq('tenant_id', tenantId)
+            .textSearch('content', query.split(' ').join(' | '))
+            .limit(3);
+
+        const [vectorResult, keywordResult] = await Promise.all([vectorSearch, keywordSearch]);
         
-        if (!error && chunks && chunks.length > 0) {
+        const chunks = [];
+        const seenIds = new Set();
+        
+        if (!vectorResult.error && vectorResult.data) {
+            vectorResult.data.forEach(c => {
+                chunks.push(c);
+                if (c.id) seenIds.add(c.id);
+            });
+        }
+        
+        if (!keywordResult.error && keywordResult.data) {
+            keywordResult.data.forEach(c => {
+                if (!seenIds.has(c.id)) {
+                    chunks.push(c);
+                    if (c.id) seenIds.add(c.id);
+                }
+            });
+        }
+        
+        if (chunks.length > 0) {
             return chunks.map(c => `[Source: ${c.title || c.url}]\n${c.content}`).join('\n\n');
         }
     } catch (ragErr) {

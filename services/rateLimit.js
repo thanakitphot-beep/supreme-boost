@@ -7,51 +7,56 @@ const MAX_REQUESTS = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10);
 const CHAT_MAX = parseInt(process.env.RATE_LIMIT_CHAT_MAX || '30', 10);          // stricter for chat
 const BURST_MAX = parseInt(process.env.RATE_LIMIT_BURST || '10', 10);            // max burst per 5s
 
-// In-memory store: { key → [timestamps] }
+// In-memory store for Token Bucket: { key → { tokens, lastRefill, burstTokens, lastBurstRefill, violations } }
 const store = new Map();
-const blocklist = new Set();
+const blocklist = new Map(); // key -> unblockTime
 
-// Cleanup every 5 minutes — remove expired windows
+// Cleanup every 10 minutes — remove inactive buckets and expired blocklists
 setInterval(() => {
-    const cutoff = Date.now() - WINDOW_MS;
-    for (const [key, timestamps] of store.entries()) {
-        const fresh = timestamps.filter(t => t > cutoff);
-        if (fresh.length === 0) store.delete(key);
-        else store.set(key, fresh);
+    const now = Date.now();
+    for (const [key, unblockTime] of blocklist.entries()) {
+        if (now > unblockTime) blocklist.delete(key);
     }
-}, 5 * 60 * 1000);
+    for (const [key, bucket] of store.entries()) {
+        if (now - bucket.lastRefill > WINDOW_MS * 2) {
+            store.delete(key);
+        }
+    }
+}, 10 * 60 * 1000);
 
-/**
- * Get the number of requests in the current window for a key
- */
-function getCount(key) {
+function getBucket(key, limit, burstLimit) {
     const now = Date.now();
-    const cutoff = now - WINDOW_MS;
-    const timestamps = (store.get(key) || []).filter(t => t > cutoff);
-    store.set(key, timestamps);
-    return timestamps.length;
-}
+    let bucket = store.get(key);
+    
+    if (!bucket) {
+        bucket = {
+            tokens: limit,
+            lastRefill: now,
+            burstTokens: burstLimit,
+            lastBurstRefill: now,
+            violations: 0
+        };
+        store.set(key, bucket);
+    } else {
+        // Refill main tokens based on elapsed time (tokens per millisecond)
+        const timePassed = now - bucket.lastRefill;
+        const refillRate = limit / WINDOW_MS;
+        const newTokens = Math.floor(timePassed * refillRate);
+        if (newTokens > 0) {
+            bucket.tokens = Math.min(limit, bucket.tokens + newTokens);
+            bucket.lastRefill = now;
+        }
 
-/**
- * Record a new request for a key
- */
-function increment(key) {
-    const now = Date.now();
-    const cutoff = now - WINDOW_MS;
-    const timestamps = (store.get(key) || []).filter(t => t > cutoff);
-    timestamps.push(now);
-    store.set(key, timestamps);
-    return timestamps.length;
-}
-
-/**
- * Get burst count (last 5 seconds)
- */
-function getBurstCount(key) {
-    const now = Date.now();
-    const burstCutoff = now - 5000;
-    const timestamps = store.get(key) || [];
-    return timestamps.filter(t => t > burstCutoff).length;
+        // Refill burst tokens (refill over 5 seconds)
+        const burstTimePassed = now - bucket.lastBurstRefill;
+        const burstRefillRate = burstLimit / 5000;
+        const newBurstTokens = Math.floor(burstTimePassed * burstRefillRate);
+        if (newBurstTokens > 0) {
+            bucket.burstTokens = Math.min(burstLimit, bucket.burstTokens + newBurstTokens);
+            bucket.lastBurstRefill = now;
+        }
+    }
+    return bucket;
 }
 
 /**
@@ -69,24 +74,27 @@ function checkRateLimit(req, res, routeType = 'api') {
     const identifier = apiKey ? `key:${apiKey}` : `ip:${ip}`;
 
     // Blocklist check
-    if (blocklist.has(identifier)) {
+    const now = Date.now();
+    if (blocklist.has(identifier) && now < blocklist.get(identifier)) {
         if (res) {
-            res.setHeader('Retry-After', Math.ceil(WINDOW_MS / 1000));
+            const retryAfter = Math.ceil((blocklist.get(identifier) - now) / 1000);
+            res.setHeader('Retry-After', retryAfter);
             res.setHeader('X-RateLimit-Remaining', '0');
             res.status(429).json({
                 error: 'Too Many Requests — you are temporarily blocked.',
-                retryAfter: Math.ceil(WINDOW_MS / 1000)
+                retryAfter: retryAfter
             });
         }
         return false;
+    } else if (blocklist.has(identifier)) {
+        blocklist.delete(identifier); // unblock if expired
     }
 
     const limit = routeType === 'chat' ? CHAT_MAX : MAX_REQUESTS;
-    const count = getCount(identifier);
-    const burstCount = getBurstCount(identifier);
+    const bucket = getBucket(identifier, limit, BURST_MAX);
 
-    // Burst protection
-    if (burstCount > BURST_MAX) {
+    // Burst protection (Token bucket approach for bursts)
+    if (bucket.burstTokens <= 0) {
         if (res) {
             res.setHeader('Retry-After', '5');
             res.setHeader('X-RateLimit-Limit', String(limit));
@@ -99,12 +107,13 @@ function checkRateLimit(req, res, routeType = 'api') {
         return false;
     }
 
-    // Window limit
-    if (count >= limit) {
-        // Auto-block repeated offenders (5x over limit)
-        if (count >= limit * 5) {
-            blocklist.add(identifier);
-            setTimeout(() => blocklist.delete(identifier), WINDOW_MS * 10);
+    // Main window limit
+    if (bucket.tokens <= 0) {
+        bucket.violations++;
+        // Auto-block repeated offenders (5 violations = block)
+        if (bucket.violations >= 5) {
+            blocklist.set(identifier, now + (WINDOW_MS * 10)); // block for 10x window
+            bucket.violations = 0; // reset after block
         }
         if (res) {
             res.setHeader('Retry-After', Math.ceil(WINDOW_MS / 1000));
@@ -120,12 +129,14 @@ function checkRateLimit(req, res, routeType = 'api') {
         return false;
     }
 
-    // Allowed — record and set headers
-    const newCount = increment(identifier);
+    // Allowed — deduct tokens and set headers
+    bucket.tokens--;
+    bucket.burstTokens--;
+    
     if (res) {
         res.setHeader('X-RateLimit-Limit', String(limit));
-        res.setHeader('X-RateLimit-Remaining', String(Math.max(0, limit - newCount)));
-        res.setHeader('X-RateLimit-Reset', String(Math.ceil((Date.now() + WINDOW_MS) / 1000)));
+        res.setHeader('X-RateLimit-Remaining', String(Math.floor(bucket.tokens)));
+        res.setHeader('X-RateLimit-Reset', String(Math.ceil((now + WINDOW_MS) / 1000)));
     }
     return true;
 }

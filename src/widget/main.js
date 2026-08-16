@@ -202,15 +202,14 @@
     var Observer = {
         _trail:[], _scrollHist:[], _clicks:[], _hoverEl:null, _hoverSec:null, _hoverStart:0, _hoverTimer:null, _lastY:0, _enabled:true, _listeners:[],
         onHesitation:null, onFrustration:null, onConfusion:null, _handoffFrustrationCount:0,
-        init:function(){var self=this;this._lastY=window.scrollY;this._add(document,"mouseover",function(e){self._onHover(e);},true);this._add(document,"mousemove",function(e){self._trail.push({x:e.clientX,y:e.clientY,t:performance.now()});if(self._trail.length>60)self._trail.shift();},true);this._add(document,"click",function(e){self._onClick(e);},true);this._add(window,"scroll",function(e){self._onScroll(e);},true);this._tick();},
+        init:function(){var self=this;this._lastY=window.scrollY;this._add(document,"mouseover",function(e){self._onHover(e);},true);this._add(document,"mousemove",function(e){if(self._mouseTimer)return;self._mouseTimer=setTimeout(function(){self._mouseTimer=null;},50);self._trail.push({x:e.clientX,y:e.clientY,t:performance.now()});if(self._trail.length>60)self._trail.shift();},true);this._add(document,"click",function(e){self._onClick(e);},true);this._add(window,"scroll",function(e){self._onScroll(e);},true);},
         destroy:function(){this._enabled=false;for(var i=0;i<this._listeners.length;i++){var l=this._listeners[i];l.el.removeEventListener(l.evt,l.handler,l.passive);}this._listeners=[];if(this._hoverTimer){clearTimeout(this._hoverTimer);this._hoverTimer=null;}},
         _add:function(el,evt,handler,pas){el.addEventListener(evt,handler,{passive:pas});this._listeners.push({el:el,evt:evt,handler:handler,passive:pas});},
         _type:function(el){if(!el||el.id===WIDGET_ID||el.closest("#"+WIDGET_ID))return null;var tag=el.tagName,cls=(el.className||"")+" "+(el.id||""),txt=(el.textContent||"").toLowerCase(),role=el.getAttribute("role")||"";if(tag==="FORM"||tag==="INPUT"||tag==="SELECT"||tag==="TEXTAREA"||role==="form"||role==="searchbox")return"form";if(tag==="ARTICLE"||role==="article"||/post|entry|article|blog|content/i.test(cls))return"article";if(tag==="NAV"||tag==="MENU"||role==="navigation"||role==="menu"||/nav|menu/i.test(cls))return"navigation";if(tag==="BUTTON"||tag==="A"||role==="button"||role==="link")return"interactive";if(/product|item|card|grid|listing|shop|store|catalog|service/gi.test(cls))return"catalog";if(/form|input|search|signup|register|contact/i.test(cls))return"form";if(/price|cost|fee|rate|package|plan|pricing/i.test(cls))return"pricing";if(tag==="TABLE"||tag==="LI"||role==="list"||role==="listitem")return"list";return"content";},
         _captureSnippet:function(el){if(!el)return"";var exact=el.cloneNode(true);exact.querySelectorAll("script,style,svg").forEach(function(n){n.remove();});var exactText=exact.textContent.replace(/\s+/g," ").trim();var parent=el.closest('section, article, [class*="card"], [class*="container"]')||el.parentElement||el;var pclone=parent.cloneNode(true);pclone.querySelectorAll("script,style,svg").forEach(function(n){n.remove();});var parentText=pclone.textContent.replace(/\s+/g," ").trim().slice(0,500);if(exactText.length>80||exact===parent)return exactText;return "Exact focus: \""+exactText+"\" (Context: "+parentText+")";},
         _onHover:function(e){if(!this._enabled)return;var el=e.target,tp=this._type(el);if(!tp)return;if(this._hoverEl!==el){if(this._hoverTimer){clearTimeout(this._hoverTimer);this._hoverTimer=null;}this._hoverEl=el;this._hoverSec=tp;this._hoverStart=Date.now();this._hoverTimer=setTimeout(function(self,el,tp){return function(){if(!self._enabled)return;if(document.body.contains(el)&&self._hoverEl===el&&Date.now()-self._hoverStart>=HESITATION_MS){var snippet=self._captureSnippet(el);if(self.onHesitation)self.onHesitation({element:el,type:tp,duration:Date.now()-self._hoverStart,snippet:snippet});}};}(this,el,tp),HESITATION_MS);}},
         _onClick:function(e){if(!this._enabled)return;var x=e.clientX,y=e.clientY,now=Date.now();this._clicks.push({x:x,y:y,t:now,el:e.target});this._clicks=this._clicks.filter(function(c){return now-c.t<RAGE_CLICK_WINDOW;});var cnt=0;for(var i=0;i<this._clicks.length;i++){var c=this._clicks[i];if(Math.abs(c.x-x)<RAGE_CLICK_CLUSTER_PX&&Math.abs(c.y-y)<RAGE_CLICK_CLUSTER_PX)cnt++;}if(cnt>=3){var el=e.target;var snippet=this._captureSnippet(el);this._handoffFrustrationCount++;if(this.onFrustration)this.onFrustration({x:x,y:y,el:el,size:cnt,handoffCount:this._handoffFrustrationCount,snippet:snippet});this._clicks=[];}},
-        _onScroll:function(){if(!this._enabled)return;var sy=window.scrollY,dir=sy>this._lastY?"down":"up";if(sy!==this._lastY){this._scrollHist.push({y:sy,t:performance.now(),d:dir});if(this._scrollHist.length>30)this._scrollHist.shift();}this._lastY=sy;},
-        _tick:function(){if(!this._enabled)return;var now=performance.now(),recent=this._scrollHist.filter(function(s){return now-s.t<CONFUSION_SCROLL_WINDOW;}),self=this;if(recent.length>=4){var ch=0;for(var i=1;i<recent.length;i++){if(recent[i].d!==recent[i-1].d)ch++;}if(ch>=CONFUSION_DIRECTION_CHANGES){if(this.onConfusion)this.onConfusion({changes:ch});this._scrollHist=[];}}requestAnimationFrame(function(){self._tick();});},
+        _onScroll:function(){if(!this._enabled)return;var sy=window.scrollY,dir=sy>this._lastY?"down":"up";if(sy!==this._lastY){this._scrollHist.push({y:sy,t:performance.now(),d:dir});if(this._scrollHist.length>30)this._scrollHist.shift();}this._lastY=sy;var now=performance.now(),recent=this._scrollHist.filter(function(s){return now-s.t<CONFUSION_SCROLL_WINDOW;}),self=this;if(recent.length>=4){var ch=0;for(var i=1;i<recent.length;i++){if(recent[i].d!==recent[i-1].d)ch++;}if(ch>=CONFUSION_DIRECTION_CHANGES){if(this.onConfusion)this.onConfusion({changes:ch});this._scrollHist=[];}}},
         snapshot:function(){var s={scrollDepth:Math.round((window.scrollY+window.innerHeight)/Math.max(1,document.body.scrollHeight)*100),timeOnPage:Math.round((Date.now()-(window._sbSess||Date.now()))/1000),pageUrl:location.href,pageTitle:document.title,_hesitation:false,_frustration:false,_confusion:false,_hoverContext:""};if(this._hoverTimer&&Date.now()-this._hoverStart>HESITATION_MS*0.5)s._hesitation=true;if(this._handoffFrustrationCount>0)s._frustration=true;if(this._hoverEl){s._hoverContext=this._captureSnippet(this._hoverEl);}return s;}
     };
 
@@ -634,9 +633,23 @@
                 }
             }
 
+            window.__sendMsgRef = sendMsg;
             async function sendMsg(raw) {
                 var text = String(raw || "").trim();
                 if (!text || state.busy) return;
+                
+                if (navigator.onLine === false) {
+                    SessionDB.getPref("offline_queue").then(function(q) {
+                        var queue = q || [];
+                        queue.push({ text: text, ts: Date.now() });
+                        SessionDB.setPref("offline_queue", queue);
+                    });
+                    addMsg(messages, "user", text);
+                    addMsg(messages, "assistant", "⚠️ " + (t(state.locale, "offlineQueued") || "You are offline. Message queued and will be sent when connection is restored."));
+                    input.value = ""; autoGrow(input);
+                    return;
+                }
+                
                 var rl = detectTextLocale(text) || (cfg.langMode !== "auto" ? cfg.langMode : state.locale);
                 if (cfg.langMode === "auto" && rl !== state.locale) { state.locale = rl; applyLocale(ui, state.locale, cfg); renderQuick(quick, input, sendMsg, state.locale, true); }
                 var cmd = localCmd(text, state.locale);
@@ -675,13 +688,27 @@
                     if (data.action) { execAction(data.action); }
                     else if (data.reply) { autoWarpCheck(data.reply); }
                 } catch (err) {
-                    AmbientUI.setBrainPhase(null);
-                    console.error("Chat:", err);
-                    var fb = localReply(text, state.locale);
-                    var emsg = err && err.message && !/^HTTP/i.test(err.message) ? err.message : strs.connectError;
-                    updateMsg(load, cmd ? cmd.reply : (fb || emsg), true);
-                } finally { state.busy = false; form.classList.remove("sb-busy"); try { input.focus(); } catch(e) {} }
-            }
+        } catch (err) {
+            AmbientUI.setBrainPhase(null);
+            console.error("Chat:", err);
+            var fb = localReply(text, state.locale);
+            var emsg = err && err.message && !/^HTTP/i.test(err.message) ? err.message : strs.connectError;
+            updateMsg(load, cmd ? cmd.reply : (fb || emsg), true);
+        } finally { state.busy = false; form.classList.remove("sb-busy"); try { input.focus(); } catch(e) {} }
+    }
+
+    window.addEventListener("online", function() {
+                SessionDB.getPref("offline_queue").then(function(q) {
+                    if (q && q.length > 0) {
+                        SessionDB.setPref("offline_queue", []);
+                        q.forEach(function(item, index) {
+                            setTimeout(function() {
+                                if (window.__sendMsgRef) window.__sendMsgRef(item.text);
+                            }, 1000 * (index + 1));
+                        });
+                    }
+                });
+            });
 
             return true;
         } catch (e) { console.error("[SB] Init error:", e); return false; }

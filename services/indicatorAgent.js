@@ -266,9 +266,10 @@ function conversationalReply(prompt, identity) {
 
 function intentFor(prompt) {
     const text = normalize(prompt);
+    if (/(โมโห|ไม่พอใจ|แย่มาก|ห่วย|ช้ามาก|ร้องเรียน|complaint|angry|bad|terrible)/iu.test(text)) return 'complaint';
     if (RECOMMENDATION_REQUEST.test(text)) return 'recommend_products';
     if (availabilitySubject(text)) return 'find_product';
-    if (/(เจ้าหน้าที่|พนักงาน|human|agent)/iu.test(text)) return 'handoff';
+    if (/(ติดต่อ|เบอร์โทร|อีเมล|เจ้าหน้าที่|พนักงาน|human|agent|contact|support)/iu.test(text)) return 'handoff';
     if (/(สรุป|summari[sz]e|ย่อ)/iu.test(text)) return 'summarize';
     if (/(คำศัพท์|คำว่า|หมายถึง|definition|meaning)/iu.test(text)) return 'define_term';
     if (/(หัวข้อ|บทความ|นโยบาย|where|page|section|heading)/iu.test(text)) return 'search_unified';
@@ -332,12 +333,45 @@ function bestProductMatch(items, prompt) {
     return rankedProductMatches(items, prompt, 1)[0] || null;
 }
 
+// Server-side short-term memory to preserve context better than client payload alone
+const memoryCache = new Map();
+
 function recentHistory(payload) {
-    if (!Array.isArray(payload && payload.history)) return [];
-    return payload.history.slice(-MAX_CONTEXT_MESSAGES).map(item => ({
+    const convId = payload && payload.conversationId ? String(payload.conversationId) : null;
+    let serverHistory = [];
+    
+    // Manage server memory
+    if (convId) {
+        serverHistory = memoryCache.get(convId) || [];
+        // Extract new prompt from payload and add to server memory
+        if (payload.prompt && !payload.isProactive) {
+             serverHistory.push({ role: 'user', text: safeText(payload.prompt, 1000) });
+             if (serverHistory.length > MAX_CONTEXT_MESSAGES * 2) {
+                 serverHistory = serverHistory.slice(-MAX_CONTEXT_MESSAGES * 2);
+             }
+             memoryCache.set(convId, serverHistory);
+        }
+    }
+
+    if (!Array.isArray(payload && payload.history) && serverHistory.length === 0) return [];
+    
+    // Merge client and server history, preferring server memory if available
+    const rawHistory = serverHistory.length > 0 ? serverHistory : payload.history;
+    
+    return rawHistory.slice(-MAX_CONTEXT_MESSAGES).map(item => ({
         role: item && item.role === 'assistant' ? 'assistant' : 'user',
         text: safeText(item && item.text, 1000)
     })).filter(item => item.text);
+}
+
+function updateServerMemory(conversationId, assistantReply) {
+    if (!conversationId) return;
+    let history = memoryCache.get(conversationId) || [];
+    history.push({ role: 'assistant', text: safeText(assistantReply, 1000) });
+    if (history.length > MAX_CONTEXT_MESSAGES * 2) {
+        history = history.slice(-MAX_CONTEXT_MESSAGES * 2);
+    }
+    memoryCache.set(conversationId, history);
 }
 
 function productFromHistory(knowledge, payload) {
@@ -660,7 +694,8 @@ function runIndicatorAgent(payload = {}) {
         case 'find_content': result = searchUnified(knowledge, payload, prompt); break;
         case 'define_term': result = defineTerm(knowledge, payload, prompt); break;
         case 'summarize': result = summarize(knowledge, payload); break;
-        case 'handoff': result = base('ผมจะสรุปเรื่องที่คุยไว้ให้เจ้าหน้าที่ช่วยต่อครับ', { action: { type: 'handoff' } }); break;
+        case 'complaint': result = base('ต้องขออภัยในความไม่สะดวกเป็นอย่างยิ่งครับ ผมจะรีบส่งต่อเรื่องนี้ให้เจ้าหน้าที่ดูแลทันทีครับ', { action: { type: 'handoff', priority: 'high' } }); break;
+        case 'handoff': result = base('ผมจะเชื่อมต่อกับเจ้าหน้าที่ให้เพื่อการดูแลที่ต่อเนื่องนะครับ', { action: { type: 'handoff' } }); break;
         default: {
             const knowledgeAnswer = answerFromWebsiteKnowledge(knowledge, payload, prompt);
             if (knowledgeAnswer) {
@@ -676,7 +711,7 @@ function runIndicatorAgent(payload = {}) {
             break;
         }
     }
-    return {
+    const resultPayload = {
         ...result,
         agent: {
             name: safeText(identity.name, 120),
@@ -684,6 +719,11 @@ function runIndicatorAgent(payload = {}) {
             purpose: safeText(identity.purpose, 240)
         }
     };
+    
+    if (payload.conversationId && result.reply) {
+        updateServerMemory(payload.conversationId, result.reply);
+    }
+    return resultPayload;
 }
 
 module.exports = { runIndicatorAgent, intentFor, score };

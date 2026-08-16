@@ -2,25 +2,36 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const socketIo = require('socket.io'); // Added socket.io
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const socketIo = require('socket.io'); // Added socket.io
 
 // ─── Global System Logs Interceptor ───
 global.systemLogs = [];
 const MAX_LOGS = 200;
 let io = null; // Added io reference
 
-function addLog(type, args) {
+function addLog(type, args, tenantId = null) {
     const message = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
     const logEntry = {
         timestamp: new Date().toISOString(),
         type: type,
-        message: message
+        message: message,
+        tenantId: tenantId
     };
     global.systemLogs.push(logEntry);
     if (global.systemLogs.length > MAX_LOGS) {
         global.systemLogs.shift();
     }
-    // Emit log via socket
-    if (io) io.emit('system-log', logEntry);
+    // Emit log via socket to specific tenant room if provided, else broadcast globally
+    if (io) {
+        if (tenantId) {
+            io.to(tenantId).emit('system-log', logEntry);
+        } else {
+            io.emit('system-log', logEntry);
+        }
+    }
 }
 
 const originalLog = console.log;
@@ -256,15 +267,35 @@ if (require.main === module) {
         });
     });
 
-    // Initialize socket.io (WebSocket for Real-time logs and Audio Streaming later)
-    io = socketIo(server, { cors: { origin: '*' } });
+    // Initialize socket.io (WebSocket for Real-time logs, Audio Streaming, and Tenant Isolation)
+    io = socketIo(server, { 
+        cors: { origin: '*' },
+        pingTimeout: 60000,
+        pingInterval: 25000 
+    });
+    
     io.on('connection', (socket) => {
         console.log(`✅ Client connected via WebSocket: ${socket.id}`);
-        // Send initial logs to admin dashboards
+        
+        // Tenant Isolation: Join specific tenant room
+        socket.on('join-tenant', (tenantId) => {
+            if (tenantId) {
+                socket.join(tenantId);
+                console.log(`🔒 Socket ${socket.id} joined tenant room: ${tenantId}`);
+                // Send initial logs to this specific admin dashboard
+                socket.emit('initial-logs', global.systemLogs.filter(log => !log.tenantId || log.tenantId === tenantId));
+            }
+        });
+
+        // Send global logs if no tenant specified (backward compatibility)
         socket.emit('initial-logs', global.systemLogs);
         
         socket.on('audio-stream', (data) => {
             // Placeholder for OMEGA-JARVIS Phase 3 (Voice)
+        });
+        
+        socket.on('disconnect', (reason) => {
+            console.log(`❌ Client disconnected: ${socket.id} (Reason: ${reason})`);
         });
     });
     global.io = io;
