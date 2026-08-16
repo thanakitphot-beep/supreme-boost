@@ -231,27 +231,15 @@ module.exports = async function handler(req, res) {
                 ragContext: payload.ragContext,
                 tools: toolRegistry.getAvailableTools(),
                 userMessage: payload.prompt,
-                pageContent: payload.pageContent,
-                siteDNA: payload.siteDNA,
                 metadata: { requestId }
             });
             
-            // 2. Execute Tools if Brain Agent requested one
-            let toolResult = null;
-            if (aiResponse.action && aiResponse.action.type) {
-                try {
-                    toolResult = await toolRegistry.execute(aiResponse.action.type, aiResponse.action, payload);
-                } catch (err) {
-                    console.error("[Triple-Agent] Tool execution failed:", err);
-                }
-            }
-
-            // 3. Pipeline Check: Did the tool trigger the Scroller Action Agent?
-            if (toolResult && toolResult.actionTrigger) {
-                console.log(`[Triple-Agent] Brain delegated to Scroller. Target: ${toolResult.target}`);
+            // 2. Pipeline Check: Did the Brain trigger the Scroller Action Agent?
+            if (aiResponse.action && aiResponse.action.actionTrigger) {
+                console.log(`[Triple-Agent] Brain delegated to Scroller. Target: ${aiResponse.action.target}`);
                 
                 // Pass GPT's exact keyword command to the deterministic Scroller Agent
-                const scrollerPayload = { ...payload, prompt: toolResult.target };
+                const scrollerPayload = { ...payload, prompt: aiResponse.action.target };
                 let draft = runIndicatorAgent(scrollerPayload);
                 
                 if (draft && draft.researchRequest) {
@@ -285,8 +273,6 @@ module.exports = async function handler(req, res) {
                 ragContext: payload.ragContext,
                 tools: toolRegistry.getAvailableTools(),
                 userMessage: payload.prompt,
-                pageContent: payload.pageContent,
-                siteDNA: payload.siteDNA,
                 metadata: { requestId }
             });
         }

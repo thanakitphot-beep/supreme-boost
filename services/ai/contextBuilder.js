@@ -11,8 +11,6 @@ function buildContext({
     ragContext,
     tools,
     userMessage,
-    pageContent,
-    siteDNA,
     requestId
 }) {
     logEvent('info', 'Building context', { requestId });
@@ -26,21 +24,7 @@ function buildContext({
         tools.forEach(tool => {
             systemInstruction += `- ${tool.name}: ${tool.description} (Params: ${JSON.stringify(tool.parameters)})\n`;
         });
-    }
-
-    systemInstruction += `\nCRITICAL OUTPUT FORMAT:
-You MUST ALWAYS respond with a SINGLE valid JSON object. Do not include markdown code blocks.
-The JSON object MUST conform to this schema:
-{
-  "reply": "Your conversation response to the user (REQUIRED)",
-  "action": { "type": "tool_name", ...params } (OPTIONAL, use only if calling a tool)
-}\n\n`;
-
-    if (siteDNA) {
-        systemInstruction += `\nCURRENT PAGE INFO:\n- Title: ${siteDNA.title || 'Unknown'}\n- Description: ${siteDNA.metaDescription || 'Unknown'}\n`;
-    }
-    if (pageContent) {
-        systemInstruction += `\nVISIBLE PAGE TEXT:\n"""\n${pageContent.slice(0, 1500)}\n"""\n(Use this to understand what the user is currently looking at. If they ask about something on the page, use this context.)\n\n`;
+        systemInstruction += `To use a tool, return ONLY JSON with the "action" field matching the tool name and parameters.\n`;
     }
 
     let memoryContext = '';

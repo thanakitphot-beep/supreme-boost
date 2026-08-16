@@ -10,8 +10,6 @@ class IndicatorAIGateway {
         ragContext,
         tools,
         userMessage,
-        pageContent,
-        siteDNA,
         metadata = {}
     }) {
         const requestId = metadata.requestId || generateRequestId();
@@ -23,8 +21,6 @@ class IndicatorAIGateway {
             ragContext,
             tools,
             userMessage,
-            pageContent,
-            siteDNA,
             requestId
         });
         
