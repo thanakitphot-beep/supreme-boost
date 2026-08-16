@@ -55,40 +55,31 @@
   ],
   "catalog": [
     {
-      "id": "nike-air",
-      "name": "รองเท้าวิ่ง Nike Air",
-      "description": "Air Max Cushioning รุ่นล่าสุด สำหรับการวิ่ง",
-      "price": 2790,
+      "id": "plan-starter",
+      "name": "แพ็กเกจ Starter",
+      "description": "เหมาะสำหรับเว็บไซต์ขนาดเล็ก แชท 1,000 ข้อความ/เดือน",
+      "price": 990,
       "inStock": true,
-      "url": "/megastore.html#products",
-      "keywords": ["รองเท้าวิ่ง", "nike", "air", "กีฬา"]
+      "url": "/pricing.html#starter",
+      "keywords": ["starter", "เริ่มต้น", "ราคาถูก", "ขนาดเล็ก"]
     },
     {
-      "id": "wireless-headphones",
-      "name": "หูฟังไร้สาย Premium",
-      "description": "หูฟัง Bluetooth สำหรับฟังเพลงและสนทนา",
-      "price": 2990,
+      "id": "plan-pro",
+      "name": "แพ็กเกจ Pro Matrix",
+      "description": "ยอดนิยม ปลดล็อกพลัง Sci-Fi เต็มรูปแบบ แชท 10,000 ข้อความ",
+      "price": 2490,
       "inStock": true,
-      "url": "/megastore.html#products",
-      "keywords": ["หูฟัง", "ไร้สาย", "bluetooth", "electronics"]
+      "url": "/pricing.html#pro",
+      "keywords": ["pro", "matrix", "ยอดนิยม", "sci-fi"]
     },
     {
-      "id": "oxford-shirt",
-      "name": "เสื้อเชิ้ต Oxford สีขาว",
-      "description": "เสื้อเชิ้ตผ้าฝ้ายคุณภาพสูง ทรง Slim Fit",
-      "price": 790,
+      "id": "plan-enterprise",
+      "name": "แพ็กเกจ Enterprise",
+      "description": "สำหรับองค์กร ไม่จำกัดข้อความ และ Custom RAG",
+      "price": "ติดต่อเรา",
       "inStock": true,
-      "url": "/megastore.html#products",
-      "keywords": ["เสื้อเชิ้ต", "oxford", "ผู้ชาย", "เสื้อ"]
-    },
-    {
-      "id": "investment-book",
-      "name": "หนังสือจิตวิทยาการลงทุน",
-      "description": "หนังสือ Best Seller เกี่ยวกับจิตวิทยาตลาดหุ้น",
-      "price": 380,
-      "inStock": true,
-      "url": "/megastore.html#products",
-      "keywords": ["หนังสือ", "ลงทุน", "จิตวิทยา", "หุ้น"]
+      "url": "/pricing.html#enterprise",
+      "keywords": ["enterprise", "องค์กร", "ไม่จำกัด"]
     }
   ],
   "glossary": [
