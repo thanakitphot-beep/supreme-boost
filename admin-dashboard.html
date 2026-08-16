@@ -443,6 +443,46 @@
                     <div class="pc empty" style="padding:50px"><i class="fa-solid fa-spinner fa-spin"></i><p>กำลังโหลด...</p></div>
                 </div>
             </div>
+
+            <!-- Bottom info section -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:20px">
+                <div class="card" style="padding:20px">
+                    <div style="font-size:.85rem;font-weight:700;color:var(--t1);margin-bottom:14px;display:flex;align-items:center;gap:8px">
+                        <div style="width:28px;height:28px;border-radius:7px;background:rgba(6,182,212,.12);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-circle-info" style="color:var(--c2);font-size:.7rem"></i></div>
+                        ขั้นตอนการชำระเงิน
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                        <div style="display:flex;align-items:flex-start;gap:10px"><div style="width:22px;height:22px;border-radius:50%;background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.3);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--c2);flex-shrink:0">1</div><div style="font-size:.76rem;color:var(--t2);line-height:1.5">ลูกค้าเลือกแพ็กเกจและกดสมัคร</div></div>
+                        <div style="display:flex;align-items:flex-start;gap:10px"><div style="width:22px;height:22px;border-radius:50%;background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.3);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--c2);flex-shrink:0">2</div><div style="font-size:.76rem;color:var(--t2);line-height:1.5">ระบบแสดงบัญชีที่เปิดใช้งานให้ลูกค้าโอน</div></div>
+                        <div style="display:flex;align-items:flex-start;gap:10px"><div style="width:22px;height:22px;border-radius:50%;background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.3);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--c2);flex-shrink:0">3</div><div style="font-size:.76rem;color:var(--t2);line-height:1.5">ลูกค้าอัปโหลดสลิปเพื่อยืนยัน</div></div>
+                        <div style="display:flex;align-items:flex-start;gap:10px"><div style="width:22px;height:22px;border-radius:50%;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--g2);flex-shrink:0">4</div><div style="font-size:.76rem;color:var(--t2);line-height:1.5">Admin อนุมัติและระบบเปิด Plugin อัตโนมัติ</div></div>
+                    </div>
+                </div>
+                <div class="card" style="padding:20px">
+                    <div style="font-size:.85rem;font-weight:700;color:var(--t1);margin-bottom:14px;display:flex;align-items:center;gap:8px">
+                        <div style="width:28px;height:28px;border-radius:7px;background:rgba(245,158,11,.12);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-lightbulb" style="color:var(--a2);font-size:.7rem"></i></div>
+                        คำแนะนำการตั้งค่า
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px">
+                        <div style="padding:9px 12px;border-radius:8px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.12);font-size:.76rem;color:var(--t2);line-height:1.5"><i class="fa-solid fa-check" style="color:var(--a2);margin-right:6px"></i>ใส่ชื่อธนาคารให้ชัดเจน เช่น <span style="color:var(--a2)">กสิกรไทย (KBANK)</span></div>
+                        <div style="padding:9px 12px;border-radius:8px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.12);font-size:.76rem;color:var(--t2);line-height:1.5"><i class="fa-solid fa-check" style="color:var(--a2);margin-right:6px"></i>อัปโหลด QR Code พร้อมเพย์เพื่อความสะดวก</div>
+                        <div style="padding:9px 12px;border-radius:8px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.12);font-size:.76rem;color:var(--t2);line-height:1.5"><i class="fa-solid fa-check" style="color:var(--a2);margin-right:6px"></i>ปิดช่องทางที่ไม่ใช้แทนการลบ</div>
+                        <div style="padding:9px 12px;border-radius:8px;background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.12);font-size:.76rem;color:var(--t2);line-height:1.5"><i class="fa-solid fa-star" style="color:var(--g2);margin-right:6px"></i>แนะนำมี <span style="color:var(--g2)">2+ ช่องทาง</span> เพื่อรองรับทุกธนาคาร</div>
+                    </div>
+                </div>
+                <div class="card" style="padding:20px">
+                    <div style="font-size:.85rem;font-weight:700;color:var(--t1);margin-bottom:14px;display:flex;align-items:center;gap:8px">
+                        <div style="width:28px;height:28px;border-radius:7px;background:rgba(139,92,246,.12);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-gauge-high" style="color:var(--v3);font-size:.7rem"></i></div>
+                        สถานะภาพรวม
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--s1);border:1px solid var(--b1);border-radius:9px"><span style="font-size:.78rem;color:var(--t2)"><i class="fa-solid fa-building-columns" style="color:var(--v3);margin-right:7px"></i>ช่องทางที่เปิดอยู่</span><span id="pay-active-count" style="font-size:.9rem;font-weight:700;color:var(--v3)">—</span></div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--s1);border:1px solid var(--b1);border-radius:9px"><span style="font-size:.78rem;color:var(--t2)"><i class="fa-solid fa-qrcode" style="color:var(--c2);margin-right:7px"></i>มี QR Code</span><span id="pay-qr-count" style="font-size:.9rem;font-weight:700;color:var(--c2)">—</span></div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--s1);border:1px solid var(--b1);border-radius:9px"><span style="font-size:.78rem;color:var(--t2)"><i class="fa-solid fa-circle-xmark" style="color:var(--t3);margin-right:7px"></i>ปิดใช้งาน</span><span id="pay-off-count" style="font-size:.9rem;font-weight:700;color:var(--t3)">—</span></div>
+                        <button onclick="sw('billing')" class="btn btn-gh-vl btn-sm" style="width:100%;justify-content:center;margin-top:4px"><i class="fa-solid fa-receipt"></i> ดูคำขอโอนเงินรอยืนยัน</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- SETTINGS -->
@@ -994,6 +1034,10 @@ async function delB(id){if(!confirm('⚠️ ต้องการลบราย
 // ====PAYMENT====
 async function loadPM(){
     const d=await fetchAPI('payment_methods'),bl=document.getElementById('bklist'),ms=d.methods||[];
+    const elA=document.getElementById('pay-active-count'),elQ=document.getElementById('pay-qr-count'),elO=document.getElementById('pay-off-count');
+    if(elA)elA.textContent=ms.filter(m=>m.is_active).length;
+    if(elQ)elQ.textContent=ms.filter(m=>m.qr_base64).length;
+    if(elO)elO.textContent=ms.filter(m=>!m.is_active).length;
     if(!ms.length){bl.innerHTML=`<div class="pc empty" style="padding:50px"><i class="fa-solid fa-credit-card"></i><h4>ยังไม่มีช่องทางรับเงิน</h4><p>เพิ่มบัญชีด้านซ้ายเพื่อเริ่มรับเงิน</p></div>`;return}
     bl.innerHTML=ms.map(m=>`
         <div class="pc" style="${!m.is_active?'opacity:.45':''}">
