@@ -1,7 +1,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const socketIo = require('socket.io'); // Added socket.io
+const socketIo = require('socket.io');
+const keepAlive = require('./services/keepAlive');
 
 // ─── Global System Logs Interceptor ───
 global.systemLogs = [];
@@ -302,9 +303,13 @@ if (require.main === module) {
         console.log(`📍 API:  http://localhost:${PORT}/api/chat`);
         const agentMode = String(process.env.INDICATOR_AGENT_MODE || 'owned').toLowerCase();
         console.log(`\n🧠 INDICATOR Agent Mode: ${agentMode === 'legacy' ? 'legacy provider pipeline' : 'owned provider-independent agent'}`);
-        if (agentMode === 'legacy') {
-            console.log(`🔑 Gemini Key: ${process.env.GEMINI_API_KEY ? '✅ Loaded' : '❌ Missing'}`);
-        }
+        console.log(`🔑 OpenAI:  ${process.env.OPENAI_API_KEY  ? '✅' : '❌ Missing'}`);
+        console.log(`🔑 Gemini:  ${process.env.GEMINI_API_KEY  ? '✅' : '❌ Missing'}`);
+        console.log(`🔑 Groq:    ${process.env.GROQ_API_KEY    ? '✅' : '❌ Missing'}`);
+        console.log(`🔑 Cohere:  ${process.env.COHERE_API_KEY  ? '✅' : '❌ Missing'}`);
         console.log(`\nPress Ctrl+C to stop\n`);
+
+        // เปิด Keep-Alive เพื่อป้องกัน Render Free Plan Sleep
+        keepAlive.start();
     });
 }

@@ -7,18 +7,77 @@ services:
     buildCommand: "npm ci && npm run build"
     startCommand: "node server.js"
     healthCheckPath: /api/v1/health
+    autoDeploy: true
+
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3000
+
+      # ==========================================
+      # AI Keys — ตั้งค่าใน Render Dashboard
+      # ==========================================
+      - key: OPENAI_API_KEY
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: COHERE_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+      # AI Architecture
+      - key: AI_PRIMARY_PROVIDER
+        value: openai
+      - key: AI_FALLBACK_PROVIDER
+        value: groq
+      - key: AI_FAST_MODEL
+        value: gpt-5.6-terra
+      - key: AI_NORMAL_MODEL
+        value: gpt-5.6-terra
+      - key: AI_REASONING_MODEL
+        value: gpt-5.6-terra
+      - key: AI_FALLBACK_MODEL
+        value: llama-3.3-70b-versatile
+      - key: AI_REQUEST_TIMEOUT_MS
+        value: 15000
+      - key: AI_MAX_RETRIES
+        value: 2
+      - key: AI_CIRCUIT_MAX_FAILURES
+        value: 3
+
+      # Cohere Reranker
+      - key: COHERE_RERANK_MODEL
+        value: rerank-v3.5
+      - key: COHERE_RERANK_TOP_N
+        value: 5
+
+      # Keep-Alive: ใส่ URL ของ Render Service ที่นี่เพื่อ Ping ตัวเอง
+      # เช่น: https://indicator-web-chat.onrender.com
+      - key: RENDER_EXTERNAL_URL
+        sync: false
+
+      # Database
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
         sync: false
+      - key: MONGODB_URI
+        sync: false
+
+      # Auth
       - key: JWT_SECRET
         generateValue: true
-      - key: ADMIN_KEY
+      - key: ADMIN_PASSWORD
+        sync: false
+
+      # SMTP
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
         sync: false

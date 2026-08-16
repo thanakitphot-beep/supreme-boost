@@ -3,7 +3,10 @@
 const { createClient } = require('@supabase/supabase-js');
 const { semanticCache } = require('../services/cache');
 const { getRagContext } = require('../services/rag');
-const { multiAgentPipeline } = require('../services/llm');
+const indicatorAI = require('../services/ai/gateway');
+const memoryManager = require('../services/memory');
+const toolRegistry = require('../services/tools/registry');
+const { generateRequestId, logEvent } = require('../services/ai/logger');
 const { runIndicatorAgent } = require('../services/indicatorAgent');
 const { resolveSiteProfile, originIsAllowed } = require('../services/siteProfiles');
 const { learnPublicPage, getSiteKnowledge, getExpertiseStatus } = require('../services/siteExpertise');
@@ -162,6 +165,8 @@ module.exports = async function handler(req, res) {
             });
         }
 
+        const requestId = generateRequestId();
+
         const payload = {
             prompt: maskPII(rawPrompt),
             isProactive: body.proactive === true,
@@ -188,17 +193,20 @@ module.exports = async function handler(req, res) {
         // turning browser traffic into unreviewed model-training data.
         payload.expertiseStatus = learnPublicPage(siteProfile, payload);
         payload.expertKnowledge = getSiteKnowledge(siteProfile);
-        if (!payload.expertiseStatus) payload.expertiseStatus = getExpertiseStatus(siteProfile);
-        // Keep a separate, evidence-first learning ledger. It never lets a
-        // browser page or user message silently retrain the agent.
-        payload.learningStatus = learnFromPublicPage(siteProfile, payload);
+        if (!payload.expertiseStatus) payload.experti        // 2. Fetch or update server memory context
+        const conversationId = payload.conversationId || requestId;
+        
+        if (payload.prompt && !payload.isProactive) {
+            await memoryManager.addMessage(conversationId, 'user', payload.prompt);
+        }
+        
+        const mergedHistory = await memoryManager.getMergedHistory(conversationId, payload.history);
 
-        // Gemini embeddings are needed only by the explicitly selected legacy
-        // pipeline. The INDICATOR Agent relies on its own knowledge registry
-        // and page context, so no Gemini request is made in owned mode.
+        // 3. Obtain RAG Context (Now supports provider agnostic rewriting internally)
         payload.ragContext = "";
-        if (!usesIndicatorAgent() && rawPrompt && supabase && process.env.GEMINI_API_KEY) {
+        if (rawPrompt && supabase) {
             const ragTenantId = tenantInfo ? tenantInfo.id : 'demo';
+            // We still pass GEMINI_API_KEY if available for embeddings, but local alternatives can be added
             payload.ragContext = await getRagContext(supabase, ragTenantId, rawPrompt, process.env.GEMINI_API_KEY);
         }
 
@@ -210,33 +218,68 @@ module.exports = async function handler(req, res) {
 
         let result;
         if (usesIndicatorAgent()) {
-            // 1. Always let the deterministic local Agent try to route or show a catalog first.
-            // This ensures our highly-accurate 'searchUnified' and 'live DOM match' take precedence
-            // over the LLM which tends to just chat instead of navigating.
-            let draft = runIndicatorAgent(payload);
-            if (draft && draft.researchRequest) {
-                const externalResearch = await researchExternal(draft.researchRequest);
-                draft = runIndicatorAgent({ ...payload, externalResearch });
-            }
+            const identity = {
+                name: 'INDICATOR',
+                role: 'Website Assistant',
+                purpose: 'Help users navigate the site and find products.'
+            };
             
-            const hasAction = draft && draft.action && draft.action.type;
-            const hasCarousel = draft && draft.interactive && draft.interactive.type === 'carousel';
-
-            if (hasAction || hasCarousel) {
-                // The local agent successfully found a target to navigate to, or a catalog to show.
-                result = draft;
+            // 1. Triple-Agent Pipeline: Brain Agent (GPT) analyzes first with RAG data
+            const aiResponse = await indicatorAI.generate({
+                identity,
+                memory: mergedHistory,
+                ragContext: payload.ragContext,
+                tools: toolRegistry.getAvailableTools(),
+                userMessage: payload.prompt,
+                metadata: { requestId }
+            });
+            
+            // 2. Pipeline Check: Did the Brain trigger the Scroller Action Agent?
+            if (aiResponse.action && aiResponse.action.actionTrigger) {
+                console.log(`[Triple-Agent] Brain delegated to Scroller. Target: ${aiResponse.action.target}`);
+                
+                // Pass GPT's exact keyword command to the deterministic Scroller Agent
+                const scrollerPayload = { ...payload, prompt: aiResponse.action.target };
+                let draft = runIndicatorAgent(scrollerPayload);
+                
+                if (draft && draft.researchRequest) {
+                    const externalResearch = await researchExternal(draft.researchRequest);
+                    draft = runIndicatorAgent({ ...scrollerPayload, externalResearch });
+                }
+                
+                result = {
+                    ...draft,
+                    // If GPT provided a conversational reply along with the command, use it, otherwise use Scroller's default
+                    reply: (aiResponse.reply && aiResponse.reply.trim() !== '') ? aiResponse.reply : draft.reply,
+                    status: draft.status || 'ok'
+                };
             } else {
-                // 2. If it's just a general question (no action/carousel), let the LLM handle the chat.
-                // The Python service is opt-in and fail-closed.
-                result = intelligenceEnabled() ? await answerWithIntelligence(payload) : null;
-                if (!result) {
-                    result = draft; // Fallback to local agent's basic chat
+                // 3. Just chat/reasoning from the Brain
+                result = aiResponse;
+                
+                // Safe fallback: If AI failed completely, fallback to basic agent
+                if (result.status === 'error') {
+                    result = runIndicatorAgent(payload);
                 }
             }
             
             if (result && Object.prototype.hasOwnProperty.call(result, 'researchRequest')) delete result.researchRequest;
         } else {
-            result = await multiAgentPipeline(payload);
+            // Legacy mode is now unified via the Gateway too but skips deterministic agent
+            const identity = { name: 'INDICATOR', role: 'Website Assistant', purpose: 'Help users.' };
+            result = await indicatorAI.generate({
+                identity,
+                memory: mergedHistory,
+                ragContext: payload.ragContext,
+                tools: toolRegistry.getAvailableTools(),
+                userMessage: payload.prompt,
+                metadata: { requestId }
+            });
+        }
+        
+        // Save assistant reply to memory
+        if (result && result.reply && result.status !== "error") {
+            await memoryManager.addMessage(conversationId, 'assistant', result.reply);
         }
 
         if (result && result.status !== "silent_abort") {

@@ -58,17 +58,26 @@ module.exports = async function handler(req, res) {
     if (url.includes('/health') && req.method === 'GET') {
         const checks = {
             server: 'ok',
-            gemini_key: process.env.GEMINI_API_KEY ? 'ok' : 'missing',
-            groq_key: process.env.GROQ_API_KEY ? 'ok' : 'missing',
-            supabase: process.env.SUPABASE_URL ? 'ok' : 'missing',
-            cache: cacheStats.size <= 100 ? 'ok' : 'warn'
+            openai_key:  process.env.OPENAI_API_KEY  ? 'ok' : 'missing',
+            gemini_key:  process.env.GEMINI_API_KEY  ? 'ok' : 'missing',
+            groq_key:    process.env.GROQ_API_KEY    ? 'ok' : 'missing',
+            cohere_key:  process.env.COHERE_API_KEY  ? 'ok' : 'missing',
+            supabase:    process.env.SUPABASE_URL     ? 'ok' : 'missing',
+            cache:       cacheStats.size <= 100        ? 'ok' : 'warn',
+            keep_alive:  process.env.RENDER_EXTERNAL_URL ? 'active' : 'disabled'
         };
-        const allOk = Object.values(checks).every(v => v === 'ok');
+        // เซิร์ฟเวอร์ยังใช้ได้ถ้ามี provider อย่างน้อย 1 ตัว
+        const hasAnyProvider = [
+            process.env.OPENAI_API_KEY,
+            process.env.GEMINI_API_KEY,
+            process.env.GROQ_API_KEY
+        ].some(Boolean);
+        const allOk = checks.server === 'ok' && hasAnyProvider;
 
         return res.status(allOk ? 200 : 206).json({
             status: allOk ? 'healthy' : 'degraded',
-            version: '3.0.0',
-            project: 'OMEGA-JARVIS',
+            version: '3.1.0',
+            project: 'INDICATOR',
             timestamp: new Date().toISOString(),
             uptime: uptime.formatted,
             uptime_ms: uptime.ms,
