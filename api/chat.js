@@ -231,6 +231,8 @@ module.exports = async function handler(req, res) {
                 ragContext: payload.ragContext,
                 tools: toolRegistry.getAvailableTools(),
                 userMessage: payload.prompt,
+                pageContent: payload.pageContent,
+                siteDNA: payload.siteDNA,
                 metadata: { requestId }
             });
             
@@ -283,6 +285,8 @@ module.exports = async function handler(req, res) {
                 ragContext: payload.ragContext,
                 tools: toolRegistry.getAvailableTools(),
                 userMessage: payload.prompt,
+                pageContent: payload.pageContent,
+                siteDNA: payload.siteDNA,
                 metadata: { requestId }
             });
         }
