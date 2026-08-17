@@ -1,4 +1,7 @@
-// Chat API Handler
+'use strict';
+
+// INDICATOR WEB CHAT — Chat API Handler
+// Accuracy-first pipeline for main.js structured entityIndex + indicatorAgent.js.
 
 const { createClient } = require('@supabase/supabase-js');
 const { semanticCache } = require('../services/cache');
@@ -7,7 +10,7 @@ const indicatorAI = require('../services/ai/gateway');
 const memoryManager = require('../services/memory');
 const toolRegistry = require('../services/tools/registry');
 const { generateRequestId, logEvent } = require('../services/ai/logger');
-const { runIndicatorAgent } = require('../services/indicatorAgent');
+const { runIndicatorAgent, intentFor } = require('../services/indicatorAgent');
 const { resolveSiteProfile, originIsAllowed } = require('../services/siteProfiles');
 const { learnPublicPage, getSiteKnowledge, getExpertiseStatus } = require('../services/siteExpertise');
 const { learnFromPublicPage } = require('../services/knowledgeLearning');
@@ -25,137 +28,475 @@ const supabase = SUPABASE_URL && SUPABASE_KEY
     : null;
 
 const MAX_PROMPT_CHARS = 1200;
-const MAX_PAGE_CHARS = 6000;
+const MAX_PAGE_CHARS = 12000;
 const MAX_SELECTED_CHARS = 1200;
 const MAX_HISTORY_ITEMS = 8;
+const MAX_ENTITY_ITEMS = 120;
+const MAX_ENTITY_TEXT = 700;
+const MAX_ENTITY_DESCRIPTION = 600;
+const MAX_BRAIN_PAGE_CHARS = 5000;
+const MAX_BRAIN_ENTITY_ITEMS = 30;
 
-// "owned" is the default: it uses the provider-independent INDICATOR Agent.
-// Set INDICATOR_AGENT_MODE=legacy only as an explicit rollback switch.
+const GROUNDED_INTENTS = new Set([
+    'recommend_products',
+    'search_unified',
+    'find_product',
+    'find_content',
+    'define_term',
+    'summarize',
+    'complaint',
+    'handoff'
+]);
+
+// "owned" is the default: provider-independent resolver is authoritative
+// for website facts/actions. Set INDICATOR_AGENT_MODE=legacy only as rollback.
 function usesIndicatorAgent() {
     return String(process.env.INDICATOR_AGENT_MODE || 'owned').toLowerCase() !== 'legacy';
 }
 
-// Using centralized CORS service
-
 function parseBody(body) {
     if (!body) return {};
-    if (typeof body === "string") { try { return JSON.parse(body); } catch { return {}; } }
+    if (typeof body === 'string') {
+        try { return JSON.parse(body); } catch (_) { return {}; }
+    }
     return body;
 }
 
 function cleanText(value, maxLength) {
-    if (typeof value !== "string") return "";
-    return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
+    if (typeof value !== 'string') return '';
+    return value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
 }
 
-const LOCALE_LABELS = { th: "ภาษาไทย", en: "English", zh: "中文", ja: "日本語" };
+function cleanOptionalText(value, maxLength) {
+    return cleanText(typeof value === 'string' ? value : '', maxLength);
+}
+
+const LOCALE_LABELS = {
+    th: 'ภาษาไทย',
+    en: 'English',
+    zh: '中文',
+    ja: '日本語'
+};
+
 function normalizeLocale(value) {
-    let code = cleanText(typeof value === "string" ? value : "", 10).toLowerCase().split("-")[0];
-    return Object.prototype.hasOwnProperty.call(LOCALE_LABELS, code) ? code : "en";
+    const code = cleanText(typeof value === 'string' ? value : '', 10)
+        .toLowerCase()
+        .split('-')[0];
+    return Object.prototype.hasOwnProperty.call(LOCALE_LABELS, code) ? code : 'en';
 }
 
 function maskHistory(history) {
     if (!Array.isArray(history)) return [];
-    return history.slice(-MAX_HISTORY_ITEMS).map(item => {
-        return { role: item && item.role === "assistant" ? "assistant" : "user", text: maskPII(cleanText(item && item.text, 1000)) };
-    }).filter(item => item.text);
+    return history
+        .slice(-MAX_HISTORY_ITEMS)
+        .map(item => ({
+            role: item && item.role === 'assistant' ? 'assistant' : 'user',
+            text: maskPII(cleanText(item && item.text, 1000))
+        }))
+        .filter(item => item.text);
+}
+
+function safeEntityId(value) {
+    const id = cleanText(typeof value === 'string' ? value : '', 160);
+    return /^[a-zA-Z0-9_.:-]{1,160}$/.test(id) ? id : '';
+}
+
+function canonicalEntitySelector(entityId) {
+    if (!entityId) return '';
+    return `[data-sb-entity-id="${entityId}"]`;
+}
+
+function sanitizeEntity(entity, index) {
+    if (!entity || typeof entity !== 'object' || Array.isArray(entity)) return null;
+
+    const id = safeEntityId(entity.id) || `visible-structured-${index + 1}`;
+    const title = maskPII(cleanOptionalText(entity.title || entity.name || entity.label, 220));
+    if (!title) return null;
+
+    let price = null;
+    if (Number.isFinite(entity.price)) {
+        price = Number(entity.price);
+    } else if (typeof entity.price === 'string') {
+        price = maskPII(cleanText(entity.price, 80));
+    }
+
+    return {
+        id,
+        title,
+        price,
+        description: maskPII(cleanOptionalText(entity.description || entity.desc, MAX_ENTITY_DESCRIPTION)),
+        href: cleanOptionalText(entity.href || entity.url, 500),
+        image: cleanOptionalText(entity.image, 500),
+        alt: maskPII(cleanOptionalText(entity.alt, 180)),
+        text: maskPII(cleanOptionalText(entity.text, MAX_ENTITY_TEXT)),
+        type: cleanOptionalText(entity.type, 80),
+        // Never accept an arbitrary selector from the browser. Rebuild the
+        // exact selector from the validated entity id instead.
+        selector: canonicalEntitySelector(id),
+        inStock: entity.inStock === true ? true : entity.inStock === false ? false : null
+    };
 }
 
 function sanitizeDNA(dna) {
-    if (!dna || typeof dna !== "object") return {};
-    let result = {};
-    if (typeof dna.title === "string") result.title = maskPII(dna.title.slice(0, 200));
-    if (typeof dna.metaDescription === "string") result.metaDescription = maskPII(dna.metaDescription.slice(0, 500));
-    if (typeof dna.metaKeywords === "string") result.metaKeywords = maskPII(dna.metaKeywords.slice(0, 500));
-    if (Array.isArray(dna.headings)) result.headings = dna.headings.map(h => maskPII(String(h).slice(0, 200))).slice(0, 5);
-    // Product-heavy pages often render far more than ten public cards. Keep
-    // enough titles for an in-page product request before falling back to a
-    // whole-site crawl, while still bounding the browser payload.
-    if (Array.isArray(dna.entities)) result.entities = dna.entities.map(h => maskPII(String(h).slice(0, 240))).slice(0, 80);
-    if (typeof dna.lang === "string") result.lang = dna.lang.slice(0, 10);
-    if (typeof dna.ogType === "string") result.ogType = dna.ogType.slice(0, 100);
-    if (typeof dna.activeSectionTag === "string") result.activeSectionTag = dna.activeSectionTag.slice(0, 50);
-    if (typeof dna.activeSectionType === "string") result.activeSectionType = dna.activeSectionType.slice(0, 50);
-    if (typeof dna.activeSectionText === "string") result.activeSectionText = maskPII(dna.activeSectionText.slice(0, 1000));
+    if (!dna || typeof dna !== 'object') return {};
+
+    const result = {};
+
+    if (typeof dna.title === 'string') {
+        result.title = maskPII(dna.title.slice(0, 200));
+    }
+    if (typeof dna.metaDescription === 'string') {
+        result.metaDescription = maskPII(dna.metaDescription.slice(0, 500));
+    }
+    if (typeof dna.metaKeywords === 'string') {
+        result.metaKeywords = maskPII(dna.metaKeywords.slice(0, 500));
+    }
+    if (Array.isArray(dna.headings)) {
+        result.headings = dna.headings
+            .map(value => maskPII(String(value).slice(0, 220)))
+            .filter(Boolean)
+            .slice(0, 12);
+    }
+
+    // Backward-compatible plain entity strings.
+    if (Array.isArray(dna.entities)) {
+        result.entities = dna.entities
+            .map(value => maskPII(String(value).slice(0, 300)))
+            .filter(Boolean)
+            .slice(0, MAX_ENTITY_ITEMS);
+    }
+
+    // NEW: Preserve main.js structured entity index all the way to the Agent.
+    if (Array.isArray(dna.entityIndex)) {
+        result.entityIndex = dna.entityIndex
+            .slice(0, MAX_ENTITY_ITEMS)
+            .map(sanitizeEntity)
+            .filter(Boolean);
+        result.entityCount = result.entityIndex.length;
+    } else if (Number.isFinite(dna.entityCount)) {
+        result.entityCount = Math.max(0, Math.min(Number(dna.entityCount), MAX_ENTITY_ITEMS));
+    }
+
+    if (Array.isArray(dna.dataPoints)) {
+        result.dataPoints = dna.dataPoints
+            .map(value => maskPII(String(value).slice(0, 200)))
+            .filter(Boolean)
+            .slice(0, 20);
+    }
+
+    if (typeof dna.lang === 'string') result.lang = dna.lang.slice(0, 10);
+    if (typeof dna.ogType === 'string') result.ogType = dna.ogType.slice(0, 100);
+    if (typeof dna.activeSectionTag === 'string') result.activeSectionTag = dna.activeSectionTag.slice(0, 50);
+    if (typeof dna.activeSectionType === 'string') result.activeSectionType = dna.activeSectionType.slice(0, 50);
+    if (typeof dna.activeSectionText === 'string') {
+        result.activeSectionText = maskPII(dna.activeSectionText.slice(0, 1400));
+    }
+    if (typeof dna.geoContext === 'string') {
+        result.geoContext = maskPII(dna.geoContext.slice(0, 160));
+    }
+
     return result;
 }
 
-module.exports = async function handler(req, res) {
+function normalizeResult(result) {
+    const source = result && typeof result === 'object' ? result : {};
+    return {
+        ...source,
+        reply: typeof source.reply === 'string' ? source.reply : '',
+        cssCommand: typeof source.cssCommand === 'string' ? source.cssCommand : '',
+        action: source.action && typeof source.action === 'object' ? source.action : null,
+        interactive: source.interactive && typeof source.interactive === 'object' ? source.interactive : null,
+        status: cleanOptionalText(source.status || 'ok', 40) || 'ok'
+    };
+}
+
+function dynamicEntityRequest(payload) {
+    return Boolean(
+        payload &&
+        payload.siteDNA &&
+        Array.isArray(payload.siteDNA.entityIndex) &&
+        payload.siteDNA.entityIndex.length
+    );
+}
+
+// Cached actions can become stale when the DOM/catalog changes, especially now
+// that actions contain exact entity IDs. Keep dynamic entity requests live.
+function cacheEligible(payload) {
+    if (!payload || payload.isProactive) return false;
+    if (dynamicEntityRequest(payload)) return false;
+    return true;
+}
+
+function appendBrainContext(payload) {
+    const parts = [];
+
+    if (payload.ragContext) {
+        parts.push(String(payload.ragContext).slice(0, 6000));
+    }
+
+    if (payload.pageContent) {
+        parts.push(`CURRENT PUBLIC PAGE:\n${payload.pageContent.slice(0, MAX_BRAIN_PAGE_CHARS)}`);
+    }
+
+    const index = payload.siteDNA && Array.isArray(payload.siteDNA.entityIndex)
+        ? payload.siteDNA.entityIndex
+        : [];
+
+    if (index.length) {
+        const compact = index.slice(0, MAX_BRAIN_ENTITY_ITEMS).map(item => {
+            const price = item.price === null || item.price === undefined || item.price === ''
+                ? ''
+                : ` | price=${item.price}`;
+            const description = item.description ? ` | ${item.description.slice(0, 180)}` : '';
+            return `- ${item.title}${price}${description}`;
+        });
+        parts.push(`VISIBLE VERIFIED ENTITIES:\n${compact.join('\n')}`);
+    }
+
+    return parts.join('\n\n').slice(0, 12000);
+}
+
+function isGroundedIntent(intent) {
+    return GROUNDED_INTENTS.has(intent);
+}
+
+function resultIsGrounded(result) {
+    if (!result || typeof result !== 'object') return false;
+    if (result.status === 'blocked') return true;
+    if (result.action) return true;
+    if (Array.isArray(result.sources) && result.sources.length) return true;
+    return false;
+}
+
+async function runAgentWithResearch(payload) {
+    let draft = runIndicatorAgent(payload);
+
+    if (draft && draft.researchRequest) {
+        try {
+            const externalResearch = await researchExternal(draft.researchRequest);
+            draft = runIndicatorAgent({ ...payload, externalResearch });
+        } catch (error) {
+            logEvent('warn', 'External research enrichment failed', {
+                error: error && error.message ? error.message : String(error)
+            });
+        }
+    }
+
+    if (draft && Object.prototype.hasOwnProperty.call(draft, 'researchRequest')) {
+        delete draft.researchRequest;
+    }
+
+    return normalizeResult(draft);
+}
+
+function brainActionTarget(aiResponse, originalPrompt) {
+    const action = aiResponse && aiResponse.action;
+    if (!action || typeof action !== 'object') return '';
+
+    return cleanText(
+        action.target ||
+        action.targetText ||
+        action.title ||
+        action.query ||
+        action.label ||
+        originalPrompt,
+        MAX_PROMPT_CHARS
+    );
+}
+
+function actionNeedsResolver(aiResponse) {
+    const action = aiResponse && aiResponse.action;
+    if (!action || typeof action !== 'object') return false;
+    if (action.actionTrigger) return true;
+    return ['warp', 'warp_cross_page', 'navigate', 'highlight'].includes(String(action.type || '').toLowerCase());
+}
+
+function safeBrainOnlyAction(action) {
+    if (!action || typeof action !== 'object') return null;
+    const type = String(action.type || '').toLowerCase();
+
+    // Website search/navigation/highlight must always be resolved by our
+    // deterministic Agent so answer + entity + DOM target stay synchronized.
+    if (['warp', 'warp_cross_page', 'navigate', 'highlight'].includes(type)) return null;
+
+    // Keep only existing widget actions that do not select page content.
+    if (['handoff', 'speech', 'confetti', 'plugin_action'].includes(type)) return action;
+    return null;
+}
+
+async function askBrain(payload, mergedHistory, requestId) {
+    const identity = {
+        name: 'INDICATOR',
+        role: 'Website Assistant',
+        purpose: 'Help users using verified public website information. Never invent a product or DOM target.'
+    };
+
+    return indicatorAI.generate({
+        identity,
+        memory: mergedHistory,
+        ragContext: appendBrainContext(payload),
+        tools: toolRegistry.getAvailableTools(),
+        userMessage: payload.prompt,
+        metadata: { requestId }
+    });
+}
+
+async function runOwnedPipeline(payload, mergedHistory, requestId) {
+    // Proactive hover/behavior prompts are generated by main.js and are meant
+    // to sound natural. They do not need catalog routing unless the Brain tries
+    // to trigger a page action.
+    if (payload.isProactive) {
+        const aiResponse = normalizeResult(await askBrain(payload, mergedHistory, requestId));
+        if (actionNeedsResolver(aiResponse)) {
+            const target = brainActionTarget(aiResponse, payload.prompt);
+            const resolved = await runAgentWithResearch({ ...payload, prompt: target });
+            if (resolved.action) return resolved;
+        }
+        return {
+            ...aiResponse,
+            action: safeBrainOnlyAction(aiResponse.action)
+        };
+    }
+
+    // 1) Resolve the user's real website intent FIRST. This is the source of
+    // truth for products, pages, prices, navigation and Warp targets.
+    const intent = intentFor(payload.prompt);
+    const deterministic = await runAgentWithResearch(payload);
+
+    if (isGroundedIntent(intent) || resultIsGrounded(deterministic)) {
+        return deterministic;
+    }
+
+    // 2) Optional intelligence service for general grounded reasoning. It may
+    // improve answers, but it is never allowed to overrule a deterministic
+    // product/page action selected above.
+    if (intelligenceEnabled()) {
+        try {
+            const intelligent = await answerWithIntelligence(payload);
+            if (intelligent && intelligent.reply) {
+                const normalized = normalizeResult(intelligent);
+                if (actionNeedsResolver(normalized)) {
+                    const target = brainActionTarget(normalized, payload.prompt);
+                    const resolved = await runAgentWithResearch({ ...payload, prompt: target });
+                    if (resolved.action) return resolved;
+                    normalized.action = null;
+                }
+                return normalized;
+            }
+        } catch (error) {
+            logEvent('warn', 'Intelligence bridge failed; continuing with Brain', {
+                requestId,
+                error: error && error.message ? error.message : String(error)
+            });
+        }
+    }
+
+    // 3) General conversation/reasoning goes to the provider gateway.
+    const aiResponse = normalizeResult(await askBrain(payload, mergedHistory, requestId));
+
+    if (actionNeedsResolver(aiResponse)) {
+        const target = brainActionTarget(aiResponse, payload.prompt);
+        const resolved = await runAgentWithResearch({ ...payload, prompt: target });
+        if (resolved.action) {
+            // Do NOT reuse the Brain's prose here: the deterministic reply is
+            // tied to the same verified entity/page as the action.
+            return resolved;
+        }
+        aiResponse.action = null;
+    } else {
+        aiResponse.action = safeBrainOnlyAction(aiResponse.action);
+    }
+
+    // Safe fallback if model provider failed.
+    if (aiResponse.status === 'error' || !aiResponse.reply) {
+        return deterministic;
+    }
+
+    return aiResponse;
+}
+
+async function validateTenant(body) {
+    let tenantInfo = null;
+    let isValid = true;
+    let tenantError = '';
+
+    if (body.apiKey && body.apiKey !== 'INDICATOR_TEST' && supabase) {
+        try {
+            const { data } = await supabase
+                .from('tenants')
+                .select('id, company_name, api_key, status, package_type, expires_at')
+                .eq('api_key', body.apiKey)
+                .limit(1)
+                .maybeSingle();
+
+            if (data) {
+                tenantInfo = data;
+                if (data.status === 'suspended') {
+                    isValid = false;
+                    tenantError = 'บัญชีถูกระงับการใช้งาน (Suspended)';
+                } else if (data.expires_at && new Date(data.expires_at) < new Date()) {
+                    isValid = false;
+                    tenantError = 'Package หมดอายุ (Expired) กรุณาต่ออายุเพื่อใช้งานต่อ';
+                }
+            }
+        } catch (error) {
+            console.error('Tenant validation error:', error);
+        }
+    }
+
+    return { tenantInfo, isValid, tenantError };
+}
+
+async function handler(req, res) {
     setCorsHeaders(req, res);
-    if (req.method === "OPTIONS") return res.status(200).end();
-    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     if (!checkRateLimit(req, res, 'chat')) {
-        return; // checkRateLimit already sent the 429 response
+        return;
     }
 
     try {
         const body = parseBody(req.body);
+        const tenant = await validateTenant(body);
 
-        // API Key Validation (Package & Expiry Control)
-        let tenantInfo = null;
-        let isValid = true;
-        let tenantError = "";
-
-        if (body.apiKey && body.apiKey !== 'INDICATOR_TEST') {
-            try {
-                if (supabase) {
-                    const { data, error } = await supabase
-                        .from('tenants')
-                        .select('id, company_name, api_key, status, package_type, expires_at')
-                        .eq('api_key', body.apiKey)
-                        .limit(1)
-                        .maybeSingle();
-
-                    if (data) {
-                        tenantInfo = data;
-                        if (data.status === 'suspended') {
-                            isValid = false;
-                            tenantError = "บัญชีถูกระงับการใช้งาน (Suspended)";
-                        } else if (data.expires_at && new Date(data.expires_at) < new Date()) {
-                            isValid = false;
-                            tenantError = "Package หมดอายุ (Expired) กรุณาต่ออายุเพื่อใช้งานต่อ";
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error("Tenant validation error:", err);
-            }
-        }
-
-        if (!isValid) {
+        if (!tenant.isValid) {
             try {
                 if (supabase) {
                     await supabase.from('logs').insert({
                         type: 'warn',
-                        message: `Blocked chat request: ${tenantError}`,
+                        message: `Blocked chat request: ${tenant.tenantError}`,
                         metadata: { apiKeyPrefix: (body.apiKey || '').slice(0, 12) + '...' }
                     });
                 }
-            } catch (_) {}
+            } catch (_) { }
 
             return res.status(403).json({
-                status: "blocked",
-                reply: tenantError,
-                error: tenantError,
+                status: 'blocked',
+                reply: tenant.tenantError,
+                error: tenant.tenantError,
                 interactive: null,
-                action: { type: "disable_widget" }
+                action: { type: 'disable_widget' }
             });
         }
 
-        if (supabase && tenantInfo) {
+        if (supabase && tenant.tenantInfo) {
             supabase.from('logs').insert({
                 type: 'info',
-                message: `Chat request from ${tenantInfo.company_name || tenantInfo.id}`,
-                metadata: { tenantId: tenantInfo.id }
-            }).then().catch(() => {});
+                message: `Chat request from ${tenant.tenantInfo.company_name || tenant.tenantInfo.id}`,
+                metadata: { tenantId: tenant.tenantInfo.id }
+            }).then(() => { }).catch(() => { });
         }
 
         const rawPrompt = cleanText(body.prompt, MAX_PROMPT_CHARS);
-        // A browser key selects only a public site profile.  It never grants
-        // admin or connector permissions; those must remain server-side.
         const siteProfile = resolveSiteProfile(cleanText(body.siteKey || body.apiKey, 300));
-        if (process.env.INDICATOR_STRICT_SITE_ORIGIN === 'true' && req.headers.origin && !originIsAllowed(siteProfile, req.headers.origin)) {
+
+        if (
+            process.env.INDICATOR_STRICT_SITE_ORIGIN === 'true' &&
+            req.headers.origin &&
+            !originIsAllowed(siteProfile, req.headers.origin)
+        ) {
             return res.status(403).json({
                 status: 'blocked',
                 reply: 'เว็บไซต์นี้ไม่ได้รับอนุญาตให้ใช้ Agent โปรไฟล์นี้',
@@ -166,7 +507,6 @@ module.exports = async function handler(req, res) {
         }
 
         const requestId = generateRequestId();
-
         const payload = {
             prompt: maskPII(rawPrompt),
             isProactive: body.proactive === true,
@@ -183,126 +523,144 @@ module.exports = async function handler(req, res) {
         };
 
         if (!rawPrompt && !payload.isProactive) {
-            return res.status(400).json({ error: "กรุณาพิมพ์ข้อความก่อนส่ง" });
+            return res.status(400).json({ error: 'กรุณาพิมพ์ข้อความก่อนส่ง' });
         }
 
-        // Each approved website has a strictly separate, public knowledge
-        // notebook.  It learns the current public page only; DOM snapshots,
-        // query strings, cookies, and private routes are never persisted.
-        // This lets the Agent become better at that site over time without
-        // turning browser traffic into unreviewed model-training data.
-        payload.expertiseStatus = learnPublicPage(siteProfile, payload);
+        // Learn only already-masked, public page information. These systems are
+        // tenant/profile-separated and reject private routes internally.
+        try {
+            payload.expertiseStatus = learnPublicPage(siteProfile, payload);
+        } catch (error) {
+            logEvent('warn', 'Site expertise learning failed', {
+                requestId,
+                error: error && error.message ? error.message : String(error)
+            });
+            payload.expertiseStatus = getExpertiseStatus(siteProfile);
+        }
+
+        try {
+            payload.learningStatus = learnFromPublicPage(siteProfile, payload);
+        } catch (error) {
+            logEvent('warn', 'Knowledge learning failed', {
+                requestId,
+                error: error && error.message ? error.message : String(error)
+            });
+            payload.learningStatus = null;
+        }
+
         payload.expertKnowledge = getSiteKnowledge(siteProfile);
-        if (!payload.expertiseStatus) payload.experti        // 2. Fetch or update server memory context
+
         const conversationId = payload.conversationId || requestId;
-        
+
         if (payload.prompt && !payload.isProactive) {
             await memoryManager.addMessage(conversationId, 'user', payload.prompt);
         }
-        
-        const mergedHistory = await memoryManager.getMergedHistory(conversationId, payload.history);
 
-        // 3. Obtain RAG Context (Now supports provider agnostic rewriting internally)
-        payload.ragContext = "";
+        const mergedHistory = await memoryManager.getMergedHistory(
+            conversationId,
+            payload.history
+        );
+
+        payload.ragContext = '';
         if (rawPrompt && supabase) {
-            const ragTenantId = tenantInfo ? tenantInfo.id : 'demo';
-            // We still pass GEMINI_API_KEY if available for embeddings, but local alternatives can be added
-            payload.ragContext = await getRagContext(supabase, ragTenantId, rawPrompt, process.env.GEMINI_API_KEY);
+            const ragTenantId = tenant.tenantInfo ? tenant.tenantInfo.id : 'demo';
+            try {
+                payload.ragContext = await getRagContext(
+                    supabase,
+                    ragTenantId,
+                    rawPrompt,
+                    process.env.GEMINI_API_KEY
+                );
+            } catch (error) {
+                logEvent('warn', 'RAG lookup failed', {
+                    requestId,
+                    error: error && error.message ? error.message : String(error)
+                });
+                payload.ragContext = '';
+            }
         }
 
-        let cached = semanticCache.get(payload);
-        if (cached) {
-            console.log("[Cache] HIT — returning cached response");
-            return res.status(200).json({ ...cached, expertise: payload.expertiseStatus, learning: payload.learningStatus });
+        const allowCache = cacheEligible(payload);
+        if (allowCache) {
+            const cached = semanticCache.get(payload);
+            if (cached) {
+                console.log('[Cache] HIT — returning cached response');
+                return res.status(200).json({
+                    ...cached,
+                    expertise: payload.expertiseStatus,
+                    learning: payload.learningStatus
+                });
+            }
         }
 
         let result;
+
         if (usesIndicatorAgent()) {
+            result = await runOwnedPipeline(payload, mergedHistory, requestId);
+        } else {
+            // Explicit rollback mode. Still append current public context to RAG
+            // so legacy Brain has enough page information to answer safely.
             const identity = {
                 name: 'INDICATOR',
                 role: 'Website Assistant',
-                purpose: 'Help users navigate the site and find products.'
+                purpose: 'Help users using public website information.'
             };
-            
-            // 1. Triple-Agent Pipeline: Brain Agent (GPT) analyzes first with RAG data
-            const aiResponse = await indicatorAI.generate({
+
+            result = normalizeResult(await indicatorAI.generate({
                 identity,
                 memory: mergedHistory,
-                ragContext: payload.ragContext,
+                ragContext: appendBrainContext(payload),
                 tools: toolRegistry.getAvailableTools(),
                 userMessage: payload.prompt,
                 metadata: { requestId }
-            });
-            
-            // 2. Pipeline Check: Did the Brain trigger the Scroller Action Agent?
-            if (aiResponse.action && aiResponse.action.actionTrigger) {
-                console.log(`[Triple-Agent] Brain delegated to Scroller. Target: ${aiResponse.action.target}`);
-                
-                // Pass GPT's exact keyword command to the deterministic Scroller Agent
-                const scrollerPayload = { ...payload, prompt: aiResponse.action.target };
-                let draft = runIndicatorAgent(scrollerPayload);
-                
-                if (draft && draft.researchRequest) {
-                    const externalResearch = await researchExternal(draft.researchRequest);
-                    draft = runIndicatorAgent({ ...scrollerPayload, externalResearch });
-                }
-                
-                result = {
-                    ...draft,
-                    // If GPT provided a conversational reply along with the command, use it, otherwise use Scroller's default
-                    reply: (aiResponse.reply && aiResponse.reply.trim() !== '') ? aiResponse.reply : draft.reply,
-                    status: draft.status || 'ok'
-                };
-            } else {
-                // 3. Just chat/reasoning from the Brain
-                result = aiResponse;
-                
-                // Safe fallback: If AI failed completely, fallback to basic agent
-                if (result.status === 'error') {
-                    result = runIndicatorAgent(payload);
-                }
-            }
-            
-            if (result && Object.prototype.hasOwnProperty.call(result, 'researchRequest')) delete result.researchRequest;
-        } else {
-            // Legacy mode is now unified via the Gateway too but skips deterministic agent
-            const identity = { name: 'INDICATOR', role: 'Website Assistant', purpose: 'Help users.' };
-            result = await indicatorAI.generate({
-                identity,
-                memory: mergedHistory,
-                ragContext: payload.ragContext,
-                tools: toolRegistry.getAvailableTools(),
-                userMessage: payload.prompt,
-                metadata: { requestId }
-            });
+            }));
         }
-        
-        // Save assistant reply to memory
-        if (result && result.reply && result.status !== "error") {
+
+        result = normalizeResult(result);
+
+        if (result.reply && result.status !== 'error' && result.status !== 'silent_abort') {
             await memoryManager.addMessage(conversationId, 'assistant', result.reply);
         }
 
-        if (result && result.status !== "silent_abort") {
+        if (result.status !== 'silent_abort') {
             result.expertise = payload.expertiseStatus;
             result.learning = payload.learningStatus;
-            semanticCache.set(payload, result);
+            result.metadata = {
+                ...(result.metadata || {}),
+                requestId,
+                resolver: usesIndicatorAgent() ? 'indicator-agent' : 'legacy',
+                structuredEntities: payload.siteDNA && Array.isArray(payload.siteDNA.entityIndex)
+                    ? payload.siteDNA.entityIndex.length
+                    : 0
+            };
+
+            if (allowCache) {
+                semanticCache.set(payload, result);
+            }
         }
 
         return res.status(200).json(result);
     } catch (error) {
-        console.error("Fatal handler error:", error);
+        console.error('Fatal handler error:', error);
         return res.status(200).json({
-            reply: "⚡ ระบบ AI กำลังอัปเดต รบกวนลองอีกครั้งสักครู่นะครับ",
-            cssCommand: "",
+            reply: '⚡ ระบบ AI กำลังอัปเดต รบกวนลองอีกครั้งสักครู่นะครับ',
+            cssCommand: '',
             action: null,
             interactive: null,
-            status: "error"
+            status: 'error'
         });
     }
-};
+}
 
-module.exports.cacheStats = function (req, res) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Content-Type", "application/json");
+module.exports = handler;
+
+module.exports.cacheStats = function cacheStats(req, res) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', 'application/json');
     return res.status(200).json(semanticCache.stats());
 };
+
+// Small private exports for contract tests/debugging without exposing them as
+// public API routes.
+module.exports.__sanitizeDNA = sanitizeDNA;
+module.exports.__cacheEligible = cacheEligible;

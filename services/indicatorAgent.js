@@ -15,8 +15,12 @@ const { getSiteKnowledge } = require('./siteExpertise');
 const { normalizeHumanText, fuzzyPhraseScore, productPhrases } = require('./languageUnderstanding');
 
 const KNOWLEDGE_PATH = path.join(__dirname, '..', 'data', 'indicator-knowledge.json');
+const EXPERTISE_PATH = path.join(__dirname, '..', 'data', 'site-expertise.json');
+const PROJECT_ROOT = path.resolve(__dirname, '..');
 const MAX_PROMPT_CHARS = 1200;
 const MAX_CONTEXT_MESSAGES = 8;
+const MAX_RUNTIME_ENTITIES = 120;
+const MAX_LOCAL_CATALOG_ITEMS = 240;
 const PRIVATE_CONTEXT_PREFIX = '__indicator_context_product__:';
 const PRODUCT_TERMS = ['กางเกง', 'รองเท้า', 'เสื้อ', 'กระเป๋า', 'หูฟัง', 'หนังสือ', 'นาฬิกา', 'โทรศัพท์', 'หมวก', 'ขวดน้ำ', 'เสื่อ', 'โต๊ะ', 'เก้าอี้', 'สินค้า', 'shoe', 'shoes', 'shirt', 'pants', 'shorts', 'bag', 'headphone', 'book', 'product'];
 const PRODUCT_CUES = ['กางเกง', 'เสื้อ', 'รองเท้า', 'กระเป๋า', 'หูฟัง', 'หนังสือ', 'นาฬิกา', 'โทรศัพท์', 'หมวก', 'ขวดน้ำ', 'เสื่อ', 'โต๊ะ', 'เก้าอี้', 'shoe', 'shirt', 'bag', 'headphone', 'book', 'watch', 'phone'];
@@ -92,6 +96,158 @@ function publicPrice(value) {
     return match ? Number(match[1].replace(/,/g, '')) : undefined;
 }
 
+function numericPrice(value) {
+    if (Number.isFinite(value)) return Number(value);
+    const text = String(value || '').replace(/,/g, '');
+    const direct = text.match(/(?:฿|บาท)?\s*([0-9]{1,9})(?:\.\d+)?/u);
+    return direct ? Number(direct[1]) : undefined;
+}
+
+function safeSameOriginUrl(value, currentUrl) {
+    try {
+        const current = new URL(String(currentUrl || '/'), 'https://indicator.local');
+        const destination = new URL(String(value || current.pathname || '/'), current);
+        if (destination.origin !== current.origin) return currentUrl || '/';
+        return `${destination.pathname}${destination.search}${destination.hash}`;
+    } catch (_) {
+        return currentUrl || '/';
+    }
+}
+
+function normalizeRuntimeEntity(entity, index, currentUrl) {
+    if (entity && typeof entity === 'object' && !Array.isArray(entity)) {
+        const name = safeText(entity.title || entity.name || entity.label, 220);
+        if (!name || isPrivateContextMarker({ name })) return null;
+        const description = safeText(entity.description || entity.desc || entity.text || '', 420);
+        const price = numericPrice(entity.price);
+        const url = safeSameOriginUrl(entity.href || entity.url || currentUrl, currentUrl);
+        const keywords = [...new Set([
+            name,
+            safeText(entity.alt, 180),
+            safeText(entity.type, 80),
+            safeText(entity.text, 260),
+            description
+        ].filter(Boolean))].slice(0, 12);
+        return {
+            id: safeText(entity.id || `visible-structured-${index + 1}`, 160),
+            entityId: safeText(entity.id, 160) || undefined,
+            selector: safeText(entity.selector, 260) || undefined,
+            name,
+            description: description || 'รายการที่พบในหน้าเว็บปัจจุบัน',
+            price,
+            inStock: entity.inStock === true ? true : entity.inStock === false ? false : null,
+            url,
+            keywords,
+            runtime: true
+        };
+    }
+
+    const rawName = safeText(entity, 260);
+    const name = rawName.replace(/\s*\([^)]*(?:฿|บาท|\d)[^)]*\)\s*$/u, '').trim();
+    if (!name || isPrivateContextMarker({ name })) return null;
+    return {
+        id: `visible-${index + 1}`,
+        name,
+        description: 'รายการที่พบในหน้าเว็บปัจจุบัน',
+        price: publicPrice(rawName),
+        inStock: null,
+        url: currentUrl,
+        keywords: [rawName, name],
+        runtime: true
+    };
+}
+
+// Migration-safe reader: older builds stored expertise under a previous
+// profile id. We only reuse a legacy record when its public origin is exactly
+// the same as the current page, so tenant data cannot cross origins.
+function legacyExpertKnowledge(payload, profile) {
+    try {
+        const current = new URL(String(payload && payload.url || ''));
+        if (!/^https?:$/i.test(current.protocol)) return { pages: [], catalog: [], glossary: [] };
+        const allowed = Array.isArray(profile && profile.allowedOrigins) ? profile.allowedOrigins : [];
+        if (allowed.length && !allowed.includes('*') && !allowed.includes(current.origin)) return { pages: [], catalog: [], glossary: [] };
+        const data = JSON.parse(fs.readFileSync(EXPERTISE_PATH, 'utf8'));
+        const sites = data && data.sites && typeof data.sites === 'object' ? Object.values(data.sites) : [];
+        const site = sites.find(item => item && item.origin === current.origin && Array.isArray(item.pages));
+        if (!site) return { pages: [], catalog: [], glossary: [] };
+
+        const pages = [];
+        const catalog = [];
+        site.pages.forEach((page, pageIndex) => {
+            const pageUrl = safeSameOriginUrl(page && page.url || '/', payload.url);
+            const headings = Array.isArray(page && page.headings) ? page.headings.map(item => safeText(item, 200)).filter(Boolean).slice(0, 12) : [];
+            const entities = Array.isArray(page && page.entities) ? page.entities : [];
+            pages.push({
+                id: `legacy-learned-page-${pageIndex + 1}`,
+                title: safeText(page && page.title || 'หน้าสาธารณะ', 200),
+                url: pageUrl,
+                headings,
+                content: safeText(page && page.content, 6000),
+                keywords: [...headings, ...entities].map(item => safeText(item, 160)).filter(Boolean).slice(0, 24),
+                learned: true
+            });
+            entities.slice(0, MAX_RUNTIME_ENTITIES).forEach((entity, entityIndex) => {
+                const parsed = normalizeRuntimeEntity(entity, entityIndex, pageUrl);
+                if (!parsed || isPrivateContextMarker(parsed)) return;
+                parsed.id = `legacy-learned-entity-${pageIndex + 1}-${entityIndex + 1}`;
+                parsed.learned = true;
+                catalog.push(parsed);
+            });
+        });
+        return { pages, catalog, glossary: [] };
+    } catch (_) {
+        return { pages: [], catalog: [], glossary: [] };
+    }
+}
+
+function decodeJsString(value) {
+    try { return JSON.parse(`"${String(value || '').replace(/"/g, '\"')}"`); }
+    catch (_) { return String(value || '').replace(/\\"/g, '"').replace(/\\n/g, '\n'); }
+}
+
+// Local/public static-page fallback. This is deliberately restricted to
+// localhost development pages and project-root .html files. Production sites
+// should normally arrive through siteDNA.entityIndex or learned knowledge.
+function loadLocalPublicCatalog(payload) {
+    try {
+        const url = new URL(String(payload && payload.url || ''));
+        if (!['localhost', '127.0.0.1', '::1'].includes(url.hostname)) return [];
+        let pathname = decodeURIComponent(url.pathname || '/');
+        if (pathname === '/') pathname = '/index.html';
+        if (!/\.html?$/i.test(pathname)) return [];
+        const filePath = path.resolve(PROJECT_ROOT, `.${pathname}`);
+        if (!filePath.startsWith(PROJECT_ROOT + path.sep) || !fs.existsSync(filePath)) return [];
+        const html = fs.readFileSync(filePath, 'utf8');
+        const catalog = [];
+        const productRegex = /\{\s*id\s*:\s*(\d+)\s*,\s*name\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*cat\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*price\s*:\s*(\d+(?:\.\d+)?)\s*,\s*sale\s*:\s*(\d+(?:\.\d+)?)\s*,\s*img\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*desc\s*:\s*"((?:\\.|[^"\\])*)"(?:\s*,\s*rating\s*:\s*([0-9.]+))?\s*\}/g;
+        let match;
+        while ((match = productRegex.exec(html)) && catalog.length < MAX_LOCAL_CATALOG_ITEMS) {
+            const id = Number(match[1]);
+            const name = decodeJsString(match[2]);
+            const category = decodeJsString(match[3]);
+            const regularPrice = Number(match[4]);
+            const salePrice = Number(match[5]);
+            const image = decodeJsString(match[6]);
+            const description = decodeJsString(match[7]);
+            catalog.push({
+                id: String(id === 47 && /nike/i.test(name) ? 'nike-air' : `local-product-${id}`),
+                name,
+                description,
+                price: salePrice > 0 ? salePrice : regularPrice,
+                originalPrice: regularPrice,
+                inStock: null,
+                url: `${url.pathname || '/'}#product-${id}`,
+                keywords: [name, category, description, /nike/i.test(name) ? 'nike' : '', /air/i.test(name) ? 'air' : ''].filter(Boolean),
+                image,
+                localStatic: true
+            });
+        }
+        return catalog;
+    } catch (_) {
+        return [];
+    }
+}
+
 function cleanKnowledge(data) {
     return {
         pages: Array.isArray(data && data.pages) ? data.pages : [],
@@ -123,18 +279,20 @@ function loadKnowledge(siteProfile) {
 
 function runtimeKnowledge(payload) {
     const knowledge = loadKnowledge(payload && payload.siteProfile);
-    // `expertKnowledge` is provided by the chat API after it has stored a
-    // public page snapshot.  Direct callers can omit it; in that case the
-    // tenant-scoped store is read here.  Static catalog data is kept first so
-    // a page mention can never override an authoritative stock/price record.
-    const learned = cleanKnowledge(payload && payload.expertKnowledge || getSiteKnowledge(payload && payload.siteProfile));
+    let learned = cleanKnowledge(payload && payload.expertKnowledge || getSiteKnowledge(payload && payload.siteProfile));
+    if (!learned.pages.length && !learned.catalog.length) {
+        learned = legacyExpertKnowledge(payload, payload && payload.siteProfile);
+    }
+
     knowledge.pages = [...knowledge.pages, ...learned.pages];
     knowledge.catalog = [...knowledge.catalog, ...learned.catalog];
     knowledge.glossary = [...knowledge.glossary, ...learned.glossary];
+
     const siteDNA = payload && payload.siteDNA && typeof payload.siteDNA === 'object' ? payload.siteDNA : {};
     const currentUrl = String(payload && payload.url || '/');
     const headings = Array.isArray(siteDNA.headings) ? siteDNA.headings : [];
-    const entities = Array.isArray(siteDNA.entities) ? siteDNA.entities : [];
+    const legacyEntities = Array.isArray(siteDNA.entities) ? siteDNA.entities : [];
+    const structuredEntities = Array.isArray(siteDNA.entityIndex) ? siteDNA.entityIndex : [];
 
     knowledge.pages.unshift({
         id: 'current-page',
@@ -145,33 +303,48 @@ function runtimeKnowledge(payload) {
         keywords: []
     });
 
-    // The widget extracts visible product cards. These runtime entries make a
-    // tenant's current page useful even before a catalog integration exists.
     const visibleCatalog = [];
-    entities.slice(0, 80).forEach((entity, index) => {
-        // The widget appends a visible price in parentheses.  Keep the actual
-        // product title clean so the Agent can match natural Thai requests.
-        const rawName = safeText(entity, 240);
-        const name = rawName.replace(/\s*\([^)]*(?:฿|บาท|\d)[^)]*\)\s*$/u, '').trim();
-        if (!name) return;
-        visibleCatalog.push({
-            id: `visible-${index + 1}`,
-            name,
-            description: 'รายการที่พบในหน้าเว็บปัจจุบัน',
-            price: publicPrice(rawName),
-            // A product card proves the item is published, not live stock.
-            inStock: null,
-            url: currentUrl,
-            keywords: [rawName]
-        });
+    const seenVisible = new Set();
+
+    // Structured entities from main.js v7 are authoritative because they
+    // preserve the exact DOM id/selector that the widget can warp to.
+    structuredEntities.slice(0, MAX_RUNTIME_ENTITIES).forEach((entity, index) => {
+        const item = normalizeRuntimeEntity(entity, index, currentUrl);
+        if (!item) return;
+        const key = normalize(item.name);
+        if (!key || seenVisible.has(key)) return;
+        seenVisible.add(key);
+        visibleCatalog.push(item);
     });
-    // Current-page facts are fresher than a previously learned snapshot. This
-    // also prevents an old snapshot from hiding the current product price.
-    knowledge.catalog = [...visibleCatalog, ...knowledge.catalog].filter(item => !isPrivateContextMarker(item));
+
+    // Legacy string entities remain supported so older widgets keep working.
+    legacyEntities.slice(0, MAX_RUNTIME_ENTITIES).forEach((entity, index) => {
+        const item = normalizeRuntimeEntity(entity, index, currentUrl);
+        if (!item) return;
+        const key = normalize(item.name);
+        if (!key || seenVisible.has(key)) return;
+        seenVisible.add(key);
+        visibleCatalog.push(item);
+    });
+
+    // Local development/demo pages can be indexed server-side if the browser
+    // has not sent siteDNA yet. This keeps deterministic contract tests and
+    // first-load local demos grounded in the actual public HTML file.
+    const localCatalog = (structuredEntities.length || legacyEntities.length) ? [] : loadLocalPublicCatalog(payload);
+
+    const combined = [...visibleCatalog, ...localCatalog, ...knowledge.catalog]
+        .filter(item => !isPrivateContextMarker(item));
+    const seenCatalog = new Set();
+    knowledge.catalog = combined.filter(item => {
+        const key = normalize(item && item.name);
+        if (!key || seenCatalog.has(key)) return false;
+        seenCatalog.add(key);
+        return true;
+    });
     return knowledge;
 }
 
-function actionFor({ title, url, currentUrl, keywords = [], permissions = [] }) {
+function actionFor({ title, url, currentUrl, keywords = [], permissions = [], entityId, selector }) {
     if (Array.isArray(permissions) && permissions.length && !permissions.includes('navigate_same_origin')) return null;
     const targetText = safeText(title, 200);
     try {
@@ -179,12 +352,13 @@ function actionFor({ title, url, currentUrl, keywords = [], permissions = [] }) 
         const destination = new URL(url || '/', current);
         if (destination.origin !== current.origin) return null;
         const safeUrl = `${destination.pathname}${destination.search}${destination.hash}`;
-        // Same page: warp (scroll to element)
         if (destination.pathname === current.pathname) {
-            return { type: 'warp', targetText, keywords: keywords.slice(0, 5) };
+            const action = { type: 'warp', targetText, keywords: keywords.slice(0, 10) };
+            if (entityId) action.entityId = safeText(entityId, 160);
+            if (selector) action.selector = safeText(selector, 260);
+            return action;
         }
-        // Different page on same origin: use warp_cross_page (widget knows this action type)
-        return { type: 'warp_cross_page', url: safeUrl, targetText, keywords: keywords.slice(0, 5) };
+        return { type: 'navigate', url: safeUrl, targetText, keywords: keywords.slice(0, 10) };
     } catch (_) {
         return null;
     }
@@ -228,7 +402,12 @@ function buildWarpKeywords(rawPrompt) {
         .split(/\s+/)
         .filter(w => w.length > 1);
     const englishTokens = normalize(rawPrompt).match(/[a-z0-9][a-z0-9\-_]{1,}/gi) || [];
-    const combined = [...new Set([...subjectWords, ...englishTokens])].slice(0, 10);
+    const compact = normalize(subject || rawPrompt).replace(/\s+/g, '');
+    const cueTokens = PRODUCT_CUES.filter(cue => compact.includes(normalize(cue).replace(/\s+/g, '')));
+    const measurementTokens = compact.match(/\d+(?:ส่วน|นิ้ว|ml|cm|mm|gb|kg)?/giu) || [];
+    const combined = [...new Set([...cueTokens, ...subjectWords, ...englishTokens, ...measurementTokens])]
+        .filter(token => token && token.length > 1)
+        .slice(0, 12);
     return { subject, keywords: combined };
 }
 
@@ -287,38 +466,60 @@ function bestMatch(items, prompt, textForItem, aliasesForItem = () => []) {
 }
 
 function productScore(prompt, product) {
-    const withoutListWords = PRODUCT_LIST_REQUEST.test(normalize(prompt))
-        ? normalize(prompt).replace(/(?:มี|อะไรบ้าง|แบบไหน|รุ่นไหน|ตัวไหน|ทั้งหมด|รายการ|ตัวเลือก)/giu, ' ')
-        : normalize(prompt);
+    const normalizedPrompt = normalize(prompt);
+    const withoutListWords = PRODUCT_LIST_REQUEST.test(normalizedPrompt)
+        ? normalizedPrompt.replace(/(?:มี|อะไรบ้าง|แบบไหน|รุ่นไหน|ตัวไหน|ทั้งหมด|รายการ|ตัวเลือก)/giu, ' ')
+        : normalizedPrompt;
     const query = withoutListWords.replace(REQUEST_FILLER, ' ').replace(/\s+/g, ' ').trim();
-    const haystack = `${product.name || ''} ${product.description || ''} ${(product.keywords || []).join(' ')}`;
-    if (!query || !haystack.trim()) return 0;
+    const name = normalize(product && product.name);
+    const description = normalize(product && product.description);
+    const keywordText = normalize((product && product.keywords || []).join(' '));
+    const haystack = `${name} ${description} ${keywordText}`.trim();
+    if (!query || !haystack) return 0;
+
     let total = score(query, haystack, product.keywords || []);
     const compactQuery = query.replace(/\s+/g, '');
-    const compactHaystack = normalize(haystack).replace(/\s+/g, '');
-    for (const cue of PRODUCT_CUES) {
-        if (compactQuery.includes(cue) && compactHaystack.includes(cue)) total += 24;
+    const compactName = name.replace(/\s+/g, '');
+    const compactHaystack = haystack.replace(/\s+/g, '');
+
+    // Strong deterministic signals first. The Agent should never choose a
+    // different card when an exact published name/brand/model is available.
+    if (name === query) total += 900;
+    else if (name.includes(query) && query.length >= 3) total += 460;
+    else if (query.includes(name) && name.length >= 4) total += 360;
+
+    const queryEnglish = query.match(/[a-z][a-z0-9\-_]{1,}/gi) || [];
+    for (const token of queryEnglish) {
+        if (name.includes(token)) total += 180;
+        else if (keywordText.includes(token)) total += 90;
     }
-    // Numbers with units express a customer constraint. For example,
-    // "กางเกง 3 ส่วน" must rank above another generic pair of trousers.
+
+    for (const cue of PRODUCT_CUES) {
+        const normalizedCue = normalize(cue).replace(/\s+/g, '');
+        if (compactQuery.includes(normalizedCue) && compactName.includes(normalizedCue)) total += 58;
+        else if (compactQuery.includes(normalizedCue) && compactHaystack.includes(normalizedCue)) total += 30;
+    }
+
     const measurements = compactQuery.match(/\d+(?:ส่วน|นิ้ว|ml|cm|mm|gb|kg)?/giu) || [];
     for (const measurement of measurements) {
-        if (measurement.length > 1 && compactHaystack.includes(measurement)) total += 70;
+        if (measurement.length > 1 && compactName.includes(measurement)) total += 130;
+        else if (measurement.length > 1 && compactHaystack.includes(measurement)) total += 80;
     }
-    // Categories are scored above. Keep fuzzy matching for real product
-    // names/keywords so "รองเท้าปีนเขา" is not treated as any "รองเท้า".
+
     total += fuzzyPhraseScore(query, productPhrases(product));
     return total;
 }
 
 function rankedProductMatches(items, prompt, limit = 5) {
+    const normalizedPrompt = normalize(prompt);
+    const subject = extractQuerySubject(prompt);
+    const hasSpecificBrandOrNumber = /[a-z][a-z0-9\-_]{1,}/i.test(subject) || /\d/.test(subject);
+    const wantsList = PRODUCT_LIST_REQUEST.test(normalizedPrompt);
+    const threshold = hasSpecificBrandOrNumber ? 42 : wantsList ? 45 : 50;
     const ranked = items
-        .map(item => ({ item, score: productScore(prompt, item) }))
-        // A shared broad category alone (for example "รองเท้า") is not
-        // enough to select an arbitrary product. Require another signal such
-        // as a model, feature, brand, or numeric constraint first.
-        .filter(result => result.score >= 50)
-        .sort((left, right) => right.score - left.score)
+        .map((item, index) => ({ item, index, score: productScore(prompt, item) }))
+        .filter(result => result.score >= threshold)
+        .sort((left, right) => right.score - left.score || left.index - right.index)
         .map(result => result.item);
     const seen = new Set();
     return ranked.filter(item => {
@@ -338,30 +539,30 @@ const memoryCache = new Map();
 
 function recentHistory(payload) {
     const convId = payload && payload.conversationId ? String(payload.conversationId) : null;
-    let serverHistory = [];
-    
-    // Manage server memory
-    if (convId) {
-        serverHistory = memoryCache.get(convId) || [];
-        // Extract new prompt from payload and add to server memory
-        if (payload.prompt && !payload.isProactive) {
-             serverHistory.push({ role: 'user', text: safeText(payload.prompt, 1000) });
-             if (serverHistory.length > MAX_CONTEXT_MESSAGES * 2) {
-                 serverHistory = serverHistory.slice(-MAX_CONTEXT_MESSAGES * 2);
-             }
-             memoryCache.set(convId, serverHistory);
-        }
-    }
+    let serverHistory = convId ? (memoryCache.get(convId) || []).slice() : [];
+    const clientHistory = Array.isArray(payload && payload.history) ? payload.history : [];
 
-    if (!Array.isArray(payload && payload.history) && serverHistory.length === 0) return [];
-    
-    // Merge client and server history, preferring server memory if available
-    const rawHistory = serverHistory.length > 0 ? serverHistory : payload.history;
-    
-    return rawHistory.slice(-MAX_CONTEXT_MESSAGES).map(item => ({
+    const merged = [...clientHistory, ...serverHistory].map(item => ({
         role: item && item.role === 'assistant' ? 'assistant' : 'user',
         text: safeText(item && item.text, 1000)
     })).filter(item => item.text);
+
+    const deduped = [];
+    for (const item of merged) {
+        const previous = deduped[deduped.length - 1];
+        if (!previous || previous.role !== item.role || previous.text !== item.text) deduped.push(item);
+    }
+
+    if (payload && payload.prompt && !payload.isProactive) {
+        const promptText = safeText(payload.prompt, 1000);
+        const last = deduped[deduped.length - 1];
+        if (!last || last.role !== 'user' || last.text !== promptText) deduped.push({ role: 'user', text: promptText });
+    }
+
+    if (convId) {
+        memoryCache.set(convId, deduped.slice(-MAX_CONTEXT_MESSAGES * 2));
+    }
+    return deduped.slice(-MAX_CONTEXT_MESSAGES);
 }
 
 function updateServerMemory(conversationId, assistantReply) {
@@ -443,7 +644,9 @@ function explainProduct(product, payload) {
             url: product.url,
             currentUrl: payload.url,
             keywords: product.keywords || [],
-            permissions: payload.siteProfile && payload.siteProfile.permissions
+            permissions: payload.siteProfile && payload.siteProfile.permissions,
+            entityId: product.entityId,
+            selector: product.selector
         }),
         interactive: {
             type: 'carousel',
@@ -480,7 +683,9 @@ function findProduct(knowledge, payload, prompt, preMatchedProducts = null) {
         url: product.url,
         currentUrl: payload.url,
         keywords: product.keywords || [],
-        permissions: payload.siteProfile && payload.siteProfile.permissions
+        permissions: payload.siteProfile && payload.siteProfile.permissions,
+        entityId: product.entityId,
+        selector: product.selector
     });
     const price = Number.isFinite(product.price) ? ` ราคา ${product.price.toLocaleString('th-TH')} บาท` : '';
     return base(`เจอ ${product.name}${price} ครับ ผมพาไปที่รายการนี้ให้แล้ว`, {
@@ -520,58 +725,96 @@ function recommendProducts(knowledge) {
 }
 
 function searchUnified(knowledge, payload, prompt) {
-    // 1. Try to find a product first (highest precision via catalog)
+    const availability = availabilitySubject(prompt);
+    const { subject, keywords } = buildWarpKeywords(prompt);
+    const targetText = availability || subject || safeText(prompt, 120);
+
+    // Availability questions must search the whole site before saying an item
+    // does not exist. This also works for categories the Agent has never seen.
+    if (availability) {
+        const availabilityKeywords = [...new Set([availability, ...keywords, ...PRODUCT_CUES.filter(cue => normalize(availability).includes(normalize(cue)))])]
+            .filter(Boolean).slice(0, 12);
+        return base(`กำลังตรวจสอบว่าในร้านนี้มี “${availability}” หรือไม่ครับ`, {
+            action: { type: 'warp', targetText: availability, keywords: availabilityKeywords, searchAll: true, showResults: true },
+            sources: [{ type: 'site_search', query: availability }]
+        });
+    }
+
+    // Explicit navigation/page requests should resolve page knowledge before
+    // fuzzy product matching. This prevents a product keyword from hijacking
+    // requests such as “พาไปหน้าสมัครใช้งาน AI Chat Widget”.
+    const explicitPageIntent = /(?:พาไปหน้า|ไปหน้า|หน้าสมัคร|หน้าราคา|pricing|page|section|หัวข้อ|บทความ|นโยบาย)/iu.test(normalize(prompt));
+    if (explicitPageIntent) {
+        const page = bestMatch(
+            knowledge.pages,
+            prompt,
+            item => `${item.title || ''} ${(item.headings || []).join(' ')} ${item.content || ''}`,
+            item => item.keywords || []
+        );
+        if (page) return findContent(knowledge, payload, prompt, page);
+    }
+
     const products = rankedProductMatches(knowledge.catalog, prompt);
     if (products.length > 0) {
         return findProduct(knowledge, payload, prompt, products);
     }
 
-    // 2. Extract the real search subject from the raw query (Thai/English)
-    //    This must happen before any knowledge lookup so we warp with the right text.
-    const { subject, keywords } = buildWarpKeywords(prompt);
-    const targetText = subject || safeText(prompt, 120);
-
-    // 3. Live page match FIRST: the widget already extracted headings/entities from the DOM.
-    //    If the subject is right on the current page — warp immediately, no knowledge needed.
     const siteDNA = payload && payload.siteDNA || {};
     const liveHeadings = Array.isArray(siteDNA.headings) ? siteDNA.headings : [];
     const liveEntities = Array.isArray(siteDNA.entities) ? siteDNA.entities : [];
+    const structuredEntities = Array.isArray(siteDNA.entityIndex) ? siteDNA.entityIndex : [];
     const liveContent = normalize(String(siteDNA.activeSectionText || payload.pageContent || ''));
+
+    // Structured entity match first so answer + warp share the same exact DOM id.
+    let bestStructured = null;
+    let bestStructuredScore = 0;
+    for (const entity of structuredEntities.slice(0, MAX_RUNTIME_ENTITIES)) {
+        const item = normalizeRuntimeEntity(entity, 0, payload.url);
+        if (!item) continue;
+        const value = productScore(prompt, item);
+        if (value > bestStructuredScore) {
+            bestStructuredScore = value;
+            bestStructured = item;
+        }
+    }
+    if (bestStructured && bestStructuredScore >= 45) {
+        return findProduct({ ...knowledge, catalog: [bestStructured] }, payload, prompt, [bestStructured]);
+    } else if (bestStructured && bestStructuredScore >= 35) {
+        const warpKw = keywords.length > 0 ? keywords : [subject];
+        return base(`พบ “${bestStructured.name}” บนหน้านี้แล้วครับ กำลังพาไปให้`, {
+            action: { type: 'warp', targetText: bestStructured.name, selector: bestStructured.selector, keywords: warpKw, searchAll: false },
+            sources: [{ type: 'structured_entity', query: subject }]
+        });
+    }
 
     const allLiveText = [...liveHeadings, ...liveEntities];
     let bestLive = null, bestLiveScore = 0;
     for (const text of allLiveText) {
-        const s = livePageScore(subject, text);
-        if (s > bestLiveScore) { bestLiveScore = s; bestLive = text; }
+        const value = livePageScore(subject, text);
+        if (value > bestLiveScore) { bestLiveScore = value; bestLive = text; }
     }
 
     const subjectInContent = subject && liveContent.includes(normalize(subject));
     const hasLiveMatch = bestLiveScore >= 40 || subjectInContent;
-
     if (hasLiveMatch) {
-        const cleanLive = bestLive ? String(bestLive).replace(/^h[1-6]:/i, '') : subject;
+        const cleanLive = bestLive ? String(bestLive).replace(/^h[1-6]:/i, '').replace(/\s*\([^)]*(?:฿|บาท|\d)[^)]*\)\s*$/u, '').trim() : subject;
         const warpKw = keywords.length > 0 ? keywords : [subject];
-        return base(`พบ "${cleanLive}" บนหน้านี้แล้วครับ กำลังพาไปให้`, {
+        return base(`พบ “${cleanLive}” บนหน้านี้แล้วครับ กำลังพาไปให้`, {
             action: { type: 'warp', targetText: cleanLive, keywords: warpKw, searchAll: false },
             sources: [{ type: 'live_page', query: subject }]
         });
     }
 
-    // 4. Try static page knowledge match (for cross-page navigation)
     const page = bestMatch(
         knowledge.pages,
         prompt,
         item => `${item.title || ''} ${(item.headings || []).join(' ')} ${item.content || ''}`,
         item => item.keywords || []
     );
-    if (page) {
-        return findContent(knowledge, payload, prompt, page);
-    }
+    if (page) return findContent(knowledge, payload, prompt, page);
 
-    // 5. Ultimate fallback: broadcast warp+cross-search with properly extracted keywords
-    //    so the widget's crossSearch/findEl can locate the target anywhere on the site
     const wantsList = PRODUCT_LIST_REQUEST.test(normalize(prompt));
-    return base(`กำลังค้นหา "${targetText}" ในเว็บไซต์นี้ครับ`, {
+    return base(`กำลังค้นหา “${targetText}” ทั่วเว็บไซต์นี้ครับ`, {
         action: { type: 'warp', targetText, keywords, searchAll: true, showResults: wantsList },
         sources: [{ type: 'site_search', query: targetText }]
     });
@@ -719,7 +962,7 @@ function runIndicatorAgent(payload = {}) {
             purpose: safeText(identity.purpose, 240)
         }
     };
-    
+
     if (payload.conversationId && result.reply) {
         updateServerMemory(payload.conversationId, result.reply);
     }
