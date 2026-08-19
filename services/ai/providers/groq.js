@@ -2,7 +2,7 @@ const BaseProvider = require('./base');
 
 class GroqProvider extends BaseProvider {
     async generate({ system, messages, schema }, options = {}) {
-        const apiKey = this.config.apiKey || process.env.GROQ_API_KEY;
+        const apiKey = this.config.apiKey || process.env.GROQ_API_KEY || process.env.API_KEY;
         if (!apiKey) throw new Error('GROQ_API_KEY is not configured');
 
         const model = this.config.model || process.env.AI_FALLBACK_MODEL || 'llama-3.3-70b-versatile';

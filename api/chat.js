@@ -367,6 +367,13 @@ async function runOwnedPipeline(payload, mergedHistory, requestId) {
         return deterministic;
     }
 
+    // If the deterministic agent already produced a meaningful reply
+    // (e.g. greetings, fallback), skip the Brain call entirely to avoid
+    // showing AI error messages when provider keys are missing/overloaded.
+    if (deterministic.reply && deterministic.status === 'ok') {
+        return deterministic;
+    }
+
     // 2) Optional intelligence service for general grounded reasoning. It may
     // improve answers, but it is never allowed to overrule a deterministic
     // product/page action selected above.
@@ -392,7 +399,16 @@ async function runOwnedPipeline(payload, mergedHistory, requestId) {
     }
 
     // 3) General conversation/reasoning goes to the provider gateway.
-    const aiResponse = normalizeResult(await askBrain(payload, mergedHistory, requestId));
+    let aiResponse;
+    try {
+        aiResponse = normalizeResult(await askBrain(payload, mergedHistory, requestId));
+    } catch (error) {
+        logEvent('warn', 'Brain call threw unexpectedly; returning deterministic', {
+            requestId,
+            error: error && error.message ? error.message : String(error)
+        });
+        return deterministic;
+    }
 
     if (actionNeedsResolver(aiResponse)) {
         const target = brainActionTarget(aiResponse, payload.prompt);

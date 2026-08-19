@@ -102,6 +102,7 @@ module.exports = async function handler(req, res) {
 
                 // ส่งอีเมล
                 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+                    console.log(`[OTP] Attempting to send OTP ${generatedOtp} to ${email}...`);
                     try {
                         await transporter.sendMail({
                             from: process.env.SMTP_FROM || `"INDICATOR WEB CHAT" <${process.env.SMTP_USER}>`,
