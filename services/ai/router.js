@@ -69,7 +69,8 @@ class ModelRouter {
     }
 
     getProvider(name) {
-        const providerName = (name || process.env.AI_PRIMARY_PROVIDER || 'gemini').toLowerCase();
+        // Force gemini since the Vercel environment has a broken openai configuration
+        const providerName = 'gemini';
         return { name: providerName, instance: this.providers[providerName] || this.providers['gemini'] };
     }
 
