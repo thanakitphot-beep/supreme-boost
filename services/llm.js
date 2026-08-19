@@ -80,7 +80,7 @@ async function callGroqFallback(systemPrompt, userMsg) {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
+            model: 'groq/compound',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userMsg }
