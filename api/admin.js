@@ -80,7 +80,7 @@ module.exports = async function handler(req, res) {
             if (action === 'get_chat_logs') {
                 const tenantId = url.searchParams.get('tenantId');
                 if (!tenantId) return res.status(400).json({ error: 'Tenant ID required' });
-                const data = await db.collection('logs').find({ type: 'chat' }).sort({ timestamp: -1 }).limit(200).toArray();
+                const data = await db.collection('logs').find({ type: { $in: ['chat', 'handoff'] } }).sort({ timestamp: -1 }).limit(200).toArray();
                 const filtered = (data || []).filter(l => l.metadata && l.metadata.tenantId === tenantId).slice(0, 50);
                 return res.status(200).json({ logs: filtered });
             }

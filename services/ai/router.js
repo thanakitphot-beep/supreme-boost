@@ -23,6 +23,15 @@ function defaultProvider() {
     return ['openai', 'gemini', 'groq', 'local'].find(providerHasCredentials) || 'groq';
 }
 
+function modelMatchesProvider(provider, model) {
+    const value = String(model || '').toLowerCase();
+    if (!value) return false;
+    if (provider === 'openai') return value.startsWith('gpt-') || value.startsWith('o');
+    if (provider === 'gemini') return value.startsWith('gemini-');
+    if (provider === 'groq') return /^(llama|mixtral|qwen|deepseek)/.test(value);
+    return provider === 'local';
+}
+
 class CircuitBreaker {
     constructor(maxFailures, resetTimeout) {
         this.states = {};
@@ -137,7 +146,9 @@ class ModelRouter {
                 const startedAt = Date.now();
                 try {
                     logEvent('info', 'Calling provider', { provider: currentProvider.name, attempt: attempt + 1, requestId });
-                    const response = await currentProvider.instance.generate(payload, { ...options, signal: controller.signal });
+                    const providerOptions = { ...options, signal: controller.signal };
+                    if (!modelMatchesProvider(currentProvider.name, providerOptions.model)) delete providerOptions.model;
+                    const response = await currentProvider.instance.generate(payload, providerOptions);
                     clearTimeout(timeout);
                     this.circuitBreaker.recordSuccess(currentProvider.name);
                     return {
@@ -168,3 +179,4 @@ class ModelRouter {
 module.exports = new ModelRouter();
 module.exports.ModelRouter = ModelRouter;
 module.exports.providerHasCredentials = providerHasCredentials;
+module.exports.modelMatchesProvider = modelMatchesProvider;

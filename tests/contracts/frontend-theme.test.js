@@ -27,5 +27,8 @@ describe('Shared product visual system', () => {
         const source = fs.readFileSync(path.resolve(__dirname, '../../src/widget/main.js'), 'utf8');
         expect(source).toContain('applyWidgetSymbolStyle');
         expect(source).toContain('Website assistant ready');
+        expect(source).toContain('/api/handoff');
+        expect(source).toContain('data.status !== "ok"');
+        expect(source).toContain('siteKey: cfg.siteKey');
     });
 });

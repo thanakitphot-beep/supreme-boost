@@ -178,7 +178,7 @@ function handleRequest(req, res) {
     }
     const pathname = parsedUrl.pathname;
     req.query = Object.fromEntries(parsedUrl.searchParams.entries());
-    const tenantCorsRoute = ['/api/chat', '/api/v1/chat', '/api/crawl'].includes(pathname);
+    const tenantCorsRoute = ['/api/chat', '/api/v1/chat', '/api/crawl', '/api/handoff'].includes(pathname);
 
     // Request Tracing & Metrics
     req.id = req.headers['x-request-id'] || Math.random().toString(36).substring(2, 15);
@@ -208,6 +208,7 @@ function handleRequest(req, res) {
         '/api/chat': chatHandler,
         '/api/v1/chat': chatHandler, // New v1 endpoint
         '/api/crawl': crawlHandler,
+        '/api/handoff': require('./api/handoff.js'),
         '/api/learn': learnHandler,
         '/api/learning-feedback': learningFeedbackHandler,
         '/api/admin': adminHandler,

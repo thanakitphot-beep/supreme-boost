@@ -10,7 +10,8 @@ class IndicatorAIGateway {
         ragContext,
         tools,
         userMessage,
-        metadata = {}
+        metadata = {},
+        runtimeOptions = {}
     }) {
         const requestId = metadata.requestId || generateRequestId();
         const deadlineAt = Date.now() + Math.min(Math.max(Number.parseInt(process.env.AI_TOTAL_TIMEOUT_MS || '22000', 10) || 22000, 5000), 30000);
@@ -29,7 +30,7 @@ class IndicatorAIGateway {
 
         try {
             // First attempt
-            let { response, metadata: providerMeta } = await router.generateWithRetry(payload, { deadlineAt }, requestId);
+            let { response, metadata: providerMeta } = await router.generateWithRetry(payload, { deadlineAt, ...runtimeOptions }, requestId);
             
             let validation = validateResponse(response, requestId);
             
@@ -45,7 +46,7 @@ class IndicatorAIGateway {
                     ]
                 };
                 
-                const correctionResult = await router.generateWithRetry(correctionPayload, { deadlineAt }, requestId);
+                const correctionResult = await router.generateWithRetry(correctionPayload, { deadlineAt, ...runtimeOptions }, requestId);
                 validation = validateResponse(correctionResult.response, requestId);
                 providerMeta = correctionResult.metadata;
             }

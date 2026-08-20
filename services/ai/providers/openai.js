@@ -5,7 +5,7 @@ class OpenAIProvider extends BaseProvider {
         const apiKey = this.config.apiKey || process.env.OPENAI_API_KEY;
         if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
 
-        const model = this.config.model || process.env.AI_NORMAL_MODEL || 'gpt-4o-mini';
+        const model = options.model || this.config.model || process.env.AI_NORMAL_MODEL || 'gpt-4o-mini';
         const url = 'https://api.openai.com/v1/chat/completions';
         
         const payloadMessages = [

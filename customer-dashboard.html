@@ -282,6 +282,13 @@
                     <input type="range" class="fi" id="setTemp" min="0" max="1" step="0.1" value="0.3" style="padding:4px">
                     <span id="setTempVal" style="font-size:.78rem;color:var(--t3)">0.3</span>
                 </div>
+                <div style="border-top:1px solid var(--b1);padding-top:16px;margin-top:18px">
+                    <div class="card-title" style="font-size:.82rem"><i class="fa-solid fa-headset"></i> ช่องทางติดต่อเจ้าหน้าที่</div>
+                    <p style="font-size:.74rem;color:var(--t3);margin:-6px 0 14px">เมื่อผู้เข้าชมขอความช่วยเหลือ ระบบจะสร้าง ticket และแสดงช่องทางที่กำหนดไว้</p>
+                    <div class="fg"><label class="fl">อีเมล support</label><input class="fi" id="setSupportEmail" type="email" placeholder="support@yourcompany.com"></div>
+                    <div class="fg"><label class="fl">เบอร์โทรศัพท์</label><input class="fi" id="setSupportPhone" type="tel" placeholder="+66 2 000 0000"></div>
+                    <div class="fg"><label class="fl">ลิงก์ติดต่อ (LINE, WhatsApp, CRM หรือหน้า contact)</label><input class="fi" id="setSupportUrl" type="url" placeholder="https://..."></div>
+                </div>
                 <button class="btn btn-vl" onclick="saveSettings()">
                     <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า
                 </button>
@@ -482,6 +489,9 @@
             if (s.theme_color) document.getElementById('setTheme').value = s.theme_color;
             if (s.system_model) document.getElementById('setModel').value = s.system_model;
             if (s.system_prompt) document.getElementById('setPrompt').value = s.system_prompt;
+            if (s.support_email) document.getElementById('setSupportEmail').value = s.support_email;
+            if (s.support_phone) document.getElementById('setSupportPhone').value = s.support_phone;
+            if (s.support_url) document.getElementById('setSupportUrl').value = s.support_url;
             if (s.temperature !== undefined) {
                 document.getElementById('setTemp').value = s.temperature;
                 document.getElementById('setTempVal').textContent = s.temperature;
@@ -498,7 +508,10 @@
                     theme_color: document.getElementById('setTheme').value,
                     system_model: document.getElementById('setModel').value,
                     system_prompt: document.getElementById('setPrompt').value,
-                    temperature: parseFloat(document.getElementById('setTemp').value)
+                    temperature: parseFloat(document.getElementById('setTemp').value),
+                    support_email: document.getElementById('setSupportEmail').value.trim(),
+                    support_phone: document.getElementById('setSupportPhone').value.trim(),
+                    support_url: document.getElementById('setSupportUrl').value.trim()
                 })
             });
             const data = await res.json();

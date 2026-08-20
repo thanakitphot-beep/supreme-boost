@@ -93,7 +93,7 @@
     function ready(cb) { if (document.readyState !== "loading") { cb(); return; } document.addEventListener("DOMContentLoaded", cb, { once: true }); setTimeout(cb, 2000); }
     function retry(fn, n) { if (n === void 0) n = INIT_RETRY_TIMES; var a = 0, go = function () { a++; try { if (document.body && fn()) return; } catch (e) { console.error("[SB] init", a, e); } if (a < n) setTimeout(go, INIT_RETRY_DELAY); else console.warn("[SB] init failed"); }; go(); }
     function getScript() { return _cs || document.querySelector('script[src*="boost.js"]'); }
-    function getConfig() { var s = getScript(), u = s && s.src ? new URL(s.src, document.baseURI) : null, b = u && u.origin !== "null" ? u.origin + "/api/chat" : "/api/chat"; var wc = window.IndicatorConfig || {}; var lm = (wc.lang || getAttr(s, "data-lang", "auto")).toLowerCase(); var themeKey = wc.theme || getAttr(s, "data-theme", ""); var themeMap = { "cyber-calm": "#6366f1", "modern-light": "#3b82f6", "dark-matrix": "#10b981" }; return { apiKey: wc.apiKey || getAttr(s, "data-api-key", ""), title: wc.title || getAttr(s, "data-title", DEFAULT_TITLE), greeting: wc.greeting || getAttr(s, "data-greeting", ""), shopPrompt: wc.shopPrompt || getAttr(s, "data-shop-prompt", ""), backendUrl: wc.backendUrl || getAttr(s, "data-backend-url", b), primary: normColor(wc.primaryColor || themeMap[themeKey] || getAttr(s, "data-primary", DEFAULT_PRIMARY)), position: String(wc.position || getAttr(s, "data-position", "right")).toLowerCase() === "left" ? "left" : "right", startOpen: String(wc.startOpen || getAttr(s, "data-open", "false")) === "true", langMode: lm === "auto" ? "auto" : normLocale(lm) }; }
+    function getConfig() { var s = getScript(), u = s && s.src ? new URL(s.src, document.baseURI) : null, b = u && u.origin !== "null" ? u.origin + "/api/chat" : "/api/chat"; var wc = window.IndicatorConfig || {}; var lm = (wc.lang || getAttr(s, "data-lang", "auto")).toLowerCase(); var themeKey = wc.theme || getAttr(s, "data-theme", ""); var themeMap = { "cyber-calm": "#6366f1", "modern-light": "#3b82f6", "dark-matrix": "#10b981" }; return { apiKey: wc.apiKey || getAttr(s, "data-api-key", ""), siteKey: wc.siteKey || getAttr(s, "data-site-key", ""), title: wc.title || getAttr(s, "data-title", DEFAULT_TITLE), greeting: wc.greeting || getAttr(s, "data-greeting", ""), shopPrompt: wc.shopPrompt || getAttr(s, "data-shop-prompt", ""), backendUrl: wc.backendUrl || getAttr(s, "data-backend-url", b), primary: normColor(wc.primaryColor || themeMap[themeKey] || getAttr(s, "data-primary", DEFAULT_PRIMARY)), position: String(wc.position || getAttr(s, "data-position", "right")).toLowerCase() === "left" ? "left" : "right", startOpen: String(wc.startOpen || getAttr(s, "data-open", "false")) === "true", langMode: lm === "auto" ? "auto" : normLocale(lm) }; }
     function normLocale(v) { var c = String(v || "").toLowerCase().split("-")[0]; return SUPPORTED_LOCALES.indexOf(c) !== -1 ? c : "en"; }
 
     // Global Geo-Locale Engine State
@@ -658,6 +658,63 @@
 
     function triggerHandoff(locale, context) { _handoffCount++; var strs = t(locale); if (!_st || !_msgs) return; setOpen(true); var card = document.createElement("div"); card.className = "sb-msg sb-assistant sb-handoff"; card.innerHTML = '<div style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border-radius:12px;padding:16px;text-align:center;animation:sbSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1);"><div style="font-size:24px;margin-bottom:4px;">\uD83D\uDC68\u200D\uD83D\uDCBB</div><div style="font-weight:700;font-size:15px;margin-bottom:4px;">' + strs.handoffTitle + '</div><div style="font-size:12px;opacity:0.9;margin-bottom:10px;">' + strs.handoffBody + '</div><div style="background:rgba(255,255,255,0.2);border-radius:8px;padding:8px;font-size:11px;text-align:left;line-height:1.5;"><strong>' + strs.handoffSummary + ':</strong><br>' + escHtml(context.slice(0, 300)) + '</div><div style="margin-top:10px;font-size:11px;opacity:0.7;">ID #' + _handoffCount + '</div></div>'; _msgs.appendChild(card); _msgs.scrollTop = _msgs.scrollHeight; SessionDB.setPref("handoff", { count: _handoffCount, time: Date.now(), context: context.slice(0, 300) }); }
 
+    function appendHandoffButton(container, label, href, onClick) {
+        var button = href ? document.createElement("a") : document.createElement("button");
+        if (href) { button.href = href; button.target = "_blank"; button.rel = "noopener noreferrer"; }
+        else { button.type = "button"; button.addEventListener("click", onClick); }
+        button.textContent = label;
+        button.style.cssText = "display:inline-flex;align-items:center;justify-content:center;margin:8px 6px 0 0;padding:8px 12px;border:1px solid rgba(255,255,255,.35);border-radius:8px;background:rgba(255,255,255,.16);color:#fff;font:600 12px/1 Arial,sans-serif;text-decoration:none;cursor:pointer;";
+        container.appendChild(button);
+    }
+
+    function requestHandoff(locale, reason, priority) {
+        if (!_st || !_cfg || !_msgs) return;
+        var loading = addMsg(_msgs, "assistant", "กำลังส่งคำขอถึงเจ้าหน้าที่...", true);
+        var idempotencyKey = "handoff-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+        fetch(_cfg.backendUrl.replace('/api/chat', '/api/handoff'), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "omit",
+            body: JSON.stringify({
+                apiKey: _cfg.apiKey,
+                conversationId: _st.conversationId,
+                idempotencyKey: idempotencyKey,
+                reason: String(reason || "Visitor requested human support").slice(0, 500),
+                priority: priority === "high" ? "high" : "normal",
+                summary: String(reason || "").slice(0, 1200),
+                history: maskHist(_st.history),
+                url: location.href,
+                title: document.title
+            })
+        }).then(function (response) {
+            return response.ok ? response.json() : Promise.reject(new Error("HTTP " + response.status));
+        }).then(function (data) {
+            if (!data || data.status === "unavailable") {
+                updateMsg(loading, data && data.message || "ยังไม่มีช่องทางติดต่อเจ้าหน้าที่สำหรับหน้านี้", true);
+                return;
+            }
+            updateMsg(loading, (data.message || "คำขอถูกส่งเข้าคิวเจ้าหน้าที่แล้ว") + (data.ticketId ? "\nเลขอ้างอิง: " + data.ticketId : ""), true);
+            var contact = data.contact || {};
+            if (contact.url) appendHandoffButton(loading, "เปิดช่องทางติดต่อ", contact.url);
+            if (contact.email) appendHandoffButton(loading, "ส่งอีเมล", "mailto:" + contact.email);
+            if (contact.phone) appendHandoffButton(loading, "โทรหาเจ้าหน้าที่", "tel:" + contact.phone.replace(/[^+\d]/g, ""));
+            appendHandoffButton(loading, "คัดลอกสรุป", null, function () {
+                navigator.clipboard && navigator.clipboard.writeText(String(reason || "")).catch(function () { });
+            });
+        }).catch(function () {
+            updateMsg(loading, "ส่งคำขอไม่สำเร็จในขณะนี้ คุณสามารถคัดลอกสรุปเพื่อติดต่อทีมงานได้", true);
+            appendHandoffButton(loading, "คัดลอกสรุป", null, function () {
+                navigator.clipboard && navigator.clipboard.writeText(String(reason || "")).catch(function () { });
+            });
+        });
+    }
+
+    function offerHandoff(locale, reason) {
+        if (!_msgs) return;
+        var card = addMsg(_msgs, "assistant", "ดูเหมือนว่าคุณอาจต้องการความช่วยเหลือเพิ่มเติม", false);
+        appendHandoffButton(card, "ติดต่อเจ้าหน้าที่", null, function () { requestHandoff(locale, reason, "high"); });
+    }
+
     function init() {
         try {
             if (!document.body) return false;
@@ -857,7 +914,7 @@
                 doProactive(undefined, { _frustration: true, _frustrationCount: info.handoffCount });
                 if (info.handoffCount >= HUMAN_HANDOFF_FRUSTRATION_THRESHOLD) {
                     var context = "User showing frustration at: " + (info.el ? info.el.tagName + "." + (info.el.className || "").slice(0, 40) : "unknown") + " | Snippet: " + (info.snippet || "").slice(0, 200);
-                    triggerHandoff(state.locale, context);
+                    offerHandoff(state.locale, context);
                 }
             };
             Observer.onConfusion = function () {
@@ -973,9 +1030,11 @@
 
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
-    var _proactiveAbort = null;
+    var _proactiveAbort = null, _lastProactiveAt = 0;
     function doProactive(overridePrompt, overrideSnapshot) {
         if (!_st || !_cfg || _st.open || _st.busy) return;
+        if (Date.now() - _lastProactiveAt < 20000) return;
+        _lastProactiveAt = Date.now();
         if (_proactiveAbort) { try { _proactiveAbort.abort(); } catch (e) { } }
         _proactiveAbort = new AbortController();
         var currentAbort = _proactiveAbort;
@@ -985,24 +1044,18 @@
         var to = setTimeout(function () { currentAbort.abort(); }, 12000);
         fetch(_cfg.backendUrl, {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ apiKey: _cfg.apiKey, conversationId: _st.conversationId, prompt: overridePrompt || "", proactive: true, domSnapshot: snap, siteDNA: dna, pageContent: collectContent(), selectedText: "", history: [], url: location.href, title: document.title, locale: normLocale(_st.locale), hoverContext: snap._hoverContext || "" }),
+            body: JSON.stringify({ apiKey: _cfg.apiKey, siteKey: _cfg.siteKey, conversationId: _st.conversationId, prompt: overridePrompt || "", proactive: true, domSnapshot: snap, siteDNA: dna, pageContent: collectContent(), selectedText: "", history: [], url: location.href, title: document.title, locale: normLocale(_st.locale), hoverContext: snap._hoverContext || "" }),
             signal: currentAbort.signal
-        }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (data) {
+        }).then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; }).then(function (data) {
             clearTimeout(to);
             if (currentAbort !== _proactiveAbort) return;
-            if (!data || data.status === "silent_abort" || _st.open) return;
+            if (!data || data.status !== "ok" || _st.open) return;
             if (data.interactive) {
                 Whisper.hide();
                 InteractiveWhisper.render(data.interactive, _st.locale);
             } else if (data.reply) {
                 InteractiveWhisper.hide();
                 Whisper.show(data.reply.slice(0, 160), "proactive");
-            }
-            if (data.action) {
-                safetyShield(data.action, _st.locale,
-                    function () { execAction(data.action); },
-                    function () { }
-                );
             }
         }).catch(function () { clearTimeout(to); });
     }
@@ -1014,7 +1067,7 @@
         try {
             var r = await fetch(cfg.backendUrl, {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ apiKey: cfg.apiKey, conversationId: state.conversationId, prompt: maskPII(prompt), pageContent: maskPII(collectContent()), siteDNA: dna, selectedText: maskPII(state.selectedText), history: maskHist(state.history), url: location.href, title: document.title, locale: normLocale(locale), domSnapshot: snap }),
+                body: JSON.stringify({ apiKey: cfg.apiKey, siteKey: cfg.siteKey, conversationId: state.conversationId, prompt: maskPII(prompt), pageContent: maskPII(collectContent()), siteDNA: dna, selectedText: maskPII(state.selectedText), history: maskHist(state.history), url: location.href, title: document.title, locale: normLocale(locale), domSnapshot: snap }),
                 signal: ctrl.signal
             });
             if (r.status === 404) {
@@ -1025,8 +1078,8 @@
             }
             var d = await r.json().catch(function () { return {}; });
             if (!d || d.status === "silent_abort") return { reply: "", cssCommand: "", action: null, interactive: null };
-            if (d.status === "blocked" && d.reply) return { reply: "⚠️ " + d.reply, cssCommand: "", action: null, interactive: null };
-            if (!r.ok) throw new Error(d.error || d.reply || "HTTP " + r.status);
+            if (d.status === "blocked" && d.reply) return { reply: "⚠️ " + d.reply, cssCommand: "", action: d.action && d.action.type === "disable_widget" ? d.action : null, interactive: null };
+            if (!r.ok) throw new Error("HTTP " + r.status);
             return { reply: d.reply || "", cssCommand: d.cssCommand || "", action: d.action || null, interactive: d.interactive || null };
         } finally { clearTimeout(to); }
     }
@@ -1468,7 +1521,7 @@
                     }
                     break;
                 case "handoff":
-                    triggerHandoff(_st ? _st.locale : "en", "User requested human agent via chat.");
+                    requestHandoff(_st ? _st.locale : "en", "User requested human agent via chat.", act.priority);
                     break;
                 case "warp":
                     var warpTarget = resolveWarpTarget(act);

@@ -37,6 +37,7 @@ const MAX_ENTITY_TEXT = 700;
 const MAX_ENTITY_DESCRIPTION = 600;
 const MAX_BRAIN_PAGE_CHARS = 5000;
 const MAX_BRAIN_ENTITY_ITEMS = 30;
+const ALLOWED_TENANT_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gpt-5.6-terra', 'gpt-5.6-sol', 'llama-3.3-70b-versatile']);
 
 const GROUNDED_INTENTS = new Set([
     'recommend_products',
@@ -103,6 +104,20 @@ async function logTenantEvent(tenantId, type, message, metadata = {}) {
         metadata: { tenantId, ...metadata },
         timestamp: new Date().toISOString()
     });
+}
+
+async function getTenantRuntimeSettings(tenantId) {
+    if (!tenantId || tenantId === 'demo') return {};
+    const db = await connectToDatabase();
+    if (!db) return {};
+    const settings = await db.collection('settings').findOne({ id: tenantId }) || {};
+    const temperature = Number(settings.temperature);
+    const model = cleanText(settings.system_model, 120);
+    return {
+        systemPrompt: cleanText(settings.system_prompt, 1200),
+        model: ALLOWED_TENANT_MODELS.has(model) ? model : '',
+        temperature: Number.isFinite(temperature) ? Math.min(1, Math.max(0, temperature)) : undefined
+    };
 }
 
 const LOCALE_LABELS = {
@@ -359,10 +374,12 @@ function safeBrainOnlyAction(action) {
 }
 
 async function askBrain(payload, mergedHistory, requestId) {
+    const tenantSettings = payload.tenantSettings || {};
     const identity = {
         name: 'INDICATOR',
         role: 'Website Assistant',
-        purpose: 'Help users using verified public website information. Never invent a product or DOM target.'
+        purpose: 'Help users using verified public website information. Never invent a product or DOM target.' +
+            (tenantSettings.systemPrompt ? `\nTenant response guidance: ${tenantSettings.systemPrompt}` : '')
     };
 
     return indicatorAI.generate({
@@ -371,7 +388,8 @@ async function askBrain(payload, mergedHistory, requestId) {
         ragContext: appendBrainContext(payload),
         tools: toolRegistry.getAvailableTools(),
         userMessage: payload.prompt,
-        metadata: { requestId }
+        metadata: { requestId },
+        runtimeOptions: { model: tenantSettings.model, temperature: tenantSettings.temperature }
     });
 }
 
@@ -525,6 +543,7 @@ async function handler(req, res) {
         const requestId = generateRequestId();
         const tenantId = tenant.tenantInfo && tenant.tenantInfo.id || 'demo';
         logTenantEvent(tenantId, 'chat', `Chat request from ${tenant.tenantInfo && (tenant.tenantInfo.company_name || tenantId) || tenantId}`, { requestId }).catch(() => { });
+        const tenantSettings = await getTenantRuntimeSettings(tenantId).catch(() => ({}));
         const payload = {
             prompt: maskPII(rawPrompt),
             isProactive: body.proactive === true,
@@ -538,6 +557,7 @@ async function handler(req, res) {
             locale: normalizeLocale(body.locale),
             conversationId: cleanText(body.conversationId, 120),
             tenantId,
+            tenantSettings,
             siteProfile
         };
 

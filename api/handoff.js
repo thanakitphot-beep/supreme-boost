@@ -1,0 +1,80 @@
+'use strict';
+
+const crypto = require('crypto');
+const { connectToDatabase } = require('./_mongodb');
+const { maskPII } = require('../services/safety');
+const { checkRateLimit } = require('../services/rateLimit');
+const { applyPluginCors, authorizePluginRequest } = require('../services/tenantAccess');
+
+function cleanText(value, max) {
+    return maskPII(String(value || '').replace(/\s+/g, ' ').trim()).slice(0, max);
+}
+
+function safeContact(settings = {}) {
+    const contact = {};
+    const email = cleanText(settings.support_email, 200);
+    const phone = cleanText(settings.support_phone, 40);
+    const url = cleanText(settings.support_url, 500);
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email)) contact.email = email;
+    if (/^[+\d][\d\s()-]{5,30}$/u.test(phone)) contact.phone = phone;
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol === 'https:') contact.url = parsed.href;
+    } catch (_) { }
+    return contact;
+}
+
+module.exports = async function handoffHandler(req, res) {
+    if (!await applyPluginCors(req, res)) return res.status(403).json({ error: 'Origin is not allowed' });
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'api')) return;
+
+    const body = typeof req.body === 'object' && req.body ? req.body : {};
+    const access = await authorizePluginRequest({ apiKey: body.apiKey, origin: req.headers.origin });
+    if (access.error) return res.status(403).json({ error: access.error });
+    if (!access.tenant || access.tenant.id === 'demo') {
+        return res.status(200).json({ status: 'unavailable', message: 'หน้านี้เป็นตัวอย่าง จึงยังไม่มีเจ้าหน้าที่สำหรับรับเรื่อง' });
+    }
+
+    const db = await connectToDatabase();
+    if (!db) return res.status(503).json({ error: 'Support queue is temporarily unavailable' });
+
+    const tenantId = access.tenant.id;
+    const idempotencyKey = cleanText(body.idempotencyKey, 120) || crypto.randomUUID();
+    const existing = await db.collection('handoff_tickets').findOne({ tenant_id: tenantId, idempotency_key: idempotencyKey });
+    if (existing) {
+        return res.status(200).json({ status: existing.status, ticketId: existing.id, contact: existing.contact || {}, message: 'คำขอของคุณอยู่ในคิวแล้ว' });
+    }
+
+    const settings = await db.collection('settings').findOne({ id: tenantId }) || {};
+    const contact = safeContact(settings);
+    const now = new Date().toISOString();
+    const priority = body.priority === 'high' ? 'high' : 'normal';
+    const ticket = {
+        id: `handoff_${crypto.randomUUID()}`,
+        tenant_id: tenantId,
+        idempotency_key: idempotencyKey,
+        status: 'queued',
+        priority,
+        reason: cleanText(body.reason, 500),
+        summary: cleanText(body.summary, 1600),
+        conversation: Array.isArray(body.history) ? body.history.slice(-8).map(item => ({
+            role: item && item.role === 'assistant' ? 'assistant' : 'user',
+            text: cleanText(item && item.text, 600)
+        })).filter(item => item.text) : [],
+        page: { url: cleanText(body.url, 500), title: cleanText(body.title, 200) },
+        contact,
+        created_at: now,
+        updated_at: now
+    };
+    await db.collection('handoff_tickets').insertOne(ticket);
+    await db.collection('logs').insertOne({
+        id: crypto.randomUUID(),
+        type: 'handoff',
+        message: `Human handoff requested: ${ticket.reason || 'Visitor requested support'}`,
+        metadata: { tenantId, ticketId: ticket.id, priority },
+        timestamp: now
+    });
+    return res.status(201).json({ status: 'queued', ticketId: ticket.id, contact, message: 'คำขอถูกส่งเข้าคิวเจ้าหน้าที่แล้ว' });
+};

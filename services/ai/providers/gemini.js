@@ -6,7 +6,7 @@ class GeminiProvider extends BaseProvider {
         if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
         // Use config model or fallback to gemini-2.5-flash
-        const model = this.config.model || process.env.AI_NORMAL_MODEL || 'gemini-2.5-flash';
+        const model = options.model || this.config.model || process.env.AI_NORMAL_MODEL || 'gemini-2.5-flash';
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
         
         // Convert messages to Gemini format

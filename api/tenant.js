@@ -61,7 +61,7 @@ module.exports = async function handler(req, res) {
                 return res.status(200).json({ data: data || [] });
             }
             if (action === 'logs') {
-                const data = await db.collection('logs').find({ type: 'chat', 'metadata.tenantId': tenant.id }).sort({ timestamp: -1 }).limit(100).toArray();
+                const data = await db.collection('logs').find({ type: { $in: ['chat', 'handoff'] }, 'metadata.tenantId': tenant.id }).sort({ timestamp: -1 }).limit(100).toArray();
                 return res.status(200).json({ logs: data || [] });
             }
         }
@@ -75,6 +75,9 @@ module.exports = async function handler(req, res) {
                 if (body.system_prompt !== undefined) payload.system_prompt = body.system_prompt;
                 if (body.theme_color !== undefined) payload.theme_color = body.theme_color;
                 if (body.temperature !== undefined) payload.temperature = body.temperature;
+                if (body.support_email !== undefined) payload.support_email = String(body.support_email || '').trim().slice(0, 200);
+                if (body.support_phone !== undefined) payload.support_phone = String(body.support_phone || '').trim().slice(0, 40);
+                if (body.support_url !== undefined) payload.support_url = String(body.support_url || '').trim().slice(0, 500);
                 payload.updated_at = new Date().toISOString();
                 
                 await db.collection('settings').updateOne({ id: tenant.id }, { $set: payload }, { upsert: true });
