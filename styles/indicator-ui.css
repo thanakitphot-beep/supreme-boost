@@ -334,3 +334,37 @@ body.indicator-app .btn-vl { background: linear-gradient(135deg,#7c3aed,#4f46e5)
 body.indicator-app .btn-gh { background: rgba(255,255,255,.06) !important; color: #cbd5e1 !important; border-color: rgba(255,255,255,.1) !important; }
 body.indicator-app .code-box,
 body.indicator-app .code-block { background: #030310 !important; border-color: rgba(139,92,246,.22) !important; }
+
+/* Override legacy light admin rules so tables and controls stay on the dark system. */
+body.indicator-app .tbl thead th { background: rgba(15,23,42,.72) !important; color: #94a3b8 !important; border-bottom-color: rgba(255,255,255,.09) !important; }
+body.indicator-app .tbl tbody tr { background: transparent !important; }
+body.indicator-app .tbl tbody tr:hover { background: rgba(255,255,255,.035) !important; }
+body.indicator-app .tbl tbody td { color: #cbd5e1 !important; border-bottom-color: rgba(255,255,255,.07) !important; }
+body.indicator-app .tbl tbody td [style*="color:var(--t1)"] { color: #f8fafc !important; }
+body.indicator-app .tbl tbody td [style*="color:var(--t3)"] { color: #94a3b8 !important; }
+body.indicator-app .btn-gh,
+body.indicator-app .btn-gh-vl,
+body.indicator-app .btn-gh-am,
+body.indicator-app .btn-gh-rs,
+body.indicator-app .ref-btn,
+body.indicator-app .m-close { background: rgba(255,255,255,.07) !important; color: #e2e8f0 !important; border-color: rgba(255,255,255,.14) !important; }
+body.indicator-app .btn-gh:hover,
+body.indicator-app .btn-gh-vl:hover,
+body.indicator-app .btn-gh-am:hover,
+body.indicator-app .btn-gh-rs:hover,
+body.indicator-app .ref-btn:hover,
+body.indicator-app .m-close:hover { background: rgba(255,255,255,.13) !important; color: #fff !important; border-color: rgba(255,255,255,.25) !important; }
+body.indicator-app .adm-pill { background: rgba(255,255,255,.04) !important; border-color: rgba(255,255,255,.1) !important; }
+body.indicator-app .adm-av { background: rgba(139,92,246,.22) !important; color: #c4b5fd !important; }
+body.indicator-app .logout-btn { background: rgba(244,63,94,.08) !important; color: #fda4af !important; border-color: rgba(244,63,94,.25) !important; }
+body.indicator-app .logout-btn:hover { background: rgba(244,63,94,.16) !important; border-color: rgba(251,113,133,.45) !important; }
+body.indicator-app .ver-badge { background: rgba(255,255,255,.07) !important; color: #cbd5e1 !important; border-color: rgba(255,255,255,.12) !important; }
+body.indicator-app .badge { background: rgba(255,255,255,.08) !important; color: #cbd5e1 !important; border-color: rgba(255,255,255,.13) !important; }
+body.indicator-app .badge-active,
+body.indicator-app .badge-approved { background: rgba(16,185,129,.14) !important; color: #6ee7b7 !important; border-color: rgba(16,185,129,.3) !important; }
+body.indicator-app .badge-pending { background: rgba(245,158,11,.14) !important; color: #fcd34d !important; border-color: rgba(245,158,11,.3) !important; }
+body.indicator-app .badge-suspended,
+body.indicator-app .badge-rejected { background: rgba(244,63,94,.14) !important; color: #fda4af !important; border-color: rgba(244,63,94,.3) !important; }
+body.indicator-app .badge-pkg { background: rgba(139,92,246,.14) !important; color: #c4b5fd !important; border-color: rgba(139,92,246,.3) !important; }
+body.indicator-app .card .fi,
+body.indicator-app .srch .fi { background: rgba(15,23,42,.78) !important; color: #f8fafc !important; }
