@@ -1,7 +1,7 @@
 (function () {
     "use strict";
     var _cs = document.currentScript;
-    console.log("[INDICATOR WEB CHAT] v6.0 — Triple-Brain Matrix + Layout Fortress ✓");
+    console.log("[INDICATOR] Website assistant ready");
 
     var WIDGET_ID = "supreme-boost-root";
     var STYLE_ID = "supreme-boost-style";
@@ -438,7 +438,7 @@
         setPref: function (k, v) { this.set("prefs", k, v); }
     };
 
-    // ─── Behavioral Observer (Autonomous Brain) ───────────────────
+    // ─── Behavioral Observer ──────────────────────────────────────
 
     var Observer = {
         _trail: [], _scrollHist: [], _clicks: [], _hoverEl: null, _hoverSec: null, _hoverStart: 0, _hoverTimer: null, _lastY: 0, _enabled: true, _listeners: [],
@@ -642,7 +642,13 @@
 
     var Whisper = { _el: null, _timer: null, _visible: false, init: function (shadow) { this._el = document.getElementById(WIDGET_ID + "-whisper"); }, show: function (text, type) { if (!this._el) return; if (this._timer) clearTimeout(this._timer); var label = "⚡ AI INSIGHT"; if (type === "proactive") label = "🔮 AI ตรวจจับ"; else if (type === "greeting") label = "🤖 AI ทักทาย"; else if (type === "hint") label = "💡 คำแนะนำ"; var words = text.split(" "); var spans = words.map(function (w, i) { return '<span style="opacity:0;display:inline-block;transform:translateY(10px) scale(0.9);animation:sbFloatWord 0.5s cubic-bezier(0.34,1.56,0.64,1) ' + (0.08 + i * 0.06) + 's forwards;">' + w + '</span>'; }).join(' '); this._el.innerHTML = '<span class="sb-whisper-label">' + label + '</span>' + spans; this._el.className = "sb-whisper sb-whisper-" + (type || "info"); this._el.style.opacity = "1"; this._el.style.transform = "translateY(0) scale(1)"; this._visible = true; this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS); }, hide: function () { if (!this._el || !this._visible) return; this._visible = false; this._el.style.opacity = "0"; this._el.style.transform = "translateY(10px) scale(0.95)"; if (this._timer) { clearTimeout(this._timer); this._timer = null; } }, isVisible: function () { return this._visible; } };
 
-    Whisper.show = function (text, type) { if (!this._el) return; if (this._timer) clearTimeout(this._timer); var label = "AI INSIGHT"; if (type === "proactive") label = "AI ตรวจจับ"; else if (type === "greeting") label = "AI ทักทาย"; else if (type === "hint") label = "คำแนะนำ"; this._el.textContent = ""; var labelEl = document.createElement("span"); labelEl.className = "sb-whisper-label"; labelEl.textContent = label; this._el.appendChild(labelEl); String(text || "").split(/(\s+)/).forEach(function (word, index) { if (!word) return; var span = document.createElement("span"); span.textContent = word; if (!/^\s+$/.test(word)) { span.style.opacity = "0"; span.style.display = "inline-block"; span.style.transform = "translateY(10px) scale(0.9)"; span.style.animation = "sbFloatWord 0.5s cubic-bezier(0.34,1.56,0.64,1) " + (0.08 + index * 0.06) + "s forwards"; } this._el.appendChild(span); }.bind(this)); this._el.className = "sb-whisper sb-whisper-" + (type || "info"); this._el.style.opacity = "1"; this._el.style.transform = "translateY(0) scale(1)"; this._visible = true; this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS); };
+    Whisper.show = function (text, type) { if (!this._el) return; if (this._timer) clearTimeout(this._timer); var label = "คำแนะนำ"; if (type === "proactive") label = "ความช่วยเหลือ"; else if (type === "greeting") label = "ยินดีต้อนรับ"; else if (type === "hint") label = "คำแนะนำ"; this._el.textContent = ""; var labelEl = document.createElement("span"); labelEl.className = "sb-whisper-label"; labelEl.textContent = label; this._el.appendChild(labelEl); String(text || "").split(/(\s+)/).forEach(function (word, index) { if (!word) return; var span = document.createElement("span"); span.textContent = word; if (!/^\s+$/.test(word)) { span.style.opacity = "0"; span.style.display = "inline-block"; span.style.transform = "translateY(10px) scale(0.9)"; span.style.animation = "sbFloatWord 0.2s ease-out " + (0.02 + index * 0.02) + "s forwards"; } this._el.appendChild(span); }.bind(this)); this._el.className = "sb-whisper sb-whisper-" + (type || "info"); this._el.style.opacity = "1"; this._el.style.transform = "translateY(0) scale(1)"; this._visible = true; this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS); };
+
+    function applyProductStyles(shadow) {
+        var style = document.createElement("style");
+        style.textContent = ':host{--ai-primary:#2563eb;--ai-glow:rgba(37,99,235,.18);--ai-soft:rgba(37,99,235,.10);--ai-bg:#ffffff;--ai-text:#172033;--ai-muted:#64748b;--ai-border:#e2e8f0;--ai-glass:#ffffff;--ai-glass-b:#e2e8f0;--ai-r:12px;--ai-neon:none}.sb-orb,:host(.sb-brain-groq) .sb-orb,:host(.sb-brain-cohere) .sb-orb,:host(.sb-brain-gemini) .sb-orb{width:52px;height:52px;border-radius:14px;background:#2563eb;box-shadow:0 4px 12px rgba(37,99,235,.24);animation:none}.sb-orb::before{display:none}.sb-orb::after{content:"\\1F4AC";font-size:19px}.sb-panel{background:#fff;border-color:#e2e8f0;box-shadow:0 16px 36px rgba(15,23,42,.16);transform:none}.sb-header{background:#fff;color:#172033;border-bottom:1px solid #e2e8f0;animation:none}.sb-title{color:#172033}.sb-subtitle{color:#64748b;opacity:1}.sb-icon-btn{border-color:#cbd5e1;background:#fff;color:#475569}.sb-icon-btn:hover{background:#f8fafc;transform:none}.sb-messages{background:#fff}.sb-user{background:#2563eb;color:#fff;animation:none}.sb-assistant{background:#f8fafc;color:#172033;border-color:#e2e8f0;box-shadow:none;animation:none}.sb-quick,.sb-compose{background:#fff;border-color:#e2e8f0}.sb-chip{background:#fff;color:#334155;border-color:#cbd5e1;box-shadow:none}.sb-chip:hover{background:#f8fafc;border-color:#94a3b8;transform:none;box-shadow:none}.sb-input{background:#fff;color:#172033;border-color:#cbd5e1}.sb-input::placeholder{color:#94a3b8}.sb-input:focus{background:#fff;color:#172033;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.10)}.sb-send{background:#2563eb;box-shadow:none;border-radius:8px}.sb-send:hover{background:#1d4ed8;transform:none}.sb-whisper-container{display:none!important}';
+        shadow.appendChild(style);
+    }
 
     function triggerHandoff(locale, context) { _handoffCount++; var strs = t(locale); if (!_st || !_msgs) return; setOpen(true); var card = document.createElement("div"); card.className = "sb-msg sb-assistant sb-handoff"; card.innerHTML = '<div style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border-radius:12px;padding:16px;text-align:center;animation:sbSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1);"><div style="font-size:24px;margin-bottom:4px;">\uD83D\uDC68\u200D\uD83D\uDCBB</div><div style="font-weight:700;font-size:15px;margin-bottom:4px;">' + strs.handoffTitle + '</div><div style="font-size:12px;opacity:0.9;margin-bottom:10px;">' + strs.handoffBody + '</div><div style="background:rgba(255,255,255,0.2);border-radius:8px;padding:8px;font-size:11px;text-align:left;line-height:1.5;"><strong>' + strs.handoffSummary + ':</strong><br>' + escHtml(context.slice(0, 300)) + '</div><div style="margin-top:10px;font-size:11px;opacity:0.7;">ID #' + _handoffCount + '</div></div>'; _msgs.appendChild(card); _msgs.scrollTop = _msgs.scrollHeight; SessionDB.setPref("handoff", { count: _handoffCount, time: Date.now(), context: context.slice(0, 300) }); }
 
@@ -668,9 +674,10 @@
             var styleEl = document.createElement("style");
             styleEl.textContent = buildShadowStyles(cfg);
             shadow.appendChild(styleEl);
+            applyProductStyles(shadow);
 
             var whisperContainer = document.createElement("div"); whisperContainer.className = "sb-whisper-container";
-            var whisper = document.createElement("div"); whisper.id = WIDGET_ID + "-whisper"; whisper.className = "sb-whisper";
+            var whisper = document.createElement("div"); whisper.id = WIDGET_ID + "-whisper"; whisper.className = "sb-whisper"; whisper.style.display = "none";
             var panel = document.createElement("section"); panel.className = "sb-panel";
             panel.innerHTML = '<div class="sb-header"><div style="display:flex;align-items:center;gap:8px;"><img src="/INDICATOR.png" alt="Logo" style="width:28px;height:28px;object-fit:cover;border-radius:50%;border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"><div><div class="sb-title">' + cfg.title + '</div><div class="sb-subtitle"></div></div></div><div class="sb-actions"><button class="sb-icon-btn" type="button" data-action="theme">\u25D0</button><button class="sb-icon-btn" type="button" data-action="close">\u00D7</button></div></div><div class="sb-messages"></div><div class="sb-quick"></div><form class="sb-compose"><textarea class="sb-input" rows="1"></textarea><button class="sb-voice-btn" type="button" style="background:transparent;border:0;cursor:pointer;font-size:18px;color:#64748b;padding:0 8px;transition:color 0.2s;" title="พูดด้วยเสียง">\uD83C\uDFA4</button><button class="sb-send" type="submit"></button></form>';
             var orb = document.createElement("button"); orb.className = "sb-orb"; orb.type = "button";
@@ -762,6 +769,7 @@
             };
 
             AmbientUI.init(root, shadow, pri);
+            AmbientUI.showAura = function () { };
             Whisper.init(shadow);
             InteractiveWhisper.init(shadow);
             InlineShelf.init();
@@ -796,7 +804,7 @@
             input.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); } });
             document.addEventListener("selectionchange", function () { var s = window.getSelection(), t = s ? s.toString().trim() : ""; if (t.length > 20) state.selectedText = t.slice(0, 1200); });
 
-            // ─── Autonomous Brain — fires on behavior metrics without user invocation ───
+            // ─── Contextual assistance — fires on behavior metrics without user invocation ───
             Observer.onHesitation = function (info) {
                 if (state.open || state.busy) return;
                 Whisper.hide(); AmbientUI.showAura(info.element); AmbientUI.setState("watching");

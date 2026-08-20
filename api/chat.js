@@ -19,6 +19,7 @@ const { enabled: intelligenceEnabled, answerWithIntelligence } = require('../ser
 const { maskPII, maskDOMSnapshot } = require('../services/safety');
 const { checkRateLimit } = require('../services/rateLimit');
 const { applyPluginCors, authorizePluginRequest } = require('../services/tenantAccess');
+const { connectToDatabase } = require('./_mongodb');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -69,6 +70,39 @@ function cleanText(value, maxLength) {
 
 function cleanOptionalText(value, maxLength) {
     return cleanText(typeof value === 'string' ? value : '', maxLength);
+}
+
+function knowledgeScore(query, chunk) {
+    const terms = cleanText(query, 300).toLowerCase().split(/\s+/).filter(term => term.length > 2);
+    const haystack = `${chunk.title || ''} ${chunk.source || ''} ${chunk.content || ''}`.toLowerCase();
+    return terms.reduce((score, term) => score + (haystack.includes(term) ? 1 : 0), 0);
+}
+
+async function getTenantKnowledgeContext(tenantId, query) {
+    if (!tenantId || tenantId === 'demo' || !query) return '';
+    const db = await connectToDatabase();
+    if (!db) return '';
+    const chunks = await db.collection('knowledge_chunks').find({ tenant_id: tenantId }).sort({ created_at: -1 }).limit(50).toArray();
+    return chunks
+        .map(chunk => ({ chunk, score: knowledgeScore(query, chunk) }))
+        .filter(item => item.score > 0)
+        .sort((left, right) => right.score - left.score)
+        .slice(0, 5)
+        .map(item => `[Source: ${item.chunk.title || item.chunk.source || 'Tenant knowledge'}]\n${cleanText(item.chunk.content, 1600)}`)
+        .join('\n\n');
+}
+
+async function logTenantEvent(tenantId, type, message, metadata = {}) {
+    if (!tenantId || tenantId === 'demo') return;
+    const db = await connectToDatabase();
+    if (!db) return;
+    await db.collection('logs').insertOne({
+        id: generateRequestId(),
+        type,
+        message: cleanText(message, 500),
+        metadata: { tenantId, ...metadata },
+        timestamp: new Date().toISOString()
+    });
 }
 
 const LOCALE_LABELS = {
@@ -471,14 +505,6 @@ async function handler(req, res) {
             });
         }
 
-        if (supabase && tenant.tenantInfo) {
-            supabase.from('logs').insert({
-                type: 'info',
-                message: `Chat request from ${tenant.tenantInfo.company_name || tenant.tenantInfo.id}`,
-                metadata: { tenantId: tenant.tenantInfo.id }
-            }).then(() => { }).catch(() => { });
-        }
-
         const rawPrompt = cleanText(body.prompt, MAX_PROMPT_CHARS);
         const siteProfile = resolveSiteProfile(cleanText(body.siteKey || body.apiKey, 300));
 
@@ -497,6 +523,8 @@ async function handler(req, res) {
         }
 
         const requestId = generateRequestId();
+        const tenantId = tenant.tenantInfo && tenant.tenantInfo.id || 'demo';
+        logTenantEvent(tenantId, 'chat', `Chat request from ${tenant.tenantInfo && (tenant.tenantInfo.company_name || tenantId) || tenantId}`, { requestId }).catch(() => { });
         const payload = {
             prompt: maskPII(rawPrompt),
             isProactive: body.proactive === true,
@@ -509,6 +537,7 @@ async function handler(req, res) {
             title: maskPII(cleanText(body.title, 200)),
             locale: normalizeLocale(body.locale),
             conversationId: cleanText(body.conversationId, 120),
+            tenantId,
             siteProfile
         };
 
@@ -540,7 +569,7 @@ async function handler(req, res) {
 
         payload.expertKnowledge = getSiteKnowledge(siteProfile);
 
-        const conversationId = payload.conversationId || requestId;
+        const conversationId = `${tenantId}:${payload.conversationId || requestId}`;
         const mergedHistory = (await memoryManager.getMergedHistory(
             conversationId,
             payload.history
@@ -554,9 +583,9 @@ async function handler(req, res) {
             await memoryManager.addMessage(conversationId, 'user', payload.prompt);
         }
 
-        payload.ragContext = '';
-        if (rawPrompt && supabase) {
-            const ragTenantId = tenant.tenantInfo ? tenant.tenantInfo.id : 'demo';
+        payload.ragContext = await getTenantKnowledgeContext(tenantId, rawPrompt).catch(() => '');
+        if (!payload.ragContext && rawPrompt && supabase) {
+            const ragTenantId = tenantId;
             try {
                 payload.ragContext = await getRagContext(
                     supabase,
@@ -635,8 +664,8 @@ async function handler(req, res) {
         return res.status(200).json(result);
     } catch (error) {
         console.error('Fatal handler error:', error);
-        return res.status(200).json({
-            reply: '⚡ ระบบ AI กำลังอัปเดต รบกวนลองอีกครั้งสักครู่นะครับ',
+        return res.status(503).json({
+            reply: 'ระบบตอบคำถามไม่พร้อมใช้งานชั่วคราว กรุณาลองอีกครั้งในอีกสักครู่',
             cssCommand: '',
             action: null,
             interactive: null,

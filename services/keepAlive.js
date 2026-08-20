@@ -33,6 +33,7 @@ async function pingOnce(url) {
             headers: { 'User-Agent': 'INDICATOR-KeepAlive/1.0' }
         });
         clearTimeout(timeout);
+        if (!res.ok) throw new Error(`Health endpoint returned HTTP ${res.status}`);
         return res.status;
     } catch (err) {
         clearTimeout(timeout);

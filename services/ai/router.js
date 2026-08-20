@@ -1,24 +1,38 @@
 const { logEvent } = require('./logger');
-
 const OpenAIProvider = require('./providers/openai');
 const GeminiProvider = require('./providers/gemini');
 const GroqProvider = require('./providers/groq');
 const LocalProvider = require('./providers/local');
 
+const PROVIDER_NAMES = new Set(['openai', 'gemini', 'groq', 'local']);
+
+function boundedInteger(value, fallback, minimum, maximum) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.min(maximum, Math.max(minimum, parsed)) : fallback;
+}
+
+function providerHasCredentials(name) {
+    if (name === 'openai') return Boolean(process.env.OPENAI_API_KEY);
+    if (name === 'gemini') return Boolean(process.env.GEMINI_API_KEY);
+    if (name === 'groq') return Boolean(process.env.GROQ_API_KEY || process.env.API_KEY);
+    if (name === 'local') return Boolean(process.env.LOCAL_AI_BASE_URL);
+    return false;
+}
+
+function defaultProvider() {
+    return ['openai', 'gemini', 'groq', 'local'].find(providerHasCredentials) || 'groq';
+}
+
 class CircuitBreaker {
-    constructor(maxFailures = 3, resetTimeout = 60000) {
-        this.states = {}; // providerName -> state
+    constructor(maxFailures, resetTimeout) {
+        this.states = {};
         this.maxFailures = maxFailures;
         this.resetTimeout = resetTimeout;
     }
 
     getState(providerName) {
         if (!this.states[providerName]) {
-            this.states[providerName] = {
-                failures: 0,
-                status: 'CLOSED', // CLOSED, OPEN, HALF_OPEN
-                nextTry: 0
-            };
+            this.states[providerName] = { failures: 0, status: 'CLOSED', nextTry: 0, probeInFlight: false };
         }
         return this.states[providerName];
     }
@@ -26,40 +40,45 @@ class CircuitBreaker {
     canAttempt(providerName) {
         const state = this.getState(providerName);
         if (state.status === 'CLOSED') return true;
-        if (state.status === 'OPEN') {
-            if (Date.now() > state.nextTry) {
-                state.status = 'HALF_OPEN';
-                return true;
-            }
-            return false;
+        if (state.status === 'OPEN' && Date.now() > state.nextTry && !state.probeInFlight) {
+            state.status = 'HALF_OPEN';
+            state.probeInFlight = true;
+            return true;
         }
-        return true; // HALF_OPEN allows one attempt
+        return false;
     }
 
     recordSuccess(providerName) {
         const state = this.getState(providerName);
         state.failures = 0;
         state.status = 'CLOSED';
+        state.probeInFlight = false;
     }
 
     recordFailure(providerName) {
         const state = this.getState(providerName);
+        state.probeInFlight = false;
         state.failures++;
         if (state.failures >= this.maxFailures) {
             state.status = 'OPEN';
-            // Exponential backoff for reset timeout could be implemented here
-            const backoff = Math.min(this.resetTimeout * Math.pow(2, state.failures - this.maxFailures), 300000); // max 5 min
-            state.nextTry = Date.now() + backoff;
+            state.nextTry = Date.now() + Math.min(this.resetTimeout * Math.pow(2, state.failures - this.maxFailures), 300000);
+        } else {
+            state.status = 'CLOSED';
         }
+    }
+
+    snapshot() {
+        return Object.fromEntries(Object.entries(this.states).map(([name, state]) => [name, {
+            failures: state.failures,
+            status: state.status,
+            nextTry: state.nextTry
+        }]));
     }
 }
 
 class ModelRouter {
     constructor() {
-        this.circuitBreaker = new CircuitBreaker(
-            process.env.AI_CIRCUIT_MAX_FAILURES ? parseInt(process.env.AI_CIRCUIT_MAX_FAILURES) : 3,
-            60000
-        );
+        this.circuitBreaker = new CircuitBreaker(boundedInteger(process.env.AI_CIRCUIT_MAX_FAILURES, 3, 1, 10), 60000);
         this.providers = {
             openai: new OpenAIProvider({}),
             gemini: new GeminiProvider({}),
@@ -68,97 +87,84 @@ class ModelRouter {
         };
     }
 
+    resolveProviderName(name, fallback) {
+        const candidate = String(name || '').toLowerCase().trim();
+        return PROVIDER_NAMES.has(candidate) ? candidate : fallback;
+    }
+
     getProvider(name) {
-        // Use the provider name from config or fallback to groq
-        const providerName = name || 'groq';
-        return { name: providerName, instance: this.providers[providerName] || this.providers['groq'] };
+        const providerName = this.resolveProviderName(name, defaultProvider());
+        return { name: providerName, instance: this.providers[providerName] };
+    }
+
+    runtimeStatus() {
+        const primary = this.resolveProviderName(process.env.AI_PRIMARY_PROVIDER, defaultProvider());
+        const fallback = this.resolveProviderName(process.env.AI_FALLBACK_PROVIDER, 'groq');
+        return {
+            primary,
+            fallback,
+            primaryConfigured: providerHasCredentials(primary),
+            fallbackConfigured: providerHasCredentials(fallback),
+            circuits: this.circuitBreaker.snapshot()
+        };
     }
 
     async generateWithRetry(payload, options = {}, requestId) {
-        const maxRetries = process.env.AI_MAX_RETRIES ? parseInt(process.env.AI_MAX_RETRIES) : 2;
-        const timeoutMs = process.env.AI_REQUEST_TIMEOUT_MS ? parseInt(process.env.AI_REQUEST_TIMEOUT_MS) : 15000;
-        
-        const primaryConfig = this.getProvider(process.env.AI_PRIMARY_PROVIDER);
-        const fallbackConfig = this.getProvider(process.env.AI_FALLBACK_PROVIDER || 'groq');
-
-        let attempts = 0;
+        const maxRetries = boundedInteger(process.env.AI_MAX_RETRIES, 1, 0, 2);
+        const perAttemptTimeout = boundedInteger(process.env.AI_REQUEST_TIMEOUT_MS, 12000, 2000, 15000);
+        const deadlineAt = options.deadlineAt || Date.now() + boundedInteger(process.env.AI_TOTAL_TIMEOUT_MS, 22000, 5000, 30000);
+        const primary = this.getProvider(process.env.AI_PRIMARY_PROVIDER);
+        const fallback = this.getProvider(process.env.AI_FALLBACK_PROVIDER || 'groq');
+        const candidates = primary.name === fallback.name ? [primary] : [primary, fallback];
         let lastError = null;
-        let currentProvider = primaryConfig;
 
-        while (attempts <= maxRetries) {
-            attempts++;
-            
-            // Check Circuit Breaker
-            if (!this.circuitBreaker.canAttempt(currentProvider.name)) {
-                logEvent('warn', 'Circuit breaker OPEN', { provider: currentProvider.name, requestId });
-                if (currentProvider.name !== fallbackConfig.name) {
-                    logEvent('info', 'Switching to fallback provider', { fallback: fallbackConfig.name, requestId });
-                    currentProvider = fallbackConfig;
-                    attempts = 1; // reset attempts for fallback
-                    continue;
-                } else {
-                    throw new Error(`All providers failed or circuit open. Last error: ${lastError?.message}`);
-                }
+        for (const currentProvider of candidates) {
+            if (!providerHasCredentials(currentProvider.name)) {
+                lastError = new Error(`${currentProvider.name} provider is not configured`);
+                continue;
             }
 
-            const abortController = new AbortController();
-            const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
-            const callOptions = { ...options, signal: abortController.signal };
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                if (!this.circuitBreaker.canAttempt(currentProvider.name)) {
+                    lastError = new Error(`${currentProvider.name} circuit is open`);
+                    break;
+                }
+                const remaining = deadlineAt - Date.now();
+                if (remaining < 1000) throw new Error('AI request deadline exceeded');
 
-            const startTime = Date.now();
-            try {
-                logEvent('info', `Calling provider`, { provider: currentProvider.name, attempt: attempts, requestId });
-                
-                const response = await currentProvider.instance.generate(payload, callOptions);
-                
-                clearTimeout(timeoutId);
-                this.circuitBreaker.recordSuccess(currentProvider.name);
-                
-                logEvent('info', 'Provider success', { 
-                    provider: currentProvider.name, 
-                    latencyMs: Date.now() - startTime,
-                    requestId 
-                });
-                
-                return { response, metadata: { provider: currentProvider.name, latency: Date.now() - startTime } };
-            } catch (err) {
-                clearTimeout(timeoutId);
-                lastError = err;
-                
-                const isAbort = err.name === 'AbortError';
-                const isRateLimit = err.isRateLimit;
-                
-                logEvent('warn', 'Provider failed', { 
-                    provider: currentProvider.name, 
-                    error: err.message,
-                    isAbort,
-                    isRateLimit,
-                    latencyMs: Date.now() - startTime,
-                    requestId 
-                });
-
-                if (isAbort || !isRateLimit || err.status >= 500) {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), Math.min(perAttemptTimeout, remaining));
+                const startedAt = Date.now();
+                try {
+                    logEvent('info', 'Calling provider', { provider: currentProvider.name, attempt: attempt + 1, requestId });
+                    const response = await currentProvider.instance.generate(payload, { ...options, signal: controller.signal });
+                    clearTimeout(timeout);
+                    this.circuitBreaker.recordSuccess(currentProvider.name);
+                    return {
+                        response,
+                        metadata: { provider: currentProvider.name, latency: Date.now() - startedAt, fallback: currentProvider.name !== primary.name }
+                    };
+                } catch (error) {
+                    clearTimeout(timeout);
+                    lastError = error;
                     this.circuitBreaker.recordFailure(currentProvider.name);
-                }
-
-                if (attempts > maxRetries) {
-                    if (currentProvider.name !== fallbackConfig.name) {
-                        logEvent('info', 'Switching to fallback provider after max retries', { fallback: fallbackConfig.name, requestId });
-                        currentProvider = fallbackConfig;
-                        attempts = 1;
-                        continue;
+                    logEvent('warn', 'Provider failed', {
+                        provider: currentProvider.name,
+                        attempt: attempt + 1,
+                        requestId,
+                        status: error && error.status,
+                        aborted: error && error.name === 'AbortError'
+                    });
+                    if (attempt < maxRetries && deadlineAt - Date.now() > 1500) {
+                        await new Promise(resolve => setTimeout(resolve, Math.min(500 * (attempt + 1), 1000)));
                     }
-                    throw new Error(`All retries exhausted for ${currentProvider.name}. Last error: ${err.message}`);
                 }
-
-                // Exponential backoff
-                const backoffMs = Math.min(1000 * Math.pow(2, attempts) + Math.random() * 500, 5000);
-                await new Promise(r => setTimeout(r, backoffMs));
             }
         }
-        
-        throw lastError;
+        throw lastError || new Error('No configured AI provider is available');
     }
 }
 
 module.exports = new ModelRouter();
+module.exports.ModelRouter = ModelRouter;
+module.exports.providerHasCredentials = providerHasCredentials;

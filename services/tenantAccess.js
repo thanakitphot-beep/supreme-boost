@@ -58,7 +58,8 @@ async function authorizePluginRequest({ apiKey, origin }) {
 
     const canonical = canonicalOrigin(origin);
     if (tenantKeyRequired() && !canonical) return { error: 'Plugin requests must include a registered browser origin' };
-    if (canonical && !isOriginAllowed(canonical) && !normalizeAllowedOrigins(tenant.allowed_origins).includes(canonical)) {
+    const serviceOrigin = canonicalOrigin(process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
+    if (canonical && canonical !== serviceOrigin && !normalizeAllowedOrigins(tenant.allowed_origins).includes(canonical)) {
         return { error: 'This website origin is not registered for the tenant' };
     }
     return { tenant };

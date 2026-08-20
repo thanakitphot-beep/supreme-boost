@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INDICATOR WEB CHAT - The Intelligent Matrix for Websites</title>
+    <title>INDICATOR - Website Conversation Platform</title>
     <!-- SEO & Social Media Tags -->
-    <meta name="description" content="ยกระดับเว็บไซต์ของคุณด้วย INDICATOR WEB CHAT ผู้ช่วย AI อัจฉริยะ (Nanometer Architecture) ที่มีระบบเข้าอกเข้าใจและตอบโต้ลูกค้าได้อัตโนมัติ">
-    <meta name="keywords" content="AI Chatbot, แชทบอทอัจฉริยะ, ผู้ช่วย AI หน้าเว็บ, ระบบตอบกลับอัตโนมัติ, Indicator Web Chat, AI เว็บไซต์">
-    <meta property="og:title" content="INDICATOR WEB CHAT - ผู้ช่วย AI อัจฉริยะระดับนาโนเมตร">
-    <meta property="og:description" content="เปลี่ยนหน้าเว็บธรรมดาให้มีชีวิตชีวาด้วย AI อัจฉริยะที่สามารถตัดสินใจแทนคุณได้">
+    <meta name="description" content="INDICATOR ช่วยให้เว็บไซต์ตอบคำถามจากข้อมูลธุรกิจ นำทางผู้ใช้ และจัดการเนื้อหาจากศูนย์กลางเดียว">
+    <meta name="keywords" content="website chat, customer support, knowledge base, web assistant, Indicator">
+    <meta property="og:title" content="INDICATOR - Website Conversation Platform">
+    <meta property="og:description" content="เพิ่มช่องทางตอบคำถามบนเว็บไซต์จากข้อมูลธุรกิจที่ควบคุมได้">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://test-mu-cyan-21.vercel.app">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- PWA Settings -->
@@ -84,20 +84,21 @@
             -webkit-text-fill-color: transparent;
         }
     </style>
+    <link rel="stylesheet" href="/styles/indicator-ui.css">
 </head>
-<body class="antialiased selection:bg-cyan-500 selection:text-white">
+<body class="antialiased indicator-ui indicator-marketing">
 
     <!-- Navigation -->
     <nav class="fixed w-full z-50 glass-nav">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
                 <div class="flex items-center space-x-3 cursor-pointer group">
-                    <div class="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center relative overflow-hidden shadow-[0_0_15px_rgba(34,211,238,0.3)] group-hover:shadow-[0_0_25px_rgba(34,211,238,0.5)] transition-shadow bg-slate-900 p-[2px]">
+                    <div class="brand-mark w-10 h-10 rounded-full border flex items-center justify-center relative overflow-hidden transition-shadow p-[2px]">
                         <img src="/INDICATOR.png" alt="Logo" class="w-full h-full object-cover rounded-full relative z-10">
                     </div>
                     <div class="flex flex-col justify-center">
-                        <span class="text-xl font-black tracking-widest leading-none" style="background: linear-gradient(to bottom, #ffffff 0%, #a3a3a3 48%, #e0e0e0 52%, #ffffff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 4px rgba(255,255,255,0.2));">INDICATOR</span>
-                        <span class="text-[0.65rem] font-bold tracking-[0.2em] text-cyan-400 uppercase mt-0.5" style="text-shadow: 0 0 8px rgba(34,211,238,0.5);">Web Chat</span>
+                        <span class="brand-name text-xl font-black tracking-widest leading-none">INDICATOR</span>
+                        <span class="brand-subtitle text-[0.65rem] font-bold tracking-[0.2em] uppercase mt-0.5">Website Platform</span>
                     </div>
                 </div>
                 <!-- Desktop Menu -->
@@ -138,14 +139,14 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
             <div class="inline-flex items-center space-x-2 bg-slate-800/50 border border-slate-700 rounded-full px-4 py-1.5 mb-8">
                 <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                <span class="text-xs font-medium text-slate-300">INDICATOR Matrix v7.5 is now Live</span>
+                <span class="text-xs font-medium text-slate-300">พร้อมใช้งานสำหรับเว็บไซต์ธุรกิจ</span>
             </div>
             <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight mb-8">
-                The Intelligent Matrix<br />
-                <span class="gradient-text">For Your Website.</span>
+                บทสนทนาที่ดีขึ้น<br />
+                <span class="gradient-text">สำหรับเว็บไซต์ของคุณ</span>
             </h1>
             <p class="mt-4 text-xl text-slate-400 max-w-3xl mx-auto mb-10 leading-relaxed">
-                เปลี่ยนหน้าเว็บไซต์ธรรมดาให้กลายเป็นแพลตฟอร์มอัจฉริยะด้วย AI ขั้นสูง<br class="hidden md:block"> มาพร้อมระบบ Telekinesis วาร์ปข้ามหน้า และแสงลมหายใจสุดล้ำ 
+                ตอบคำถามจากข้อมูลธุรกิจ ช่วยผู้ใช้ค้นหาสิ่งที่ต้องการ และจัดการทุกเว็บไซต์จากศูนย์กลางเดียว
             </p>
             <div class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6">
                 <a href="#pricing" class="w-full sm:w-auto px-8 py-4 rounded-xl text-lg font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:scale-105 transition transform shadow-xl shadow-cyan-500/25">
@@ -159,30 +160,30 @@
     <section id="features" class="py-24 bg-slate-900/50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-16">
-                <h2 class="text-3xl md:text-4xl font-bold mb-4">ฟีเจอร์ล้ำยุค ระดับ God-Tier</h2>
-                <p class="text-slate-400">เหนือกว่าทุก AI ที่เคยมีมา ด้วยสคริปต์เพียงบรรทัดเดียว</p>
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">เครื่องมือสำหรับทีมเว็บไซต์</h2>
+                <p class="text-slate-400">ติดตั้งด้วยสคริปต์เดียว พร้อมการควบคุมข้อมูลและบัญชีลูกค้า</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div class="feature-card p-8 rounded-2xl">
                     <div class="w-12 h-12 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-6">
-                        <i class="fa-solid fa-meteor text-cyan-400 text-xl"></i>
+                        <i class="fa-solid fa-route text-cyan-400 text-xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold mb-3">Telekinesis Warp</h3>
-                    <p class="text-slate-400 leading-relaxed">ระบบอ่านใจและพาผู้ใช้วาร์ปข้ามหน้าเว็บไปยังหาสินค้าหรือหน้าที่ต้องการได้ทันทีแบบไม่ต้องกดหาเอง</p>
+                    <h3 class="text-xl font-bold mb-3">การนำทางตามบริบท</h3>
+                    <p class="text-slate-400 leading-relaxed">พาผู้ใช้ไปยังสินค้า บริการ หรือหน้าที่เกี่ยวข้องจากคำถามบนเว็บไซต์</p>
                 </div>
                 <div class="feature-card p-8 rounded-2xl">
                     <div class="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center mb-6">
-                        <i class="fa-solid fa-wave-square text-blue-400 text-xl"></i>
+                        <i class="fa-solid fa-language text-blue-400 text-xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold mb-3">Edge Breathing Glow</h3>
-                    <p class="text-slate-400 leading-relaxed">เอฟเฟกต์แสงออร่าล้อมรอบขอบหน้าจอขณะที่ AI กำลังประมวลผล ให้ความรู้สึกสัมผัสแห่งอนาคต</p>
+                    <h3 class="text-xl font-bold mb-3">รองรับหลายภาษา</h3>
+                    <p class="text-slate-400 leading-relaxed">ตอบคำถามด้วยภาษาไทย อังกฤษ จีน และญี่ปุ่น โดยใช้ข้อมูลที่ธุรกิจกำหนด</p>
                 </div>
                 <div class="feature-card p-8 rounded-2xl">
                     <div class="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center mb-6">
-                        <i class="fa-solid fa-shield-halved text-purple-400 text-xl"></i>
+                        <i class="fa-solid fa-chart-line text-purple-400 text-xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold mb-3">SaaS Control Matrix</h3>
-                    <p class="text-slate-400 leading-relaxed">ระบบจัดการหลังบ้านครบวงจร เปิด/ปิดลูกค้า เติมเงิน และจัดการความรู้ AI ได้ในหน้าเดียว (Master Control)</p>
+                    <h3 class="text-xl font-bold mb-3">ศูนย์จัดการ SaaS</h3>
+                    <p class="text-slate-400 leading-relaxed">จัดการลูกค้า แพ็กเกจ โดเมนที่อนุญาต และแหล่งข้อมูลตอบคำถามในระบบเดียว</p>
                 </div>
             </div>
         </div>
@@ -205,7 +206,7 @@
                     <ul class="space-y-4 mb-8 flex-1">
                         <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> AI แชทตอบคำถาม 1,000 ข้อความ/เดือน</li>
                         <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> เรียนรู้ข้อมูลเว็บอัตโนมัติ</li>
-                        <li class="flex items-center text-slate-500 text-sm"><i class="fa-solid fa-xmark mr-3"></i> ไม่มีระบบ Telekinesis Warp</li>
+                        <li class="flex items-center text-slate-500 text-sm"><i class="fa-solid fa-xmark mr-3"></i> ไม่มีการนำทางข้ามหน้า</li>
                     </ul>
                     <button onclick="openCheckout('Starter', 990)" class="w-full py-3 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition border border-slate-700">เริ่มต้นใช้งาน</button>
                 </div>
@@ -213,13 +214,13 @@
                 <!-- Pro -->
                 <div class="pricing-card popular p-8 rounded-3xl flex flex-col">
                     <div class="badge">ยอดนิยม</div>
-                    <h3 class="text-xl font-semibold text-cyan-400 mb-2">Pro Matrix</h3>
+                    <h3 class="text-xl font-semibold text-cyan-400 mb-2">Pro</h3>
                     <div class="text-4xl font-bold mb-6 text-white">฿2,490<span class="text-lg text-slate-400 font-normal">/เดือน</span></div>
-                    <p class="text-slate-300 mb-8 text-sm">ปลดล็อกพลัง Sci-Fi เต็มรูปแบบ ดึงดูดลูกค้าขั้นสุด</p>
+                    <p class="text-slate-300 mb-8 text-sm">สำหรับธุรกิจที่ต้องการรองรับปริมาณบทสนทนาและการนำทางมากขึ้น</p>
                     <ul class="space-y-4 mb-8 flex-1">
                         <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> AI แชท 10,000 ข้อความ/เดือน</li>
-                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ระบบ Edge Breathing Glow</li>
-                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ระบบ Telekinesis Warp</li>
+                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> การนำทางตามบริบท</li>
+                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> แหล่งข้อมูลเว็บไซต์หลายหน้า</li>
                         <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> รองรับ 2 ภาษาหลัก (TH/EN)</li>
                     </ul>
                     <button onclick="openCheckout('Pro', 2490)" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:scale-105 transition shadow-lg shadow-cyan-500/25 font-bold">เลือกแพ็กเกจนี้</button>
@@ -229,7 +230,7 @@
                 <div class="pricing-card p-8 rounded-3xl flex flex-col">
                     <h3 class="text-xl font-semibold text-slate-300 mb-2">Enterprise</h3>
                     <div class="text-4xl font-bold mb-6">ติดต่อเรา</div>
-                    <p class="text-slate-400 mb-8 text-sm">สำหรับองค์กรที่ต้องการปรับแต่ง AI และไม่จำกัดข้อความ</p>
+                    <p class="text-slate-400 mb-8 text-sm">สำหรับองค์กรที่ต้องการการกำกับดูแล การปรับแต่ง และการสนับสนุนเฉพาะทาง</p>
                     <ul class="space-y-4 mb-8 flex-1">
                         <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ไม่จำกัดข้อความ/เดือน</li>
                         <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ป้อนข้อมูล Knowledge Base (RAG) ขั้นสูง</li>
@@ -246,8 +247,8 @@
     <footer class="border-t border-slate-800 bg-slate-900 py-12">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center md:text-left flex flex-col md:flex-row justify-between items-center">
             <div class="mb-4 md:mb-0">
-                <span class="text-lg font-bold tracking-wider">INDICATOR <span class="text-cyan-400">WEB CHAT</span></span>
-                <p class="text-sm text-slate-500 mt-2">&copy; 2026 INDICATOR Matrix Inc. All rights reserved.</p>
+                <span class="text-lg font-bold tracking-wider">INDICATOR <span class="text-cyan-400">WEBSITE PLATFORM</span></span>
+                <p class="text-sm text-slate-500 mt-2">&copy; 2026 INDICATOR. All rights reserved.</p>
             </div>
             <div class="flex space-x-6 text-slate-400">
                 <a href="#" class="hover:text-cyan-400 transition"><i class="fa-brands fa-twitter text-xl"></i></a>
@@ -258,7 +259,7 @@
     </footer>
 
     <!-- Try INDICATOR WEB CHAT Widget on its own landing page! -->
-    <script src="/supreme-boost/boost.js" data-backend-url="/api/chat" data-lang="auto" data-shop-prompt="นี่คือหน้าเว็บขายโปรแกรม INDICATOR WEB CHAT ระบบ AI อัจฉริยะระดับ God-Tier สำหรับธุรกิจ มีแพ็กเกจ Starter (990), Pro (2490) และ Enterprise แนะนำผู้ใช้ให้สมัคร Pro เพราะคุ้มค่าที่สุด มีฟีเจอร์ Telekinesis Warp และ Edge Glow" defer></script>
+    <script src="/supreme-boost/boost.js" data-backend-url="/api/chat" data-lang="auto" data-shop-prompt="นี่คือหน้าเว็บขาย INDICATOR Website Platform สำหรับธุรกิจ มีแพ็กเกจ Starter (990), Pro (2490) และ Enterprise ช่วยตอบคำถามจากข้อมูลธุรกิจและนำทางผู้ใช้ไปยังหน้าที่เกี่ยวข้อง" defer></script>
 
     <!-- Customer Dashboard (Removed, moved to Nav Dropdown) -->
 

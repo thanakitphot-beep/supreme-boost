@@ -50,6 +50,8 @@ services:
         value: llama-3.3-70b-versatile
       - key: AI_REQUEST_TIMEOUT_MS
         value: 15000
+      - key: AI_TOTAL_TIMEOUT_MS
+        value: 22000
       - key: AI_MAX_RETRIES
         value: 2
       - key: AI_CIRCUIT_MAX_FAILURES

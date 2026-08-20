@@ -1,0 +1,236 @@
+:root {
+  --indicator-page: #f5f7fb;
+  --indicator-surface: #ffffff;
+  --indicator-surface-muted: #f8fafc;
+  --indicator-border: #e2e8f0;
+  --indicator-border-strong: #cbd5e1;
+  --indicator-text: #172033;
+  --indicator-text-muted: #64748b;
+  --indicator-primary: #2563eb;
+  --indicator-primary-strong: #1d4ed8;
+  --indicator-positive: #15803d;
+  --indicator-warning: #b45309;
+  --indicator-danger: #b91c1c;
+}
+
+body.indicator-ui {
+  background: var(--indicator-page);
+  color: var(--indicator-text);
+  font-family: "Sarabun", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body.indicator-ui .hero-glow,
+body.indicator-ui .stars,
+body.indicator-ui .main-bg,
+body.indicator-ui .grid-bg {
+  display: none;
+}
+
+body.indicator-ui .brand-mark {
+  border: 1px solid var(--indicator-border) !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+body.indicator-ui .brand-name {
+  background: none !important;
+  color: var(--indicator-text) !important;
+  -webkit-text-fill-color: var(--indicator-text) !important;
+  filter: none !important;
+  letter-spacing: .06em !important;
+}
+
+body.indicator-ui .brand-subtitle {
+  color: var(--indicator-text-muted) !important;
+  text-shadow: none !important;
+}
+
+/* Marketing and billing pages */
+body.indicator-marketing,
+body.indicator-pricing {
+  min-height: 100dvh;
+}
+
+body.indicator-marketing .glass-nav,
+body.indicator-pricing nav {
+  background: rgba(255, 255, 255, .96) !important;
+  border-color: var(--indicator-border) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+  backdrop-filter: none !important;
+}
+
+body.indicator-marketing nav a,
+body.indicator-pricing nav a,
+body.indicator-marketing .text-slate-300,
+body.indicator-pricing .nav-name {
+  color: var(--indicator-text-muted) !important;
+}
+
+body.indicator-marketing nav a:hover,
+body.indicator-pricing nav a:hover {
+  color: var(--indicator-primary) !important;
+}
+
+body.indicator-marketing .text-white,
+body.indicator-marketing h1,
+body.indicator-marketing h2,
+body.indicator-marketing h3,
+body.indicator-pricing h1,
+body.indicator-pricing h2,
+body.indicator-pricing h3 {
+  color: var(--indicator-text) !important;
+}
+
+body.indicator-marketing .gradient-text,
+body.indicator-pricing .hero h1 {
+  background: none !important;
+  color: var(--indicator-primary) !important;
+  -webkit-text-fill-color: var(--indicator-primary) !important;
+}
+
+body.indicator-marketing .feature-card,
+body.indicator-marketing .pricing-card,
+body.indicator-pricing .plan,
+body.indicator-pricing .order-wrapper,
+body.indicator-pricing .success-wrapper {
+  background: var(--indicator-surface) !important;
+  border-color: var(--indicator-border) !important;
+  box-shadow: none !important;
+  border-radius: 12px !important;
+}
+
+body.indicator-marketing .feature-card:hover,
+body.indicator-marketing .pricing-card:hover,
+body.indicator-pricing .plan:hover {
+  transform: none !important;
+  border-color: var(--indicator-border-strong) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04) !important;
+}
+
+body.indicator-marketing .pricing-card.popular,
+body.indicator-pricing .plan.selected {
+  border-color: var(--indicator-primary) !important;
+  box-shadow: 0 0 0 1px var(--indicator-primary) !important;
+}
+
+body.indicator-marketing .badge,
+body.indicator-pricing .nav-btn.primary,
+body.indicator-pricing .btn-primary,
+body.indicator-marketing .bg-gradient-to-r {
+  background: var(--indicator-primary) !important;
+  box-shadow: none !important;
+}
+
+body.indicator-marketing .bg-slate-900\/50,
+body.indicator-marketing footer,
+body.indicator-pricing .order-header {
+  background: var(--indicator-surface-muted) !important;
+  border-color: var(--indicator-border) !important;
+}
+
+body.indicator-marketing .text-slate-400,
+body.indicator-marketing .text-slate-500,
+body.indicator-pricing .hero p,
+body.indicator-pricing .form-label {
+  color: var(--indicator-text-muted) !important;
+}
+
+body.indicator-marketing #auth-modal .glass-nav {
+  background: #fff !important;
+  border: 1px solid var(--indicator-border) !important;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, .16) !important;
+}
+
+/* Authentication pages */
+body.indicator-auth {
+  min-height: 100dvh;
+  overflow-y: auto !important;
+  padding: 24px 0;
+}
+
+body.indicator-auth .glass-card {
+  background: #fff !important;
+  border: 1px solid var(--indicator-border) !important;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, .12) !important;
+  backdrop-filter: none !important;
+}
+
+body.indicator-auth .text-white,
+body.indicator-auth h1,
+body.indicator-auth h2,
+body.indicator-auth label {
+  color: var(--indicator-text) !important;
+}
+
+body.indicator-auth .text-slate-400,
+body.indicator-auth .text-slate-300 {
+  color: var(--indicator-text-muted) !important;
+}
+
+body.indicator-auth input {
+  background: #fff !important;
+  border-color: var(--indicator-border-strong) !important;
+  color: var(--indicator-text) !important;
+  box-shadow: none !important;
+}
+
+body.indicator-auth input:focus {
+  border-color: var(--indicator-primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .1) !important;
+}
+
+body.indicator-auth button[type="submit"] {
+  background: var(--indicator-primary) !important;
+  box-shadow: none !important;
+  border-radius: 7px !important;
+}
+
+/* Customer and admin application shells */
+body.indicator-app {
+  background: var(--indicator-page);
+  color: var(--indicator-text);
+}
+
+body.indicator-app .sidebar,
+body.indicator-app .topbar,
+body.indicator-app .sb-foot {
+  background: #fff !important;
+  border-color: var(--indicator-border) !important;
+}
+
+body.indicator-app .sidebar { width: 248px; min-width: 248px; }
+body.indicator-app .main { background: var(--indicator-page); }
+body.indicator-app .nav-btn { color: #475569; border: 0; border-radius: 7px; box-shadow: none; }
+body.indicator-app .nav-btn:hover { background: #f1f5f9; color: var(--indicator-text); }
+body.indicator-app .nav-btn.active { background: #eaf1ff; color: var(--indicator-primary); border-left: 3px solid var(--indicator-primary); border-radius: 0 7px 7px 0; }
+body.indicator-app .nv-ic { background: transparent; color: #64748b; }
+body.indicator-app .nav-btn.active .nv-ic { background: transparent; color: var(--indicator-primary); }
+body.indicator-app .nav-label { color: #94a3b8; }
+body.indicator-app .card,
+body.indicator-app .stat,
+body.indicator-app .sc,
+body.indicator-app .tenant-pill,
+body.indicator-app .tbl-wrap {
+  background: #fff !important;
+  border-color: var(--indicator-border) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  border-radius: 10px !important;
+}
+
+body.indicator-app .card:hover,
+body.indicator-app .stat:hover,
+body.indicator-app .sc:hover { transform: none !important; box-shadow: 0 1px 2px rgba(15, 23, 42, .04) !important; }
+body.indicator-app .fi { background: #fff !important; border-color: var(--indicator-border-strong) !important; color: var(--indicator-text) !important; }
+body.indicator-app .fi:focus { border-color: var(--indicator-primary) !important; box-shadow: 0 0 0 3px rgba(37, 99, 235, .1) !important; }
+body.indicator-app .btn-vl { background: var(--indicator-primary) !important; box-shadow: none !important; }
+body.indicator-app .btn-gh { background: #fff !important; color: #475569 !important; border-color: var(--indicator-border-strong) !important; box-shadow: none !important; }
+body.indicator-app .code-box,
+body.indicator-app .code-block { background: #0f172a !important; border-color: #0f172a !important; box-shadow: none !important; }
+
+@media (max-width: 768px) {
+  body.indicator-ui .content { padding: 18px !important; }
+  body.indicator-ui .topbar { padding-left: 18px !important; padding-right: 18px !important; }
+  body.indicator-auth { align-items: flex-start !important; }
+}

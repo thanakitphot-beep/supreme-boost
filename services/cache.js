@@ -23,6 +23,7 @@ const semanticCache = {
     _makeKey: function (payload) {
         let parts = [
             this._answerPolicyVersion,
+            payload.tenantId || 'anonymous-tenant',
             (payload.prompt || "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 200),
             (payload.title || "").toLowerCase().slice(0, 50),
             payload.isProactive ? "proactive" : "reactive",

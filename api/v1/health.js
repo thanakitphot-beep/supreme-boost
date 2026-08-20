@@ -5,6 +5,8 @@
 const { semanticCache } = require('../../services/cache');
 const { getRateLimiterStats } = require('../../services/rateLimit');
 const { setCorsHeaders } = require('../../services/cors');
+const router = require('../../services/ai/router');
+const { connectToDatabase } = require('../_mongodb');
 
 const startTime = Date.now();
 const requestCounter = { total: 0, success: 0, error: 0, cached: 0 };
@@ -51,23 +53,19 @@ module.exports = async function handler(req, res) {
 
     // --- GET /health ---
     if (url.includes('/health') && req.method === 'GET') {
+        const runtime = router.runtimeStatus();
+        const tenantRequired = process.env.REQUIRE_TENANT_API_KEY === 'true' || process.env.NODE_ENV === 'production';
+        const mongo = tenantRequired ? await connectToDatabase() : null;
         const checks = {
             server: 'ok',
-            openai_key:  process.env.OPENAI_API_KEY  ? 'ok' : 'missing',
-            gemini_key:  process.env.GEMINI_API_KEY  ? 'ok' : 'missing',
-            groq_key:    process.env.GROQ_API_KEY    ? 'ok' : 'missing',
-            cohere_key:  process.env.COHERE_API_KEY  ? 'ok' : 'missing',
-            supabase:    process.env.SUPABASE_URL     ? 'ok' : 'missing',
+            primary_provider: runtime.primaryConfigured ? 'ok' : 'missing',
+            fallback_provider: runtime.fallbackConfigured ? 'ok' : 'missing',
+            mongo: tenantRequired ? (mongo ? 'ok' : 'missing') : 'optional',
+            supabase: process.env.SUPABASE_URL && process.env.SUPABASE_KEY ? 'ok' : 'optional',
             cache:       cacheStats.size <= 100        ? 'ok' : 'warn',
             keep_alive:  process.env.RENDER_EXTERNAL_URL ? 'active' : 'disabled'
         };
-        // เซิร์ฟเวอร์ยังใช้ได้ถ้ามี provider อย่างน้อย 1 ตัว
-        const hasAnyProvider = [
-            process.env.OPENAI_API_KEY,
-            process.env.GEMINI_API_KEY,
-            process.env.GROQ_API_KEY
-        ].some(Boolean);
-        const allOk = checks.server === 'ok' && hasAnyProvider;
+        const allOk = checks.server === 'ok' && (runtime.primaryConfigured || runtime.fallbackConfigured) && (!tenantRequired || Boolean(mongo));
 
         return res.status(allOk ? 200 : 206).json({
             status: allOk ? 'healthy' : 'degraded',
@@ -76,7 +74,8 @@ module.exports = async function handler(req, res) {
             timestamp: new Date().toISOString(),
             uptime: uptime.formatted,
             uptime_ms: uptime.ms,
-            checks
+            checks,
+            runtime: { primary: runtime.primary, fallback: runtime.fallback, circuits: runtime.circuits }
         });
     }
 
@@ -106,6 +105,7 @@ module.exports = async function handler(req, res) {
             },
             memory: getMemoryUsage(),
             rate_limiter: rateLimiterStats,
+            runtime: router.runtimeStatus(),
             ai_keys: {
                 gemini_keys_configured: [
                     process.env.GEMINI_API_KEY,
