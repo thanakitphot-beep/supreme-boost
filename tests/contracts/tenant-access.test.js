@@ -1,4 +1,4 @@
-const { canonicalOrigin, normalizeAllowedOrigins, tenantIsActive } = require('../../services/tenantAccess');
+const { canonicalOrigin, firstPartyDemoAllowed, normalizeAllowedOrigins, tenantIsActive } = require('../../services/tenantAccess');
 const customerAuth = require('../../api/customer-auth');
 
 function mockReq(overrides = {}) {
@@ -42,6 +42,19 @@ describe('SaaS tenant origin access', () => {
         expect(tenantIsActive({ status: 'active', expires_at: null })).toBe(true);
         expect(tenantIsActive({ status: 'pending', expires_at: null })).toBe(false);
         expect(tenantIsActive({ status: 'active', expires_at: '2000-01-01T00:00:00.000Z' })).toBe(false);
+    });
+
+    test('limits the public demo to the configured service origin', () => {
+        const previous = process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO;
+        const previousUrl = process.env.RENDER_EXTERNAL_URL;
+        process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO = 'true';
+        process.env.RENDER_EXTERNAL_URL = 'https://indicator-web-chat.onrender.com';
+        expect(firstPartyDemoAllowed('https://indicator-web-chat.onrender.com')).toBe(true);
+        expect(firstPartyDemoAllowed('https://customer.example')).toBe(false);
+        if (previous === undefined) delete process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO;
+        else process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO = previous;
+        if (previousUrl === undefined) delete process.env.RENDER_EXTERNAL_URL;
+        else process.env.RENDER_EXTERNAL_URL = previousUrl;
     });
 });
 

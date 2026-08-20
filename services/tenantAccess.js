@@ -27,6 +27,12 @@ function tenantKeyRequired() {
     return process.env.REQUIRE_TENANT_API_KEY === 'true' || process.env.NODE_ENV === 'production';
 }
 
+function firstPartyDemoAllowed(origin) {
+    if (process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO !== 'true') return false;
+    const serviceOrigin = canonicalOrigin(process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
+    return Boolean(serviceOrigin && canonicalOrigin(origin) === serviceOrigin);
+}
+
 async function findActiveTenantForOrigin(origin) {
     const canonical = canonicalOrigin(origin);
     if (!canonical) return null;
@@ -45,15 +51,16 @@ async function applyPluginCors(req, res) {
 
 async function authorizePluginRequest({ apiKey, origin }) {
     const key = String(apiKey || '').trim();
+    const demoAllowed = firstPartyDemoAllowed(origin);
     if (key === 'INDICATOR_TEST' && process.env.NODE_ENV !== 'production') {
         return { tenant: { id: 'test', status: 'active', allowed_origins: [] } };
     }
-    if (!key) return tenantKeyRequired() ? { error: 'Missing widget API key' } : { tenant: null };
+    if (!key) return demoAllowed ? { tenant: { id: 'demo', status: 'active', allowed_origins: [] } } : tenantKeyRequired() ? { error: 'Missing widget API key' } : { tenant: null };
 
     const db = await connectToDatabase();
     if (!db) return { error: 'Tenant service is unavailable' };
     const tenant = await db.collection('tenants').findOne({ api_key: key });
-    if (!tenant) return { error: 'Unknown widget API key' };
+    if (!tenant) return demoAllowed ? { tenant: { id: 'demo', status: 'active', allowed_origins: [] } } : { error: 'Unknown widget API key' };
     if (!tenantIsActive(tenant)) return { error: tenant.status === 'suspended' ? 'บัญชีถูกระงับการใช้งาน (Suspended)' : 'Package หมดอายุ หรือยังไม่เปิดใช้งาน' };
 
     const canonical = canonicalOrigin(origin);
@@ -69,6 +76,7 @@ module.exports = {
     applyPluginCors,
     authorizePluginRequest,
     canonicalOrigin,
+    firstPartyDemoAllowed,
     normalizeAllowedOrigins,
     tenantIsActive
 };
