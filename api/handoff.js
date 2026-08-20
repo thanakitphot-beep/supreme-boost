@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const { connectToDatabase } = require('./_mongodb');
 const { maskPII } = require('../services/safety');
 const { checkRateLimit } = require('../services/rateLimit');
@@ -22,6 +23,33 @@ function safeContact(settings = {}) {
         if (parsed.protocol === 'https:') contact.url = parsed.href;
     } catch (_) { }
     return contact;
+}
+
+async function notifySupport(ticket) {
+    if (!ticket.contact.email || !process.env.SMTP_USER || !process.env.SMTP_PASS) return 'queued';
+    const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: Number.parseInt(process.env.SMTP_PORT || '587', 10),
+        secure: String(process.env.SMTP_PORT) === '465',
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+    });
+    try {
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || process.env.SMTP_USER,
+            to: ticket.contact.email,
+            subject: `[INDICATOR] Human handoff ${ticket.priority === 'high' ? 'high priority' : 'request'}: ${ticket.id}`,
+            text: [
+                `Ticket: ${ticket.id}`,
+                `Priority: ${ticket.priority}`,
+                `Page: ${ticket.page.title || ticket.page.url || 'Unknown'}`,
+                `Reason: ${ticket.reason || 'Visitor requested support'}`,
+                `Summary: ${ticket.summary || '-'}`
+            ].join('\n')
+        });
+        return 'delivered';
+    } catch (_) {
+        return 'queued';
+    }
 }
 
 module.exports = async function handoffHandler(req, res) {
@@ -69,12 +97,21 @@ module.exports = async function handoffHandler(req, res) {
         updated_at: now
     };
     await db.collection('handoff_tickets').insertOne(ticket);
+    ticket.status = await notifySupport(ticket);
+    if (ticket.status !== 'queued') {
+        await db.collection('handoff_tickets').updateOne({ id: ticket.id }, { $set: { status: ticket.status, updated_at: new Date().toISOString() } });
+    }
     await db.collection('logs').insertOne({
         id: crypto.randomUUID(),
         type: 'handoff',
         message: `Human handoff requested: ${ticket.reason || 'Visitor requested support'}`,
-        metadata: { tenantId, ticketId: ticket.id, priority },
+        metadata: { tenantId, ticketId: ticket.id, priority, delivery: ticket.status },
         timestamp: now
     });
-    return res.status(201).json({ status: 'queued', ticketId: ticket.id, contact, message: 'คำขอถูกส่งเข้าคิวเจ้าหน้าที่แล้ว' });
+    return res.status(201).json({
+        status: ticket.status,
+        ticketId: ticket.id,
+        contact,
+        message: ticket.status === 'delivered' ? 'คำขอถูกส่งถึงช่องทางเจ้าหน้าที่แล้ว' : 'คำขอถูกส่งเข้าคิวเจ้าหน้าที่แล้ว'
+    });
 };
