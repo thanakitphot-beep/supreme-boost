@@ -234,3 +234,103 @@ body.indicator-app .code-block { background: #0f172a !important; border-color: #
   body.indicator-ui .topbar { padding-left: 18px !important; padding-right: 18px !important; }
   body.indicator-auth { align-items: flex-start !important; }
 }
+
+/* Original INDICATOR dark product theme. Keep every surface on this system. */
+:root {
+  --indicator-page: #0f172a;
+  --indicator-surface: #1e293b;
+  --indicator-surface-muted: rgba(30, 41, 59, .72);
+  --indicator-border: rgba(255, 255, 255, .08);
+  --indicator-border-strong: rgba(148, 163, 184, .38);
+  --indicator-text: #f8fafc;
+  --indicator-text-muted: #94a3b8;
+  --indicator-primary: #06b6d4;
+  --indicator-primary-strong: #3b82f6;
+  --indicator-positive: #34d399;
+  --indicator-warning: #fbbf24;
+  --indicator-danger: #fb7185;
+}
+
+body.indicator-ui { background: var(--indicator-page); color: var(--indicator-text); }
+body.indicator-ui .hero-glow { display: block; }
+body.indicator-ui .brand-mark { background: #0f172a !important; border-color: rgba(71,85,105,.8) !important; box-shadow: 0 0 15px rgba(34,211,238,.3) !important; }
+body.indicator-ui .brand-name { color: #fff !important; -webkit-text-fill-color: #fff !important; letter-spacing: .1em !important; }
+body.indicator-ui .brand-subtitle { color: #22d3ee !important; text-shadow: 0 0 8px rgba(34,211,238,.5) !important; }
+
+body.indicator-marketing .glass-nav,
+body.indicator-pricing nav { background: rgba(15,23,42,.84) !important; border-color: rgba(255,255,255,.06) !important; box-shadow: none; backdrop-filter: blur(14px) !important; }
+body.indicator-marketing nav a,
+body.indicator-pricing nav a,
+body.indicator-marketing .text-slate-300,
+body.indicator-pricing .nav-name { color: #cbd5e1 !important; }
+body.indicator-marketing nav a:hover,
+body.indicator-pricing nav a:hover { color: #67e8f9 !important; }
+body.indicator-marketing .text-white,
+body.indicator-marketing h1,
+body.indicator-marketing h2,
+body.indicator-marketing h3,
+body.indicator-pricing h1,
+body.indicator-pricing h2,
+body.indicator-pricing h3 { color: #f8fafc !important; }
+body.indicator-marketing .gradient-text,
+body.indicator-pricing .hero h1 { background: linear-gradient(90deg,#22d3ee,#60a5fa) !important; -webkit-background-clip:text !important; color: transparent !important; -webkit-text-fill-color:transparent !important; }
+body.indicator-marketing .feature-card,
+body.indicator-marketing .pricing-card,
+body.indicator-pricing .plan,
+body.indicator-pricing .order-wrapper,
+body.indicator-pricing .success-wrapper { background: rgba(30,41,59,.78) !important; border-color: rgba(255,255,255,.1) !important; box-shadow: none !important; border-radius: 16px !important; }
+body.indicator-marketing .feature-card:hover,
+body.indicator-marketing .pricing-card:hover,
+body.indicator-pricing .plan:hover { transform: translateY(-3px) !important; border-color: rgba(34,211,238,.45) !important; box-shadow: 0 10px 28px rgba(6,182,212,.12) !important; }
+body.indicator-marketing .pricing-card.popular,
+body.indicator-pricing .plan.selected { border-color: #06b6d4 !important; box-shadow: 0 0 0 1px rgba(6,182,212,.35),0 0 32px rgba(6,182,212,.12) !important; }
+body.indicator-marketing .badge,
+body.indicator-pricing .nav-btn.primary,
+body.indicator-pricing .btn-primary,
+body.indicator-marketing .bg-gradient-to-r { background: linear-gradient(135deg,#06b6d4,#3b82f6) !important; box-shadow: 0 8px 20px rgba(6,182,212,.22) !important; }
+body.indicator-marketing .bg-slate-900\/50,
+body.indicator-marketing footer,
+body.indicator-pricing .order-header { background: rgba(15,23,42,.72) !important; border-color: rgba(255,255,255,.08) !important; }
+body.indicator-marketing .text-slate-400,
+body.indicator-marketing .text-slate-500,
+body.indicator-pricing .hero p,
+body.indicator-pricing .form-label { color: #94a3b8 !important; }
+body.indicator-marketing #auth-modal .glass-nav { background: #1e293b !important; border-color: rgba(255,255,255,.1) !important; box-shadow: 0 20px 50px rgba(0,0,0,.4) !important; }
+
+body.indicator-auth { background: #0f172a; }
+body.indicator-auth .glass-card { background: rgba(30,41,59,.82) !important; border-color: rgba(255,255,255,.1) !important; box-shadow: 0 20px 40px rgba(0,0,0,.4) !important; backdrop-filter: blur(12px) !important; }
+body.indicator-auth .text-white,
+body.indicator-auth h1,
+body.indicator-auth h2,
+body.indicator-auth label { color: #f8fafc !important; }
+body.indicator-auth .text-slate-400,
+body.indicator-auth .text-slate-300 { color: #94a3b8 !important; }
+body.indicator-auth input { background: rgba(15,23,42,.72) !important; border-color: #475569 !important; color: #f8fafc !important; }
+body.indicator-auth input:focus { border-color: #22d3ee !important; box-shadow: 0 0 0 3px rgba(6,182,212,.12) !important; }
+body.indicator-auth button[type="submit"] { background: linear-gradient(135deg,#06b6d4,#3b82f6) !important; box-shadow: 0 8px 20px rgba(6,182,212,.22) !important; }
+
+body.indicator-app { background: #0f172a; color: #f8fafc; }
+body.indicator-app .sidebar,
+body.indicator-app .topbar,
+body.indicator-app .sb-foot { background: #1e293b !important; border-color: rgba(255,255,255,.07) !important; }
+body.indicator-app .main { background: #0f172a; }
+body.indicator-app .nav-btn { color: #94a3b8; }
+body.indicator-app .nav-btn:hover { background: rgba(255,255,255,.06); color: #f8fafc; }
+body.indicator-app .nav-btn.active { background: rgba(139,92,246,.14); color: #a78bfa; border-left: 0; border-radius: 7px; }
+body.indicator-app .nv-ic { color: #94a3b8; }
+body.indicator-app .nav-btn.active .nv-ic { color: #a78bfa; }
+body.indicator-app .nav-label { color: #64748b; }
+body.indicator-app .card,
+body.indicator-app .stat,
+body.indicator-app .sc,
+body.indicator-app .tenant-pill,
+body.indicator-app .tbl-wrap { background: rgba(30,41,59,.72) !important; border-color: rgba(255,255,255,.08) !important; box-shadow: 0 8px 28px rgba(0,0,0,.16) !important; backdrop-filter: blur(10px) !important; }
+body.indicator-app .card:hover,
+body.indicator-app .stat:hover,
+body.indicator-app .sc:hover { transform: translateY(-2px) !important; box-shadow: 0 12px 34px rgba(0,0,0,.24) !important; }
+body.indicator-app .fi { background: rgba(15,23,42,.72) !important; border-color: rgba(255,255,255,.16) !important; color: #f8fafc !important; }
+body.indicator-app .fi:focus { border-color: #8b5cf6 !important; box-shadow: 0 0 0 3px rgba(139,92,246,.12) !important; }
+body.indicator-app .btn-vl { background: linear-gradient(135deg,#7c3aed,#4f46e5) !important; box-shadow: 0 5px 16px rgba(124,58,237,.28) !important; }
+body.indicator-app .btn-gh { background: rgba(255,255,255,.06) !important; color: #cbd5e1 !important; border-color: rgba(255,255,255,.1) !important; }
+body.indicator-app .code-box,
+body.indicator-app .code-block { background: #030310 !important; border-color: rgba(139,92,246,.22) !important; }
