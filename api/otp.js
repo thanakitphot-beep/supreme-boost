@@ -67,10 +67,10 @@ const transporter = nodemailer.createTransport({
 });
 
 module.exports = async function handler(req, res) {
-    setCorsHeaders(req, res);
+    if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === "OPTIONS") return res.status(200).end();
 
-    if (!checkRateLimit(req, res, 'auth')) return;
+    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'auth')) return;
 
     try {
         if (req.method === "POST") {

@@ -2,7 +2,7 @@ const db = require("./_db.js");
 const { setCorsHeaders } = require('../services/cors');
 
 module.exports = async function handler(req, res) {
-    setCorsHeaders(req, res);
+    if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ success: false, message: 'Origin is not allowed' });
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     res.setHeader('Content-Type', 'application/json');

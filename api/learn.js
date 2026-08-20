@@ -30,7 +30,7 @@ function cleanDna(value) {
 }
 
 module.exports = async function learnHandler(req, res) {
-    setCorsHeaders(req, res);
+    if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ status: 'blocked', error: 'Origin is not allowed' });
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 

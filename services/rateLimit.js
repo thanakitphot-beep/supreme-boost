@@ -11,8 +11,9 @@ const BURST_MAX = parseInt(process.env.RATE_LIMIT_BURST || '10', 10);           
 const store = new Map();
 const blocklist = new Map(); // key -> unblockTime
 
-// Cleanup every 10 minutes — remove inactive buckets and expired blocklists
-setInterval(() => {
+// Cleanup every 10 minutes — remove inactive buckets and expired blocklists.
+// unref keeps this maintenance timer from preventing graceful shutdown/tests.
+const cleanupTimer = setInterval(() => {
     const now = Date.now();
     for (const [key, unblockTime] of blocklist.entries()) {
         if (now > unblockTime) blocklist.delete(key);
@@ -23,6 +24,7 @@ setInterval(() => {
         }
     }
 }, 10 * 60 * 1000);
+cleanupTimer.unref?.();
 
 function getBucket(key, limit, burstLimit) {
     const now = Date.now();

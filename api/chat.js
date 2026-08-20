@@ -464,12 +464,12 @@ async function validateTenant(body) {
 }
 
 async function handler(req, res) {
-    setCorsHeaders(req, res);
+    if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
 
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    if (!checkRateLimit(req, res, 'chat')) {
+    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'chat')) {
         return;
     }
 
@@ -567,15 +567,18 @@ async function handler(req, res) {
         payload.expertKnowledge = getSiteKnowledge(siteProfile);
 
         const conversationId = payload.conversationId || requestId;
-
-        if (payload.prompt && !payload.isProactive) {
-            await memoryManager.addMessage(conversationId, 'user', payload.prompt);
-        }
-
-        const mergedHistory = await memoryManager.getMergedHistory(
+        const mergedHistory = (await memoryManager.getMergedHistory(
             conversationId,
             payload.history
-        );
+        )).slice();
+
+        if (payload.prompt && !payload.isProactive) {
+            const last = mergedHistory[mergedHistory.length - 1];
+            if (!last || last.role !== 'user' || last.text !== payload.prompt) {
+                mergedHistory.push({ role: 'user', text: payload.prompt });
+            }
+            await memoryManager.addMessage(conversationId, 'user', payload.prompt);
+        }
 
         payload.ragContext = '';
         if (rawPrompt && supabase) {

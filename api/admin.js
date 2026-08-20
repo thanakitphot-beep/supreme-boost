@@ -1,6 +1,6 @@
 const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
 const { connectToDatabase } = require("./_mongodb.js");
+const { authConfigured, signToken, verifyAccessJWT } = require('./_auth.js');
 const { setCorsHeaders } = require('../services/cors');
 const { checkRateLimit } = require('../services/rateLimit');
 
@@ -12,30 +12,15 @@ async function authenticateUser(req) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
     const token = authHeader.split(' ')[1];
-    
-    // NOTE: Hardcoded bypass token 'ADMIN_SUPREME_TOKEN_12345' has been REMOVED (security fix).
-
-    try {
-        const secret = process.env.JWT_SECRET || process.env.ADMIN_PASSWORD;
-        if (!secret) return null;
-        const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
-        if (decoded && decoded.role) {
-            return { role: decoded.role };
-        }
-    } catch (_) {}
-
-    return null;
+    const decoded = verifyAccessJWT(token);
+    return decoded ? { role: decoded.role } : null;
 }
 
 module.exports = async function handler(req, res) {
-    setCorsHeaders(req, res);
+    if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === "OPTIONS") return res.status(200).end();
 
     if (!checkRateLimit(req, res, 'admin')) return;
-
-    const db = await connectToDatabase();
-    if (!db) return res.status(500).json({ error: "Database not configured" });
-    
     const url = new URL(req.url, `http://${req.headers.host}`);
     const action = url.searchParams.get('action');
 
@@ -45,6 +30,10 @@ module.exports = async function handler(req, res) {
         if (!profile) return res.status(401).json({ error: "Unauthorized" });
         if (profile.role !== 'admin') return res.status(403).json({ error: "Forbidden: Admins only" });
     }
+
+    if (!authConfigured()) return res.status(503).json({ error: 'Authentication is not configured' });
+    const db = await connectToDatabase();
+    if (!db) return res.status(503).json({ error: "Database is not configured" });
 
     try {
         if (req.method === "GET") {
@@ -101,8 +90,7 @@ module.exports = async function handler(req, res) {
                 }
                 if (code === adminSecret) {
                     // Issue a real JWT — never return a static token
-                    const secret = process.env.JWT_SECRET || adminSecret;
-                    const token = jwt.sign({ role: 'admin' }, secret, { expiresIn: '24h', algorithm: 'HS256' });
+                    const token = signToken({ role: 'admin', sub: 'admin' });
                     return res.status(200).json({ success: true, token });
                 }
                 return res.status(401).json({ error: "Invalid admin code" });

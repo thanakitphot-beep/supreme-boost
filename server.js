@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const socketIo = require('socket.io');
 const keepAlive = require('./services/keepAlive');
+const { isOriginAllowed, setCorsHeaders } = require('./services/cors');
 
 // ─── Global System Logs Interceptor ───
 global.systemLogs = [];
@@ -112,6 +113,10 @@ function serveStatic(req, res, pathname) {
         filePath = path.join(__dirname, 'admin-login.html');
     } else if (pathname === '/pricing') {
         filePath = path.join(__dirname, 'pricing.html');
+    } else if (pathname === '/customer-login') {
+        filePath = path.join(__dirname, 'customer-login.html');
+    } else if (pathname === '/dashboard' || pathname === '/customer-dashboard') {
+        filePath = path.join(__dirname, 'customer-dashboard.html');
     }
     fs.readFile(filePath, (err, data) => {
         if (err) {
@@ -146,7 +151,6 @@ function wrapRes(res) {
             if (!res.headersSent) {
                 const headers = {
                     'Content-Type': 'application/json; charset=utf-8',
-                    'Access-Control-Allow-Origin': '*',
                     ...wrapper._headers
                 };
                 try { res.writeHead(wrapper._statusCode || 200, headers); } catch {}
@@ -155,7 +159,7 @@ function wrapRes(res) {
         },
         end(data) {
             if (!res.headersSent) {
-                try { res.writeHead(wrapper._statusCode || 200, { 'Access-Control-Allow-Origin': '*', ...wrapper._headers }); } catch {}
+                try { res.writeHead(wrapper._statusCode || 200, wrapper._headers); } catch {}
             }
             try { res.end(data || ''); } catch {}
         }
@@ -180,12 +184,14 @@ function handleRequest(req, res) {
     res.setHeader('X-Request-ID', req.id);
     if (requestCounter) requestCounter.total++;
 
+    if (!setCorsHeaders(req, res) && req.headers.origin) {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Origin is not allowed' }));
+        return;
+    }
+
     if (req.method === 'OPTIONS') {
-        res.writeHead(200, {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-ID, X-API-Key'
-        });
+        res.writeHead(204);
         res.end();
         return;
     }
@@ -195,6 +201,7 @@ function handleRequest(req, res) {
         if (requestCounter) requestCounter.error++;
         return;
     }
+    req._rateLimitChecked = true;
 
     const API_HANDLERS = {
         '/api/chat': chatHandler,
@@ -203,11 +210,15 @@ function handleRequest(req, res) {
         '/api/learn': learnHandler,
         '/api/learning-feedback': learningFeedbackHandler,
         '/api/admin': adminHandler,
+        '/api/checkout': require('./api/checkout.js'),
+        '/api/geo': require('./api/geo.js'),
+        '/api/tenant': require('./api/tenant.js'),
         '/api/settings': require('./api/settings.js'),
         '/api/auth': require('./api/auth.js'),
         '/api/customer-auth': require('./api/customer-auth.js'),
         '/api/otp': require('./api/otp.js'),
         '/api/knowledge': require('./api/knowledge.js'),
+        '/api/knowledge/text': require('./api/knowledge.js'),
         '/api/knowledge/crawl': require('./api/knowledge.js'),
         '/api/knowledge/search': require('./api/knowledge.js'),
         '/api/v1/health': require('./api/v1/health.js'),
@@ -223,7 +234,7 @@ function handleRequest(req, res) {
     }
 
     // --- Serve static files and extensionless routes for local testing ---
-    if (pathname === '/' || pathname === '/admin' || pathname === '/login' || pathname === '/pricing') {
+    if (pathname === '/' || pathname === '/admin' || pathname === '/login' || pathname === '/pricing' || pathname === '/customer-login' || pathname === '/dashboard' || pathname === '/customer-dashboard') {
         return serveStatic(req, res, pathname);
     }
     // Direct .html access
@@ -265,17 +276,36 @@ if (require.main === module) {
 
     const server = http.createServer((req, res) => {
         let body = '';
-        req.on('data', chunk => (body += chunk));
+        let bodySize = 0;
+        let bodyTooLarge = false;
+        req.on('data', chunk => {
+            bodySize += chunk.length;
+            if (bodySize > 1_000_000) {
+                bodyTooLarge = true;
+                return;
+            }
+            body += chunk;
+        });
         req.on('end', () => {
+            if (bodyTooLarge) {
+                res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: 'Request body too large' }));
+                return;
+            }
             try { req.body = JSON.parse(body); }
             catch { req.body = {}; }
-            handleRequest(req, res);
+            Promise.resolve(handleRequest(req, res)).catch(() => {
+                if (!res.headersSent) {
+                    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ error: 'Internal server error' }));
+                }
+            });
         });
     });
 
     // Initialize socket.io (WebSocket for Real-time logs, Audio Streaming, and Tenant Isolation)
     io = socketIo(server, { 
-        cors: { origin: '*' },
+        cors: { origin: (origin, callback) => callback(null, isOriginAllowed(origin)) },
         pingTimeout: 60000,
         pingInterval: 25000 
     });

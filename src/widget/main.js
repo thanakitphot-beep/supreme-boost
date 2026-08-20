@@ -420,6 +420,11 @@
 
     // ─── IndexedDB Session Memory ─────────────────────────────────
 
+    function createConversationId() {
+        if (window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
+        return "sb-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
+    }
+
     var SessionDB = {
         _db: null, _ready: false, _queue: [],
         init: function () { if (this._ready || this._initializing) return; this._initializing = true; try { var req = indexedDB.open("SupremeBoost", 1); req.onupgradeneeded = function (e) { var db = e.target.result; if (!db.objectStoreNames.contains("mem")) db.createObjectStore("mem", { keyPath: "key" }); if (!db.objectStoreNames.contains("cart")) db.createObjectStore("cart", { keyPath: "id" }); if (!db.objectStoreNames.contains("prefs")) db.createObjectStore("prefs", { keyPath: "k" }); }; var self = this; req.onsuccess = function (e) { self._db = e.target.result; self._ready = true; self._drain(); }; req.onerror = function () { self._ready = false; }; } catch (_) { this._ready = false; } },
@@ -637,6 +642,8 @@
 
     var Whisper = { _el: null, _timer: null, _visible: false, init: function (shadow) { this._el = document.getElementById(WIDGET_ID + "-whisper"); }, show: function (text, type) { if (!this._el) return; if (this._timer) clearTimeout(this._timer); var label = "⚡ AI INSIGHT"; if (type === "proactive") label = "🔮 AI ตรวจจับ"; else if (type === "greeting") label = "🤖 AI ทักทาย"; else if (type === "hint") label = "💡 คำแนะนำ"; var words = text.split(" "); var spans = words.map(function (w, i) { return '<span style="opacity:0;display:inline-block;transform:translateY(10px) scale(0.9);animation:sbFloatWord 0.5s cubic-bezier(0.34,1.56,0.64,1) ' + (0.08 + i * 0.06) + 's forwards;">' + w + '</span>'; }).join(' '); this._el.innerHTML = '<span class="sb-whisper-label">' + label + '</span>' + spans; this._el.className = "sb-whisper sb-whisper-" + (type || "info"); this._el.style.opacity = "1"; this._el.style.transform = "translateY(0) scale(1)"; this._visible = true; this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS); }, hide: function () { if (!this._el || !this._visible) return; this._visible = false; this._el.style.opacity = "0"; this._el.style.transform = "translateY(10px) scale(0.95)"; if (this._timer) { clearTimeout(this._timer); this._timer = null; } }, isVisible: function () { return this._visible; } };
 
+    Whisper.show = function (text, type) { if (!this._el) return; if (this._timer) clearTimeout(this._timer); var label = "AI INSIGHT"; if (type === "proactive") label = "AI ตรวจจับ"; else if (type === "greeting") label = "AI ทักทาย"; else if (type === "hint") label = "คำแนะนำ"; this._el.textContent = ""; var labelEl = document.createElement("span"); labelEl.className = "sb-whisper-label"; labelEl.textContent = label; this._el.appendChild(labelEl); String(text || "").split(/(\s+)/).forEach(function (word, index) { if (!word) return; var span = document.createElement("span"); span.textContent = word; if (!/^\s+$/.test(word)) { span.style.opacity = "0"; span.style.display = "inline-block"; span.style.transform = "translateY(10px) scale(0.9)"; span.style.animation = "sbFloatWord 0.5s cubic-bezier(0.34,1.56,0.64,1) " + (0.08 + index * 0.06) + "s forwards"; } this._el.appendChild(span); }.bind(this)); this._el.className = "sb-whisper sb-whisper-" + (type || "info"); this._el.style.opacity = "1"; this._el.style.transform = "translateY(0) scale(1)"; this._visible = true; this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS); };
+
     function triggerHandoff(locale, context) { _handoffCount++; var strs = t(locale); if (!_st || !_msgs) return; setOpen(true); var card = document.createElement("div"); card.className = "sb-msg sb-assistant sb-handoff"; card.innerHTML = '<div style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border-radius:12px;padding:16px;text-align:center;animation:sbSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1);"><div style="font-size:24px;margin-bottom:4px;">\uD83D\uDC68\u200D\uD83D\uDCBB</div><div style="font-weight:700;font-size:15px;margin-bottom:4px;">' + strs.handoffTitle + '</div><div style="font-size:12px;opacity:0.9;margin-bottom:10px;">' + strs.handoffBody + '</div><div style="background:rgba(255,255,255,0.2);border-radius:8px;padding:8px;font-size:11px;text-align:left;line-height:1.5;"><strong>' + strs.handoffSummary + ':</strong><br>' + escHtml(context.slice(0, 300)) + '</div><div style="margin-top:10px;font-size:11px;opacity:0.7;">ID #' + _handoffCount + '</div></div>'; _msgs.appendChild(card); _msgs.scrollTop = _msgs.scrollHeight; SessionDB.setPref("handoff", { count: _handoffCount, time: Date.now(), context: context.slice(0, 300) }); }
 
     function init() {
@@ -687,7 +694,7 @@
             var themeBtn = panel.querySelector('[data-action="theme"]');
             var voiceBtn = panel.querySelector(".sb-voice-btn");
 
-            var state = { open: false, busy: false, selectedText: "", history: [], locale: normLocale(detectLocale()) };
+            var state = { open: false, busy: false, selectedText: "", history: [], locale: normLocale(detectLocale()), conversationId: createConversationId() };
             _st = state; _cfg = cfg; _msgs = messages; _setOpen = setOpen;
 
             // --- Voice System ---
@@ -778,6 +785,7 @@
             });
 
             SessionDB.getPref("history").then(function (h) { if (Array.isArray(h)) state.history = h.slice(-MAX_HISTORY); });
+            SessionDB.getPref("conversationId").then(function (id) { if (typeof id === "string" && id.length >= 12 && id.length <= 120) state.conversationId = id; else SessionDB.setPref("conversationId", state.conversationId); });
             SessionDB.getPref("theme").then(function (t) { if (t === "dark") document.documentElement.classList.add("supreme-boost-dark-page"); });
 
             orb.addEventListener("click", function (e) { e.stopPropagation(); if (AmbientUI.isExpanded()) { setOpen(false); } else { setOpen(true); AmbientUI.setState("idle"); InteractiveWhisper.hide(); } });
@@ -964,7 +972,7 @@
         var to = setTimeout(function () { currentAbort.abort(); }, 12000);
         fetch(_cfg.backendUrl, {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ apiKey: _cfg.apiKey, prompt: overridePrompt || "", proactive: true, domSnapshot: snap, siteDNA: dna, pageContent: collectContent(), selectedText: "", history: [], url: location.href, title: document.title, locale: normLocale(_st.locale), hoverContext: snap._hoverContext || "" }),
+            body: JSON.stringify({ apiKey: _cfg.apiKey, conversationId: _st.conversationId, prompt: overridePrompt || "", proactive: true, domSnapshot: snap, siteDNA: dna, pageContent: collectContent(), selectedText: "", history: [], url: location.href, title: document.title, locale: normLocale(_st.locale), hoverContext: snap._hoverContext || "" }),
             signal: currentAbort.signal
         }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (data) {
             clearTimeout(to);
@@ -993,7 +1001,7 @@
         try {
             var r = await fetch(cfg.backendUrl, {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ apiKey: cfg.apiKey, prompt: maskPII(prompt), pageContent: maskPII(collectContent()), siteDNA: dna, selectedText: maskPII(state.selectedText), history: maskHist(state.history), url: location.href, title: document.title, locale: normLocale(locale), domSnapshot: snap }),
+                body: JSON.stringify({ apiKey: cfg.apiKey, conversationId: state.conversationId, prompt: maskPII(prompt), pageContent: maskPII(collectContent()), siteDNA: dna, selectedText: maskPII(state.selectedText), history: maskHist(state.history), url: location.href, title: document.title, locale: normLocale(locale), domSnapshot: snap }),
                 signal: ctrl.signal
             });
             if (r.status === 404) {
@@ -1422,6 +1430,17 @@
         return con;
     }
 
+    function safeNavigationUrl(rawUrl) {
+        try {
+            var destination = new URL(rawUrl, location.href);
+            if (destination.origin !== location.origin) return null;
+            if (/(admin|login|password|secure|backend|dashboard|checkout|auth)/i.test(destination.pathname)) return null;
+            return destination.pathname + destination.search + destination.hash;
+        } catch (_) {
+            return null;
+        }
+    }
+
     function execAction(act) {
         if (!act || !act.type) return;
         var handle = function () {
@@ -1456,8 +1475,13 @@
                         });
                     }
                     break;
+                case "navigate":
+                    if (_st && _msgs) navigate(act.url, (act.keywords || []).join(','), _msgs, _st.locale);
+                    break;
                 case "warp_cross_page":
-                    if (act.url) {
+                    var crossPageUrl = safeNavigationUrl(act.url);
+                    if (crossPageUrl) {
+                        act.url = crossPageUrl;
                         var kw = act.keywords || [];
                         var ro = document.getElementById(WIDGET_ID);
                         if (ro && ro.shadowRoot) {
@@ -1514,9 +1538,9 @@
     function showConfirm(act, loc, onYes, onNo) { var ro = document.getElementById(WIDGET_ID); if (!ro || !ro.shadowRoot) return; var p = ro.shadowRoot.querySelector(".sb-panel"); if (!p) return; ensureConfirmStyle(ro.shadowRoot); var ex = p.querySelector(".sb-confirm-overlay"); if (ex) ex.remove(); var s = t(loc), desc = act.targetText || act.selector || act.type || ""; var ov = document.createElement("div"); ov.className = "sb-confirm-overlay"; ov.innerHTML = '<div class="sb-confirm-box"><div class="sb-confirm-title">⚠️ ' + s.confirmTitle + '</div><div class="sb-confirm-body"><p>' + s.confirmBody + '</p>' + (act.safetyReason ? '<p style="color:#dc2626;font-size:12px;margin-top:4px;">' + escHtml(act.safetyReason) + '</p>' : '') + '<p style="margin-top:6px;font-family:monospace;font-size:12px;background:#f8fafc;padding:8px;border-radius:8px;word-break:break-all;">' + escHtml(desc.slice(0, 200)) + '</p></div><div class="sb-confirm-actions"><button class="sb-confirm-btn sb-confirm-deny" data-action="deny">' + s.confirmDeny + '</button><button class="sb-confirm-btn sb-confirm-allow" data-action="allow">' + s.confirmAllow + '</button></div></div>'; p.appendChild(ov); ov.querySelector('[data-action="deny"]').addEventListener("click", function () { ov.remove(); if (onNo) onNo(); }); ov.querySelector('[data-action="allow"]').addEventListener("click", function () { ov.remove(); if (onYes) onYes(); }); }
     function ensureConfirmStyle(shadow) { var s = shadow.querySelector("#" + CONFIRM_STYLE_ID); if (s) return; var st = document.createElement("style"); st.id = CONFIRM_STYLE_ID; st.textContent = ".sb-confirm-overlay{position:absolute;inset:0;z-index:2147483001;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-radius:16px;animation:sbFadeIn 0.2s ease;}.sb-confirm-box{width:88%;max-width:320px;padding:20px;background:rgba(255,255,255,0.95);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;border:1px solid rgba(255,255,255,0.3);box-shadow:0 20px 60px rgba(0,0,0,0.25);animation:sbSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);}.sb-confirm-title{font:700 15px/1.2 Arial,sans-serif;margin-bottom:8px;color:#dc2626;}.sb-confirm-body{font:13px/1.5 Arial,sans-serif;color:#475569;margin-bottom:16px;}.sb-confirm-actions{display:flex;gap:10px;justify-content:flex-end;}.sb-confirm-btn{padding:9px 20px;border-radius:10px;border:0;font:600 14px/1 Arial,sans-serif;cursor:pointer;transition:transform 0.2s ease;}.sb-confirm-btn:hover{transform:scale(1.04);}.sb-confirm-allow{background:#dc2626;color:#fff;}.sb-confirm-deny{background:#f1f5f9;color:#475569;}@keyframes sbFadeIn{from{opacity:0}to{opacity:1}}@keyframes sbSlideUp{from{opacity:0;transform:translateY(20px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}}"; var firstStyle = shadow.querySelector("style"); if (firstStyle) firstStyle.insertAdjacentElement("afterend", st); else shadow.insertBefore(st, shadow.firstChild); }
 
-    function crossSearch(kw, cfg, m, loc) { var links = collectLinks(); var strs = t(loc); var ld = addMsg(m, "assistant", strs.searchingPages || "🔍 กำลังค้นหา...", true); return fetch(cfg.backendUrl.replace('/api/chat', '/api/crawl'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: kw, urls: links, rootUrl: location.origin }) }).then(function (r) { return r.json(); }).then(function (d) { updateMsg(ld, ''); return (d.results || []).slice(0, 5); }).catch(function () { updateMsg(ld, strs.connectError); return []; }); }
+    function crossSearch(kw, cfg, m, loc) { var links = collectLinks(); var strs = t(loc); var ld = addMsg(m, "assistant", strs.searchingPages || "🔍 กำลังค้นหา...", true); return fetch(cfg.backendUrl.replace('/api/chat', '/api/crawl'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'omit', referrerPolicy: 'no-referrer', body: JSON.stringify({ keywords: kw, urls: links, rootUrl: location.origin }) }).then(function (r) { return r.json(); }).then(function (d) { updateMsg(ld, ''); return (d.results || []).slice(0, 5); }).catch(function () { updateMsg(ld, strs.connectError); return []; }); }
     function showCross(r, m, kw, loc) { if (!r.length) return; var s = t(loc); var rm = document.createElement('div'); rm.className = 'sb-msg sb-assistant'; rm.innerHTML = '<strong>' + (s.foundOnOtherPages || '✨ เจอบนหน้าอื่น:') + '</strong>'; m.appendChild(rm); r.forEach(function (rr) { var b = document.createElement('button'); b.type = 'button'; b.style.cssText = 'display:block;width:100%;text-align:left;padding:10px 14px;margin:6px 0;border:1px solid var(--sb-border);border-radius:10px;background:var(--sb-bg);color:var(--sb-text);font-size:13px;cursor:pointer;transition:all 0.25s cubic-bezier(0.34,1.56,0.64,1);'; b.innerHTML = '<strong>\uD83D\uDCC4 ' + escHtml(rr.title) + '</strong><br><small style="color:var(--sb-muted)">' + escHtml(rr.snippet.slice(0, 120)) + '...</small>'; b.onmouseenter = function () { b.style.borderColor = 'var(--sb-primary)'; b.style.transform = 'translateX(4px) scale(1.01)'; }; b.onmouseleave = function () { b.style.borderColor = 'var(--sb-border)'; b.style.transform = 'none'; }; b.onclick = function () { navigate(rr.url, kw, m, loc); }; m.appendChild(b); }); m.scrollTop = m.scrollHeight; }
-    function navigate(url, kw, m, loc) { addMsg(m, "assistant", "\uD83D\uDCCD กำลังพาวาร์ปไปที่: " + (url.split('/').pop() || url) + "..."); document.body.style.transition = "transform 0.8s cubic-bezier(0.5,0,0.2,1)"; document.body.style.transform = "scale(1.05)"; setTimeout(function () { var sep = url.indexOf('?') !== -1 ? '&' : '?'; window.location.href = url + sep + 'sb-warp=1&sb-kw=' + encodeURIComponent(kw || ''); }, 800); }
+    function navigate(url, kw, m, loc, telekinesis) { var destination = safeNavigationUrl(url); if (!destination) { addMsg(m, "assistant", "ไม่สามารถพาไปยังหน้านี้ได้"); return; } addMsg(m, "assistant", telekinesis ? "กำลังพาวาร์ปไปหน้าเป้าหมาย..." : "กำลังพาวาร์ปไปที่: " + (destination.split('/').pop() || destination) + "..."); document.body.style.transition = telekinesis ? "transform 0.8s cubic-bezier(0.5,0,0.2,1), filter 0.8s ease" : "transform 0.8s cubic-bezier(0.5,0,0.2,1)"; document.body.style.transform = "scale(1.05)"; if (telekinesis) document.body.style.filter = "blur(10px) brightness(1.5)"; setTimeout(function () { var next = new URL(destination, location.href); next.searchParams.set('sb-warp', '1'); next.searchParams.set('sb-kw', kw || ''); window.location.assign(next.pathname + next.search + next.hash); }, 800); }
     function collectLinks() { var l = [], s = new Set(), c = location.origin; document.querySelectorAll('a[href]').forEach(function (a) { try { var u = new URL(a.href, document.baseURI); if (u.origin === c && u.pathname !== location.pathname && !u.hash && !s.has(u.pathname)) { if (!/(admin|login|password|secure|backend|dashboard|checkout|auth)/i.test(u.pathname)) { s.add(u.pathname); l.push(u.href); } } } catch (_) { } }); return l.slice(0, MAX_CRAWL_SEEDS); }
     function escHtml(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
     function handlePostWarp() {

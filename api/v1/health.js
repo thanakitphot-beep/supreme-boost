@@ -4,6 +4,7 @@
 
 const { semanticCache } = require('../../services/cache');
 const { getRateLimiterStats } = require('../../services/rateLimit');
+const { setCorsHeaders } = require('../../services/cors');
 
 const startTime = Date.now();
 const requestCounter = { total: 0, success: 0, error: 0, cached: 0 };
@@ -12,12 +13,6 @@ const agentStats = { planner: 0, executor: 0, reviewer: 0, memory: 0, vision: 0 
 // Export counters so other modules can increment them
 module.exports.requestCounter = requestCounter;
 module.exports.agentStats = agentStats;
-
-function setCors(res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
 
 function getMemoryUsage() {
     try {
@@ -46,7 +41,7 @@ function getUptime() {
 }
 
 module.exports = async function handler(req, res) {
-    setCors(res);
+    if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     const url = req.url || '';

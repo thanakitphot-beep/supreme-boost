@@ -7,38 +7,31 @@ function getAllowedDomains() {
     return (process.env.CORS_ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 }
 
-function setCorsHeaders(req, res) {
-    const origin = req.headers.origin;
-    
-    let allowOrigin = '*'; // Default fallback if not strict
-
-    if (process.env.ENFORCE_STRICT_CORS === 'true') {
-        const allowedDomains = getAllowedDomains();
-        if (origin) {
-            // Check against global allowlist
-            if (allowedDomains.includes(origin)) {
-                allowOrigin = origin;
-            } else {
-                // If not in global allowlist, we would normally check tenant DB here.
-                // For Phase 0, if strict is on and not in list, we block.
-                // We'll set it to a dummy value so the browser blocks it.
-                allowOrigin = 'null';
-            }
-        } else {
-            // Non-browser request (e.g. curl).
-            allowOrigin = '*';
-        }
-    } else {
-        // Warning if strict CORS is disabled in production
-        if (process.env.NODE_ENV === 'production' && !global.__corsWarned) {
-            console.warn('[SECURITY] ENFORCE_STRICT_CORS is false. API is open to all origins.');
-            global.__corsWarned = true;
-        }
-    }
-
-    res.setHeader('Access-Control-Allow-Origin', allowOrigin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
+function strictCorsEnabled() {
+    return process.env.ENFORCE_STRICT_CORS === 'true' || process.env.NODE_ENV === 'production';
 }
 
-module.exports = { setCorsHeaders };
+function isOriginAllowed(origin) {
+    if (!origin) return true;
+    if (!strictCorsEnabled()) return true;
+    return getAllowedDomains().includes(origin);
+}
+
+function setCorsHeaders(req, res) {
+    const origin = req.headers.origin;
+    const allowed = isOriginAllowed(origin);
+
+    // Requests without Origin are non-browser clients such as health checks.
+    // Do not emit a wildcard header in production; only reflect allowlisted origins.
+    if (origin && allowed) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+    }
+    if (allowed) {
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
+    }
+    return allowed;
+}
+
+module.exports = { getAllowedDomains, isOriginAllowed, setCorsHeaders };

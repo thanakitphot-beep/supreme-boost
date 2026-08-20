@@ -87,6 +87,21 @@ describe('POST /api/chat — contract', () => {
 describe('POST /api/auth — contract', () => {
     const authHandler = require('../../api/auth');
 
+    const previousJwtSecret = process.env.JWT_SECRET;
+    const previousAdminPassword = process.env.ADMIN_PASSWORD;
+
+    beforeAll(() => {
+        process.env.JWT_SECRET = 'test-jwt-secret-that-is-long-enough-to-be-safe';
+        process.env.ADMIN_PASSWORD = 'test-admin-password';
+    });
+
+    afterAll(() => {
+        if (previousJwtSecret === undefined) delete process.env.JWT_SECRET;
+        else process.env.JWT_SECRET = previousJwtSecret;
+        if (previousAdminPassword === undefined) delete process.env.ADMIN_PASSWORD;
+        else process.env.ADMIN_PASSWORD = previousAdminPassword;
+    });
+
     test('OPTIONS preflight returns 200', async () => {
         const req = mockReq({ method: 'OPTIONS', url: '/api/auth', body: {} });
         const res = mockRes();
@@ -115,6 +130,14 @@ describe('POST /api/auth — contract', () => {
         const res = mockRes();
         await authHandler(req, res);
         expect(res._statusCode).toBe(401);
+    });
+
+    test('Refresh tokens cannot be used as access tokens', async () => {
+        const loginRes = mockRes();
+        await authHandler(mockReq({ body: { password: 'test-admin-password' } }), loginRes);
+        const verifyRes = mockRes();
+        await authHandler(mockReq({ method: 'GET', headers: { authorization: `Bearer ${loginRes._body.refreshToken}` } }), verifyRes);
+        expect(verifyRes._statusCode).toBe(401);
     });
 });
 

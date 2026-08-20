@@ -13,8 +13,8 @@ async function build() {
         });
         console.log('Widget built successfully!');
     } catch (e) {
-        console.error('Build failed (ignored for deployment):', e.message);
-        process.exit(0);
+        console.error('Build failed:', e.message);
+        process.exitCode = 1;
     }
 }
 

@@ -34,6 +34,9 @@
     "supertest": "^7.2.2"
   },
   "description": "INDICATOR web-agent widget with a provider-independent, self-hostable agent core.",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "server.js",
   "repository": {
     "type": "git",

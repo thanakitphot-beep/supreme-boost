@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { connectToDatabase } = require('./_mongodb.js');
 const { setCorsHeaders } = require('../services/cors');
+const { checkRateLimit } = require('../services/rateLimit');
 
 // Very basic authentication: For tenants, they pass `Bearer api_key_here`
 // In a real app we'd use JWT, but since they have their api_key in localStorage, we verify that.
@@ -15,11 +16,12 @@ async function authenticateTenant(req, db) {
 }
 
 module.exports = async function handler(req, res) {
-    setCorsHeaders(req, res);
+    if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === "OPTIONS") return res.status(200).end();
+    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'api')) return;
 
     const db = await connectToDatabase();
-    if (!db) return res.status(500).json({ error: "Database not configured" });
+    if (!db) return res.status(503).json({ error: "Database is not configured" });
 
     const tenant = await authenticateTenant(req, db);
     if (!tenant) {

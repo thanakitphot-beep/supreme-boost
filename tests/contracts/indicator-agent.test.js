@@ -264,10 +264,9 @@ describe('INDICATOR owned agent — contract', () => {
         const bundle = fs.readFileSync(path.resolve(__dirname, '../../supreme-boost/boost.js'), 'utf8');
         const source = fs.readFileSync(path.resolve(__dirname, '../../src/widget/main.js'), 'utf8');
         expect(bundle).toContain('case"navigate"');
-        expect(source).toContain('if(act.showResults){showCross');
-        expect(source).toContain("credentials:'omit'");
-        expect(source).toContain("/api/learn");
-        expect(source).toContain('new URL(act.url, location.href)');
+        expect(source).toContain('safeNavigationUrl');
+        expect(source).toContain("credentials: 'omit'");
+        expect(source).toContain('new URL(rawUrl, location.href)');
         expect(source).toContain('destination.origin !== location.origin');
     });
 

@@ -23,6 +23,10 @@ const PRIVATE_CONTEXT_PREFIX = '__indicator_context_product__:';
 
 let inMemoryStore = null;
 
+function filePersistenceEnabled() {
+    return process.env.INDICATOR_FILE_LEARNING === 'true';
+}
+
 function safeText(value, max) {
     return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
@@ -49,6 +53,7 @@ function readStore() {
 }
 
 function saveStore(store) {
+    if (!filePersistenceEnabled()) return;
     const directory = path.dirname(STORE_PATH);
     if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
     const temporaryPath = `${STORE_PATH}.tmp`;

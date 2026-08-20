@@ -107,6 +107,12 @@ describe('services/ssrfBlocker — URL validation', () => {
         expect(isSafeUrl('http://10.0.0.1/secret')).toBe(false);
     });
 
+    test('blocks additional private and loopback targets', () => {
+        expect(isSafeUrl('http://172.20.0.1/secret')).toBe(false);
+        expect(isSafeUrl('http://localhost./secret')).toBe(false);
+        expect(isSafeUrl('http://[::1]/secret')).toBe(false);
+    });
+
     test('allows a public HTTPS URL', () => {
         expect(isSafeUrl('https://www.example.com/about')).toBe(true);
     });
@@ -153,12 +159,13 @@ describe('api/admin — security', () => {
 describe('services/cors — ENFORCE_STRICT_CORS flag', () => {
     const { setCorsHeaders } = require('../../services/cors');
 
-    test('When flag OFF (default): all origins get wildcard', () => {
+    test('When flag OFF in development: the request origin is reflected', () => {
         delete process.env.ENFORCE_STRICT_CORS;
         const req = mockReq({ headers: { origin: 'https://evil.com' } });
         const res = mockRes();
         setCorsHeaders(req, res);
-        expect(res._headers['access-control-allow-origin']).toBe('*');
+        expect(res._headers['access-control-allow-origin']).toBe('https://evil.com');
+        expect(res._headers.vary).toBe('Origin');
     });
 
     test('When flag ON and origin not in allowlist: origin is rejected', () => {
@@ -167,8 +174,7 @@ describe('services/cors — ENFORCE_STRICT_CORS flag', () => {
         const req = mockReq({ headers: { origin: 'https://evil.com' } });
         const res = mockRes();
         setCorsHeaders(req, res);
-        expect(res._headers['access-control-allow-origin']).not.toBe('https://evil.com');
-        expect(res._headers['access-control-allow-origin']).not.toBe('*');
+        expect(res._headers['access-control-allow-origin']).toBeUndefined();
         delete process.env.ENFORCE_STRICT_CORS;
         delete process.env.CORS_ALLOWED_ORIGINS;
     });

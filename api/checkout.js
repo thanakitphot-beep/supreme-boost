@@ -1,18 +1,15 @@
 const crypto = require('crypto');
 const { connectToDatabase } = require("./_mongodb.js");
-
-function setCorsHeaders(res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
+const { setCorsHeaders } = require('../services/cors');
+const { checkRateLimit } = require('../services/rateLimit');
 
 module.exports = async function handler(req, res) {
-    setCorsHeaders(res);
+    if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === "OPTIONS") return res.status(200).end();
+    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'api')) return;
 
     const db = await connectToDatabase();
-    if (!db) return res.status(500).json({ error: "Database not configured" });
+    if (!db) return res.status(503).json({ error: "Database is not configured" });
 
     try {
         if (req.method === "GET") {
