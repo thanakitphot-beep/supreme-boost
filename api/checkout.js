@@ -60,6 +60,7 @@ module.exports = async function handler(req, res) {
                         api_key: apiKey,
                         package_type: body.packageType,
                         status: 'active',
+                        allowed_origins: [],
                         expires_at: expiry.toISOString(),
                         created_at: new Date().toISOString()
                     });

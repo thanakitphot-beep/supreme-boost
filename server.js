@@ -178,19 +178,20 @@ function handleRequest(req, res) {
     }
     const pathname = parsedUrl.pathname;
     req.query = Object.fromEntries(parsedUrl.searchParams.entries());
+    const tenantCorsRoute = ['/api/chat', '/api/v1/chat', '/api/crawl'].includes(pathname);
 
     // Request Tracing & Metrics
     req.id = req.headers['x-request-id'] || Math.random().toString(36).substring(2, 15);
     res.setHeader('X-Request-ID', req.id);
     if (requestCounter) requestCounter.total++;
 
-    if (!setCorsHeaders(req, res) && req.headers.origin) {
+    if (!setCorsHeaders(req, res) && req.headers.origin && !tenantCorsRoute) {
         res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: 'Origin is not allowed' }));
         return;
     }
 
-    if (req.method === 'OPTIONS') {
+    if (req.method === 'OPTIONS' && !tenantCorsRoute) {
         res.writeHead(204);
         res.end();
         return;

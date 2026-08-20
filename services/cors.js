@@ -16,15 +16,15 @@ function strictCorsEnabled() {
     return process.env.ENFORCE_STRICT_CORS === 'true' || process.env.NODE_ENV === 'production';
 }
 
-function isOriginAllowed(origin) {
+function isOriginAllowed(origin, additionalOrigins = []) {
     if (!origin) return true;
     if (!strictCorsEnabled()) return true;
-    return getAllowedDomains().includes(origin);
+    return [...getAllowedDomains(), ...additionalOrigins].includes(origin);
 }
 
-function setCorsHeaders(req, res) {
+function setCorsHeaders(req, res, additionalOrigins = []) {
     const origin = req.headers.origin;
-    const allowed = isOriginAllowed(origin);
+    const allowed = isOriginAllowed(origin, additionalOrigins);
 
     // Requests without Origin are non-browser clients such as health checks.
     // Do not emit a wildcard header in production; only reflect allowlisted origins.

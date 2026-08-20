@@ -1,11 +1,18 @@
 const crypto = require('crypto');
 const { connectToDatabase } = require("./_mongodb.js");
 const { authConfigured, signToken, verifyAccessJWT } = require('./_auth.js');
+const { normalizeAllowedOrigins } = require('../services/tenantAccess');
 const { setCorsHeaders } = require('../services/cors');
 const { checkRateLimit } = require('../services/rateLimit');
 
 function hashPassword(password) {
     return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function adminTenant(tenant) {
+    if (!tenant) return tenant;
+    const { password, auth, ...safeTenant } = tenant;
+    return safeTenant;
 }
 
 async function authenticateUser(req) {
@@ -44,7 +51,7 @@ module.exports = async function handler(req, res) {
             }
             if (action === 'tenants') {
                 const data = await db.collection('tenants').find({}).sort({ created_at: -1 }).toArray();
-                return res.status(200).json({ tenants: data || [] });
+                return res.status(200).json({ tenants: (data || []).map(adminTenant) });
             }
             if (action === 'billing') {
                 const data = await db.collection('billing_requests').find({}).sort({ created_at: -1 }).toArray();
@@ -100,19 +107,20 @@ module.exports = async function handler(req, res) {
             if (profile.role !== 'admin') return res.status(403).json({ error: "Forbidden: Admins only" });
 
             if (action === 'update_tenant') {
-                const { id, status, package_type, expires_at } = body;
+                const { id, status, package_type, expires_at, allowed_origins } = body;
                 const updateData = {};
                 if (status !== undefined) updateData.status = status;
                 if (package_type !== undefined) updateData.package_type = package_type;
                 if (expires_at !== undefined) updateData.expires_at = expires_at;
+                if (allowed_origins !== undefined) updateData.allowed_origins = normalizeAllowedOrigins(allowed_origins);
 
                 await db.collection('tenants').updateOne({ id }, { $set: updateData });
                 const tenant = await db.collection('tenants').findOne({ id });
-                return res.status(200).json({ success: true, tenant });
+                return res.status(200).json({ success: true, tenant: adminTenant(tenant) });
             }
 
             if (action === 'add_tenant') {
-                const { company_name, package_type, duration_months } = body;
+                const { company_name, package_type, duration_months, allowed_origins } = body;
                 if (!company_name) return res.status(400).json({ error: "Company name required" });
 
                 const apiKey = 'sk_live_' + crypto.randomBytes(12).toString('hex');
@@ -131,13 +139,14 @@ module.exports = async function handler(req, res) {
                     password: hashPassword(company_name.trim()),
                     api_key: apiKey,
                     package_type: package_type || 'basic',
+                    allowed_origins: normalizeAllowedOrigins(allowed_origins),
                     status: 'active',
                     expires_at,
                     created_at: new Date().toISOString()
                 };
                 
                 await db.collection('tenants').insertOne(newTenant);
-                return res.status(200).json({ success: true, tenant: newTenant });
+                return res.status(200).json({ success: true, tenant: adminTenant(newTenant) });
             }
 
             if (action === 'approve_billing') {
@@ -157,6 +166,7 @@ module.exports = async function handler(req, res) {
                     api_key: apiKey,
                     package_type: request.package_type,
                     status: 'active',
+                    allowed_origins: [],
                     expires_at: expiry.toISOString(),
                     created_at: new Date().toISOString()
                 };
@@ -206,7 +216,7 @@ module.exports = async function handler(req, res) {
 
                 await db.collection('tenants').updateOne({ id }, { $set: updateData });
                 const tenant = await db.collection('tenants').findOne({ id });
-                return res.status(200).json({ success: true, tenant });
+                return res.status(200).json({ success: true, tenant: adminTenant(tenant) });
             }
 
             if (action === 'delete_billing') {

@@ -637,6 +637,7 @@
                     <div class="fg" style="margin-bottom:0"><label class="fl">วันหมดอายุ</label><input type="datetime-local" id="m-exp" class="fi"></div>
                 </div>
                 <div class="fg" style="margin-bottom:0"><label class="fl">สถานะบัญชี</label><select id="m-st" class="fi fi-sel"><option value="active">✅ Active — ใช้งานได้</option><option value="suspended">🚫 Suspended — ระงับชั่วคราว</option></select></div>
+                <div class="fg" style="margin:14px 0 0"><label class="fl">Plugin Allowed Origins</label><textarea id="m-origins" class="fi" rows="3" placeholder="https://shop.example.com&#10;https://www.shop.example.com" style="resize:vertical;font-family:'JetBrains Mono',monospace;font-size:.75rem"></textarea><div style="font-size:.65rem;color:var(--t3);margin-top:5px">ใส่โดเมนเว็บลูกค้า 1 บรรทัดต่อ 1 โดเมน ระบบจะอนุญาตให้ widget ของ tenant นี้เรียก API ได้เท่านั้น</div></div>
             </div>
             <!-- CREDENTIALS -->
             <div id="mt-cred" style="display:none">
@@ -859,6 +860,7 @@ function openMng(id){
     document.getElementById('m-key').textContent=t.api_key;
     document.getElementById('m-pkg').value=t.package_type||'basic';
     document.getElementById('m-st').value=t.status;
+    document.getElementById('m-origins').value=(t.allowed_origins||[]).join('\n');
     if(t.expires_at){const d=new Date(t.expires_at);document.getElementById('m-exp').value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}else{document.getElementById('m-exp').value=''}
     document.getElementById('m-cname').value='';
     document.getElementById('m-uname').value=t.username||'';
@@ -984,7 +986,7 @@ function swMtab(tab,el){
 }
 async function saveMng(){
     if(!curTid)return;
-    const p={id:curTid,package_type:document.getElementById('m-pkg').value,status:document.getElementById('m-st').value};
+    const p={id:curTid,package_type:document.getElementById('m-pkg').value,status:document.getElementById('m-st').value,allowed_origins:document.getElementById('m-origins').value};
     const ex=document.getElementById('m-exp').value;if(ex)p.expires_at=new Date(ex).toISOString();
     try{await fetchAPI('update_tenant','POST',p);toast('อัปเดตข้อมูลลูกค้าสำเร็จ!','success');closeMng();loadT()}
     catch(e){toast('เกิดข้อผิดพลาด: '+e.message,'error')}

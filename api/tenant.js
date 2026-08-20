@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { connectToDatabase } = require('./_mongodb.js');
 const { setCorsHeaders } = require('../services/cors');
 const { checkRateLimit } = require('../services/rateLimit');
+const { tenantIsActive } = require('../services/tenantAccess');
 
 // Very basic authentication: For tenants, they pass `Bearer api_key_here`
 // In a real app we'd use JWT, but since they have their api_key in localStorage, we verify that.
@@ -27,6 +28,9 @@ module.exports = async function handler(req, res) {
     if (!tenant) {
         return res.status(401).json({ error: "Unauthorized" });
     }
+    if (!tenantIsActive(tenant)) {
+        return res.status(403).json({ error: 'Tenant account is inactive or expired' });
+    }
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     const action = url.searchParams.get('action');
@@ -47,7 +51,8 @@ module.exports = async function handler(req, res) {
                         status: tenant.status,
                         package_type: tenant.package_type,
                         expires_at: tenant.expires_at,
-                        created_at: tenant.created_at
+                        created_at: tenant.created_at,
+                        allowed_origins: Array.isArray(tenant.allowed_origins) ? tenant.allowed_origins : []
                     }
                 });
             }

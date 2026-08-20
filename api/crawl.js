@@ -1,6 +1,6 @@
 const { checkRateLimit } = require('../services/rateLimit');
-const { setCorsHeaders } = require('../services/cors');
 const { isSafeFetchUrl, isSafeUrl } = require('../services/ssrfBlocker');
+const { applyPluginCors, authorizePluginRequest } = require('../services/tenantAccess');
 
 const MAX_HTML_BYTES = 500_000;
 const MAX_PAGES = 20;
@@ -33,13 +33,15 @@ function extractText(html) {
 }
 
 module.exports = async function crawlHandler(req, res) {
-    if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
+    if (!await applyPluginCors(req, res)) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
     if (!req._rateLimitChecked && !checkRateLimit(req, res, 'api')) return;
 
     try {
         const body = parseBody(req.body);
+        const access = await authorizePluginRequest({ apiKey: body.apiKey, origin: req.headers.origin });
+        if (access.error) return res.status(403).json({ error: access.error });
         const keywords = (Array.isArray(body.keywords) ? body.keywords : [])
             .filter(keyword => typeof keyword === 'string' && keyword.trim().length > 1)
             .map(keyword => keyword.trim().toLowerCase()).slice(0, 20);

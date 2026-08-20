@@ -18,7 +18,7 @@ const { research: researchExternal } = require('../services/externalResearch');
 const { enabled: intelligenceEnabled, answerWithIntelligence } = require('../services/intelligenceBridge');
 const { maskPII, maskDOMSnapshot } = require('../services/safety');
 const { checkRateLimit } = require('../services/rateLimit');
-const { setCorsHeaders } = require('../services/cors');
+const { applyPluginCors, authorizePluginRequest } = require('../services/tenantAccess');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -431,40 +431,14 @@ async function runOwnedPipeline(payload, mergedHistory, requestId) {
     return aiResponse;
 }
 
-async function validateTenant(body) {
-    let tenantInfo = null;
-    let isValid = true;
-    let tenantError = '';
-
-    if (body.apiKey && body.apiKey !== 'INDICATOR_TEST' && supabase) {
-        try {
-            const { data } = await supabase
-                .from('tenants')
-                .select('id, company_name, api_key, status, package_type, expires_at')
-                .eq('api_key', body.apiKey)
-                .limit(1)
-                .maybeSingle();
-
-            if (data) {
-                tenantInfo = data;
-                if (data.status === 'suspended') {
-                    isValid = false;
-                    tenantError = 'บัญชีถูกระงับการใช้งาน (Suspended)';
-                } else if (data.expires_at && new Date(data.expires_at) < new Date()) {
-                    isValid = false;
-                    tenantError = 'Package หมดอายุ (Expired) กรุณาต่ออายุเพื่อใช้งานต่อ';
-                }
-            }
-        } catch (error) {
-            console.error('Tenant validation error:', error);
-        }
-    }
-
-    return { tenantInfo, isValid, tenantError };
+async function validateTenant(body, origin) {
+    const access = await authorizePluginRequest({ apiKey: body.apiKey, origin });
+    if (access.error) return { tenantInfo: null, isValid: false, tenantError: access.error };
+    return { tenantInfo: access.tenant, isValid: true, tenantError: '' };
 }
 
 async function handler(req, res) {
-    if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
+    if (!await applyPluginCors(req, res)) return res.status(403).json({ error: 'Origin is not allowed' });
 
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -475,7 +449,7 @@ async function handler(req, res) {
 
     try {
         const body = parseBody(req.body);
-        const tenant = await validateTenant(body);
+        const tenant = await validateTenant(body, req.headers.origin);
 
         if (!tenant.isValid) {
             try {

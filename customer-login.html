@@ -67,6 +67,9 @@
                 <i class="fa-solid fa-arrow-right"></i>
             </button>
         </form>
+
+        <div class="flex items-center gap-3 my-6 text-xs text-slate-500"><div class="h-px flex-1 bg-slate-700"></div><span>หรือ</span><div class="h-px flex-1 bg-slate-700"></div></div>
+        <div id="google-signin" class="hidden flex justify-center"></div>
     </div>
 
     <script>
@@ -74,6 +77,47 @@
         if (localStorage.getItem('tenant_data')) {
             window.location.href = '/dashboard';
         }
+
+        function completeLogin(data) {
+            localStorage.setItem('tenant_data', JSON.stringify(data.tenant));
+            window.location.href = '/dashboard';
+        }
+
+        window.handleGoogleCredential = async function (response) {
+            const err = document.getElementById('error-msg');
+            err.classList.add('hidden');
+            try {
+                const res = await fetch('/api/customer-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'google', credential: response.credential })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Google Sign-In failed');
+                completeLogin(data);
+            } catch (error) {
+                err.textContent = error.message;
+                err.classList.remove('hidden');
+            }
+        };
+
+        async function initGoogleSignIn() {
+            try {
+                const res = await fetch('/api/customer-auth?action=google-config');
+                const data = await res.json();
+                if (!res.ok || !data.clientId) return;
+                const script = document.createElement('script');
+                script.src = 'https://accounts.google.com/gsi/client';
+                script.async = true;
+                script.onload = function () {
+                    google.accounts.id.initialize({ client_id: data.clientId, callback: window.handleGoogleCredential, auto_select: false });
+                    google.accounts.id.renderButton(document.getElementById('google-signin'), { theme: 'outline', size: 'large', width: 320, text: 'continue_with' });
+                    document.getElementById('google-signin').classList.remove('hidden');
+                };
+                document.head.appendChild(script);
+            } catch (_) { }
+        }
+        initGoogleSignIn();
 
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -103,8 +147,7 @@
                     btn.classList.remove('from-purple-600', 'to-indigo-600');
                     btn.classList.add('bg-green-500');
                     
-                    localStorage.setItem('tenant_data', JSON.stringify(data.tenant));
-                    setTimeout(() => window.location.href = '/dashboard', 1000);
+                    setTimeout(() => completeLogin(data), 1000);
                 } else {
                     throw new Error(data.error || 'Invalid credentials');
                 }

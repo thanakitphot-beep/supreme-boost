@@ -1,11 +1,35 @@
 const crypto = require('crypto');
 const { connectToDatabase } = require("./_mongodb.js");
+const { configuredClientId, verifyGoogleCredential } = require('./_googleAuth');
 
 const { checkRateLimit } = require('../services/rateLimit');
 const { setCorsHeaders } = require('../services/cors');
 
 function hashPassword(password) {
     return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function publicTenant(tenant) {
+    return {
+        id: tenant.id,
+        username: tenant.username,
+        company_name: tenant.company_name,
+        api_key: tenant.api_key,
+        status: tenant.status,
+        package_type: tenant.package_type,
+        expires_at: tenant.expires_at,
+        created_at: tenant.created_at,
+        allowed_origins: Array.isArray(tenant.allowed_origins) ? tenant.allowed_origins : []
+    };
+}
+
+async function uniqueGoogleUsername(db, email) {
+    const base = String(email || 'google-user').split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'google-user';
+    for (let attempt = 0; attempt < 10; attempt++) {
+        const username = attempt === 0 ? base : `${base}-${crypto.randomBytes(3).toString('hex')}`;
+        if (!await db.collection('tenants').findOne({ username })) return username;
+    }
+    return null;
 }
 
 module.exports = async function handler(req, res) {
@@ -16,6 +40,16 @@ module.exports = async function handler(req, res) {
         return;
     }
 
+    if (req.method === 'GET') {
+        const action = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams.get('action');
+        if (action === 'google-config') {
+            const clientId = configuredClientId();
+            return clientId ? res.status(200).json({ clientId }) : res.status(503).json({ error: 'Google Sign-In is not configured' });
+        }
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
     const db = await connectToDatabase();
     if (!db) return res.status(503).json({ error: "Database is not configured" });
 
@@ -23,6 +57,48 @@ module.exports = async function handler(req, res) {
         if (req.method === "POST") {
             const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
             const { action, username, password } = body;
+
+            if (action === 'google') {
+                const verified = await verifyGoogleCredential(body.credential);
+                if (verified.error) {
+                    const status = configuredClientId() ? 401 : 503;
+                    return res.status(status).json({ error: verified.error });
+                }
+
+                const profile = verified.profile;
+                const existingGoogle = await db.collection('tenants').findOne({ 'auth.google.sub': profile.sub });
+                if (existingGoogle) {
+                    await db.collection('tenants').updateOne({ id: existingGoogle.id }, { $set: { 'auth.google.last_login_at': new Date().toISOString() } });
+                    return res.status(200).json({ success: true, tenant: publicTenant(existingGoogle) });
+                }
+
+                // Do not bind a Google identity to a password account solely by email.
+                const existingEmail = await db.collection('tenants').findOne({ email: profile.email });
+                if (existingEmail) return res.status(409).json({ error: 'This email already has an account. Sign in with its password before linking Google.' });
+
+                const googleUsername = await uniqueGoogleUsername(db, profile.email);
+                if (!googleUsername) return res.status(503).json({ error: 'Unable to create a unique account name. Please try again.' });
+                const now = new Date().toISOString();
+                const newTenant = {
+                    id: crypto.randomUUID(),
+                    company_name: profile.name || googleUsername,
+                    username: googleUsername,
+                    email: profile.email,
+                    api_key: 'sk_live_' + crypto.randomBytes(18).toString('hex'),
+                    status: 'pending',
+                    package_type: 'none',
+                    expires_at: null,
+                    allowed_origins: [],
+                    auth: { google: { sub: profile.sub, email: profile.email, email_verified: true, linked_at: now, last_login_at: now } },
+                    created_at: now
+                };
+                try {
+                    await db.collection('tenants').insertOne(newTenant);
+                } catch (_) {
+                    return res.status(409).json({ error: 'Google account is already linked. Please sign in again.' });
+                }
+                return res.status(201).json({ success: true, tenant: publicTenant(newTenant) });
+            }
 
             // 1. Register Action
             if (action === 'register') {
@@ -38,7 +114,7 @@ module.exports = async function handler(req, res) {
                 }
 
                 const hashedPassword = hashPassword(password);
-                const newApiKey = 'sk_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                const newApiKey = 'sk_live_' + crypto.randomBytes(18).toString('hex');
                 
                 const newTenant = {
                     id: crypto.randomUUID(),
@@ -50,6 +126,7 @@ module.exports = async function handler(req, res) {
                     status: 'pending',
                     package_type: 'none',
                     expires_at: null,
+                    allowed_origins: [],
                     created_at: new Date().toISOString()
                 };
 
@@ -59,18 +136,7 @@ module.exports = async function handler(req, res) {
                     console.warn('[AUTH] MongoDB insertOne failed, ignoring for read-only DB:', dbErr.message);
                 }
 
-                return res.status(200).json({
-                    success: true,
-                    tenant: {
-                        id: newTenant.id,
-                        username: newTenant.username,
-                        company_name: newTenant.company_name,
-                        api_key: newTenant.api_key,
-                        status: newTenant.status,
-                        package_type: newTenant.package_type,
-                        expires_at: newTenant.expires_at
-                    }
-                });
+                return res.status(200).json({ success: true, tenant: publicTenant(newTenant) });
             }
 
             // 2. Login Action
@@ -106,19 +172,7 @@ module.exports = async function handler(req, res) {
                     return res.status(403).json({ error: "Account suspended. Please contact admin." });
                 }
 
-                return res.status(200).json({
-                    success: true,
-                    tenant: {
-                        id: tenant.id,
-                        username: tenant.username,
-                        company_name: tenant.company_name,
-                        api_key: tenant.api_key,
-                        status: tenant.status,
-                        package_type: tenant.package_type,
-                        expires_at: tenant.expires_at,
-                        created_at: tenant.created_at
-                    }
-                });
+                return res.status(200).json({ success: true, tenant: publicTenant(tenant) });
             }
 
             return res.status(400).json({ error: "Invalid action" });
@@ -127,6 +181,6 @@ module.exports = async function handler(req, res) {
         return res.status(405).json({ error: "Method not allowed" });
     } catch (err) {
         console.error('Customer Auth Error:', err);
-        return res.status(500).json({ error: err.message || "Internal Server Error" });
+        return res.status(500).json({ error: "Internal Server Error" });
     }
 };
