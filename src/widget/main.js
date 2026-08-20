@@ -17,13 +17,13 @@
     var SUPPORTED_LOCALES = ["th", "en", "zh", "ja", "ko", "fr", "de", "es", "it", "pt", "ru", "ar", "hi", "vi", "id", "ms", "tr", "nl", "pl", "sv", "uk"];
     var INIT_RETRY_TIMES = 5;
     var INIT_RETRY_DELAY = 300;
-    var HESITATION_MS = 4000;
+    var HESITATION_MS = 2500;
     var RAGE_CLICK_WINDOW = 500;
     var RAGE_CLICK_CLUSTER_PX = 30;
     var CONFUSION_SCROLL_WINDOW = 2000;
     var CONFUSION_DIRECTION_CHANGES = 2;
     var ORB_IDLE_DELAY = 25000;
-    var WHISPER_DISMISS_MS = 12000;
+    var WHISPER_DISMISS_MS = 6500;
     var HUMAN_HANDOFF_FRUSTRATION_THRESHOLD = 2;
     var AUTONOMOUS_HIGHLIGHT_DELAY = 800;
 
@@ -423,6 +423,20 @@
     function createConversationId() {
         if (window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
         return "sb-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
+    }
+
+    function contextualNudge(text, locale) {
+        var value = String(text || "").toLowerCase();
+        if (/(ราคา|แพ็กเกจ|package|plan|฿|บาท|pricing|pro|starter|enterprise)/i.test(value)) {
+            return locale === "th" ? "กำลังเปรียบเทียบแพ็กเกจอยู่ใช่ไหมครับ? ผมช่วยสรุปราคาและความต่างให้ได้" : "Comparing plans? I can summarize the price and key differences.";
+        }
+        if (/(สมัคร|เริ่มต้น|เริ่มใช้งาน|signup|register|start)/i.test(value)) {
+            return locale === "th" ? "สนใจเริ่มใช้งานไหมครับ? ผมช่วยแนะนำขั้นตอนและแพ็กเกจที่เหมาะได้" : "Ready to get started? I can explain the next steps and suitable plan.";
+        }
+        if (/(ฟีเจอร์|feature|ระบบ|setting|ตั้งค่า|integration|plugin)/i.test(value)) {
+            return locale === "th" ? "ต้องการดูว่าฟีเจอร์นี้ช่วยอะไรได้บ้างไหมครับ? ถามผมต่อได้เลย" : "Want to know how this feature helps? Ask me anything about it.";
+        }
+        return locale === "th" ? "มีคำถามเกี่ยวกับส่วนนี้ไหมครับ? ผมช่วยสรุปหรือพาไปยังข้อมูลที่เกี่ยวข้องได้" : "Questions about this section? I can summarize it or guide you to related information.";
     }
 
     var SessionDB = {
@@ -880,19 +894,10 @@
                 // Skip if hovered element has no meaningful text (icons, dividers etc.)
                 if (!hoverText || hoverText.length < 8) return;
 
-                // Smart whisper: show loading bubble immediately
-                Whisper.show("🤔 กำลังคิดเรื่องนี้อยู่ไหมครับ?", "hesitation");
-
-                // Build universal context prompt — AI reads what the user sees and decides what to say
-                var contextPrompt = "The user's mouse is hovering over the following content on the webpage:\n" + hoverText + "\n\n" +
-                    "INSTRUCTIONS: Read the content and respond with 1-2 short, catchy, and highly contextual sentences in the user's language (" + normLocale(state.locale) + "). " +
-                    "CRITICAL: Do NOT use formulaic phrases like 'คุณกำลังดูที่...' (You are looking at...). " +
-                    "Instead, adapt completely to the context. For example, if it's a price, pitch its value. If it's a feature, explain how it helps. If it's a headline, offer an exciting insight. Be natural, unpredictable, and act like a very smart guide.";
+                // Respond from visible context immediately; do not make the visitor wait for a provider call.
+                Whisper.show(contextualNudge(hoverText, normLocale(state.locale)), "hesitation");
 
                 AmbientUI._pending = { el: info.element, kw: [hoverText.slice(0, 50)], snippet: hoverText };
-
-                // Fire proactive AI with the universal hover context
-                doProactive(contextPrompt, { _hesitation: true, _hoverContext: hoverText });
 
                 // Soft highlight the hovered element
                 setTimeout(function () {
@@ -911,7 +916,6 @@
                 if (state.open || state.busy) return;
                 Whisper.hide(); AmbientUI.setState("watching"); AmbientUI.setBrainPhase("cohere"); AmbientUI.showAura(info.el || document.body);
                 Whisper.show(t(state.locale, "whisperFrustration"), "frustration");
-                doProactive(undefined, { _frustration: true, _frustrationCount: info.handoffCount });
                 if (info.handoffCount >= HUMAN_HANDOFF_FRUSTRATION_THRESHOLD) {
                     var context = "User showing frustration at: " + (info.el ? info.el.tagName + "." + (info.el.className || "").slice(0, 40) : "unknown") + " | Snippet: " + (info.snippet || "").slice(0, 200);
                     offerHandoff(state.locale, context);
