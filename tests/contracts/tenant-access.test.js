@@ -56,6 +56,20 @@ describe('SaaS tenant origin access', () => {
         if (previousUrl === undefined) delete process.env.RENDER_EXTERNAL_URL;
         else process.env.RENDER_EXTERNAL_URL = previousUrl;
     });
+
+    test('enables the first-party demo by default but permits an explicit opt-out', () => {
+        const previous = process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO;
+        const previousUrl = process.env.RENDER_EXTERNAL_URL;
+        delete process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO;
+        process.env.RENDER_EXTERNAL_URL = 'https://indicator-web-chat.onrender.com';
+        expect(firstPartyDemoAllowed('https://indicator-web-chat.onrender.com')).toBe(true);
+        process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO = 'false';
+        expect(firstPartyDemoAllowed('https://indicator-web-chat.onrender.com')).toBe(false);
+        if (previous === undefined) delete process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO;
+        else process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO = previous;
+        if (previousUrl === undefined) delete process.env.RENDER_EXTERNAL_URL;
+        else process.env.RENDER_EXTERNAL_URL = previousUrl;
+    });
 });
 
 describe('Google Sign-In configuration', () => {

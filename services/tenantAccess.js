@@ -28,7 +28,7 @@ function tenantKeyRequired() {
 }
 
 function firstPartyDemoAllowed(origin) {
-    if (process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO !== 'true') return false;
+    if (process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO === 'false') return false;
     const serviceOrigin = canonicalOrigin(process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
     return Boolean(serviceOrigin && canonicalOrigin(origin) === serviceOrigin);
 }
