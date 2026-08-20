@@ -650,6 +650,12 @@
         shadow.appendChild(style);
     }
 
+    function applyWidgetSymbolStyle(shadow) {
+        var style = document.createElement("style");
+        style.textContent = '.sb-orb::after{content:"\\1F4AC"}';
+        shadow.appendChild(style);
+    }
+
     function triggerHandoff(locale, context) { _handoffCount++; var strs = t(locale); if (!_st || !_msgs) return; setOpen(true); var card = document.createElement("div"); card.className = "sb-msg sb-assistant sb-handoff"; card.innerHTML = '<div style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border-radius:12px;padding:16px;text-align:center;animation:sbSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1);"><div style="font-size:24px;margin-bottom:4px;">\uD83D\uDC68\u200D\uD83D\uDCBB</div><div style="font-weight:700;font-size:15px;margin-bottom:4px;">' + strs.handoffTitle + '</div><div style="font-size:12px;opacity:0.9;margin-bottom:10px;">' + strs.handoffBody + '</div><div style="background:rgba(255,255,255,0.2);border-radius:8px;padding:8px;font-size:11px;text-align:left;line-height:1.5;"><strong>' + strs.handoffSummary + ':</strong><br>' + escHtml(context.slice(0, 300)) + '</div><div style="margin-top:10px;font-size:11px;opacity:0.7;">ID #' + _handoffCount + '</div></div>'; _msgs.appendChild(card); _msgs.scrollTop = _msgs.scrollHeight; SessionDB.setPref("handoff", { count: _handoffCount, time: Date.now(), context: context.slice(0, 300) }); }
 
     function init() {
@@ -674,10 +680,10 @@
             var styleEl = document.createElement("style");
             styleEl.textContent = buildShadowStyles(cfg);
             shadow.appendChild(styleEl);
-            applyProductStyles(shadow);
+            applyWidgetSymbolStyle(shadow);
 
             var whisperContainer = document.createElement("div"); whisperContainer.className = "sb-whisper-container";
-            var whisper = document.createElement("div"); whisper.id = WIDGET_ID + "-whisper"; whisper.className = "sb-whisper"; whisper.style.display = "none";
+            var whisper = document.createElement("div"); whisper.id = WIDGET_ID + "-whisper"; whisper.className = "sb-whisper";
             var panel = document.createElement("section"); panel.className = "sb-panel";
             panel.innerHTML = '<div class="sb-header"><div style="display:flex;align-items:center;gap:8px;"><img src="/INDICATOR.png" alt="Logo" style="width:28px;height:28px;object-fit:cover;border-radius:50%;border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"><div><div class="sb-title">' + cfg.title + '</div><div class="sb-subtitle"></div></div></div><div class="sb-actions"><button class="sb-icon-btn" type="button" data-action="theme">\u25D0</button><button class="sb-icon-btn" type="button" data-action="close">\u00D7</button></div></div><div class="sb-messages"></div><div class="sb-quick"></div><form class="sb-compose"><textarea class="sb-input" rows="1"></textarea><button class="sb-voice-btn" type="button" style="background:transparent;border:0;cursor:pointer;font-size:18px;color:#64748b;padding:0 8px;transition:color 0.2s;" title="พูดด้วยเสียง">\uD83C\uDFA4</button><button class="sb-send" type="submit"></button></form>';
             var orb = document.createElement("button"); orb.className = "sb-orb"; orb.type = "button";
@@ -769,7 +775,6 @@
             };
 
             AmbientUI.init(root, shadow, pri);
-            AmbientUI.showAura = function () { };
             Whisper.init(shadow);
             InteractiveWhisper.init(shadow);
             InlineShelf.init();

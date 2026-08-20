@@ -25,7 +25,7 @@ describe('Shared product visual system', () => {
 
     test('widget uses the restrained product style layer', () => {
         const source = fs.readFileSync(path.resolve(__dirname, '../../src/widget/main.js'), 'utf8');
-        expect(source).toContain('applyProductStyles');
+        expect(source).toContain('applyWidgetSymbolStyle');
         expect(source).toContain('Website assistant ready');
     });
 });
