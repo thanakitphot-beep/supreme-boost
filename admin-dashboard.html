@@ -308,6 +308,61 @@
             .sb-brand { display: none; }
             .sb-foot { display: none; }
         }
+
+        /* Operations console: deliberately quiet, dense, and data-first. */
+        :root {
+            --bg:#f5f7fb; --bg2:#ffffff; --bg3:#ffffff;
+            --s1:#f8fafc; --s2:#eef2f7;
+            --b1:#e2e8f0; --b2:#cbd5e1;
+            --t1:#172033; --t2:#475569; --t3:#7c8aa0;
+            --v1:#2563eb; --v2:#1d4ed8; --v3:#2563eb;
+            --c1:#0f766e; --c2:#0f766e;
+            --g1:#15803d; --g2:#15803d;
+            --a1:#b45309; --a2:#b45309;
+            --r1:#b91c1c; --r2:#b91c1c;
+        }
+        body{background:var(--bg);color:var(--t1)}
+        ::-webkit-scrollbar-thumb{background:#cbd5e1}
+        .sidebar{width:248px;min-width:248px;background:#fff;border-right:1px solid #e2e8f0}
+        .sidebar::before{display:none}
+        .sb-brand{padding:20px 18px;border-bottom:1px solid #e2e8f0}
+        .sb-brand>div:first-child{border-color:#d7dee9!important;background:#fff!important;box-shadow:none!important}
+        .sb-brand .sb-name{background:none!important;-webkit-text-fill-color:#172033!important;filter:none!important;letter-spacing:.06em!important}
+        .sb-brand span[style*="color:#22d3ee"]{color:#64748b!important;text-shadow:none!important;letter-spacing:.12em!important}
+        .sb-nav{padding:16px 10px}
+        .nav-label{color:#94a3b8;margin-top:22px;padding:0 10px}
+        .nav-btn{border:0;border-radius:7px;color:#475569;margin-bottom:3px;padding:9px 10px;transition:background .15s,color .15s}
+        .nav-btn:hover{color:#172033;background:#f1f5f9;border:0;transform:none}
+        .nav-btn.active{color:#1d4ed8;background:#eaf1ff;border:0;border-left:3px solid #2563eb;border-radius:0 7px 7px 0}
+        .nav-btn.active .nv-ic{background:transparent;color:#2563eb}
+        .nv-ic{width:28px;height:28px;background:transparent;color:#64748b}
+        .sb-foot{background:#fff;border-top:1px solid #e2e8f0;padding:14px}
+        .adm-pill{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
+        .adm-av{background:#eaf1ff;color:#1d4ed8;border-radius:50%}
+        .adm-role{color:#15803d}.online-dot{box-shadow:none}
+        .logout-btn{border-color:#fecaca;background:#fff;color:#b91c1c}.logout-btn:hover{background:#fef2f2;border-color:#fca5a5}
+        .main{background:var(--bg)}
+        .main-bg,.grid-bg{display:none}
+        .topbar{height:68px;padding:0 30px;background:#fff;border-bottom:1px solid #e2e8f0;backdrop-filter:none}
+        .tp-title{font-size:1rem;color:#172033}.tp-sub{color:#64748b}
+        .clk{color:#64748b}.clk i{color:#64748b}
+        .ver-badge{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;color:#64748b;font-family:'Sarabun',sans-serif}
+        .ref-btn{border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:6px}.ref-btn:hover{background:#f8fafc;color:#172033;border-color:#94a3b8}
+        .content{padding:28px 30px;max-width:1500px;width:100%}
+        .tab-pane.active{animation:none}
+        .card,.sc,.bc,.pc{background:#fff;border:1px solid #e2e8f0;box-shadow:none;backdrop-filter:none;border-radius:10px}
+        .card-hov:hover,.card:hover,.sc:hover,.bc:hover{border-color:#cbd5e1;transform:none;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+        .stats-grid{gap:14px;margin-bottom:20px}
+        .sc{padding:18px}.sc::before{display:none}.sc:hover::before{display:none}
+        .sc-icon{background:#f1f5f9!important;border-radius:7px}.sc-icon i{color:#475569!important}
+        .sc-lbl{color:#64748b;letter-spacing:.04em}.sc-val,.sc.vl .sc-val,.sc.cy .sc-val,.sc.gn .sc-val,.sc.am .sc-val{background:none;-webkit-text-fill-color:#172033;color:#172033;font-size:1.9rem}.sc-sub{color:#94a3b8}
+        .qk-grid{gap:10px;margin-bottom:20px}.qk-btn{background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:none;flex-direction:row;justify-content:center;padding:12px}.qk-btn:hover{background:#f8fafc;border-color:#cbd5e1;box-shadow:none;transform:none}.qk-btn:active{transform:none;box-shadow:none}.qk-btn i{color:#475569}.qk-btn span{color:#334155}
+        .btn{border-radius:6px;box-shadow:none!important;overflow:visible}.btn::after{display:none}.btn-vl{background:#2563eb;color:#fff}.btn-vl:hover{background:#1d4ed8;transform:none}.btn-gn{background:#15803d}.btn-rs{background:#b91c1c}.btn-gh,.btn-gh-vl,.btn-gh-am,.btn-gh-rs{background:#fff;color:#475569;border:1px solid #cbd5e1}.btn-gh:hover,.btn-gh-vl:hover,.btn-gh-am:hover,.btn-gh-rs:hover{background:#f8fafc;color:#172033;border-color:#94a3b8;transform:none}
+        .tbl-wrap{border-color:#e2e8f0;border-radius:9px}.tbl thead th{background:#f8fafc;color:#64748b;border-bottom-color:#e2e8f0}.tbl tbody tr:hover{background:#f8fafc}.tbl tbody td{border-bottom-color:#eef2f7}
+        .badge{border-radius:5px;letter-spacing:0;text-transform:none}.badge-active,.badge-approved{background:#edf7ef;color:#166534;border-color:#bbdfc1}.badge-suspended,.badge-rejected{background:#fef2f2;color:#b91c1c;border-color:#fecaca}.badge-pending{background:#fff7ed;color:#9a3412;border-color:#fed7aa}.badge-pkg{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+        .fi{background:#fff;border-color:#cbd5e1;border-radius:6px;color:#172033}.fi:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1)}.fi::placeholder{color:#94a3b8}
+        .modal-bg{background:rgba(15,23,42,.38);backdrop-filter:blur(3px)}.modal-box{background:#fff;border-color:#e2e8f0;border-radius:12px;box-shadow:0 20px 50px rgba(15,23,42,.18)}.m-close{background:#fff;border-color:#cbd5e1;color:#475569}.m-close:hover{background:#f8fafc;color:#172033}.mtabs{background:#f1f5f9}.mtab.active{background:#fff;color:#1d4ed8;box-shadow:0 1px 2px rgba(15,23,42,.1)}
+        .code-block{background:#0f172a;border-color:#0f172a;color:#d1fae5}.toast{box-shadow:0 12px 30px rgba(15,23,42,.16);backdrop-filter:none}.t-ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534}.t-err{background:#fef2f2;border-color:#fecaca;color:#b91c1c}.t-info{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.skel{background:#e2e8f0;animation:none}
     </style>
 </head>
 <body>
@@ -346,9 +401,9 @@
         <button onclick="sw('settings')" id="nav-settings" class="nav-btn">
             <span class="nv-ic"><i class="fa-solid fa-sliders"></i></span>ตั้งค่าระบบ
         </button>
-        <span class="nav-label">ระบบ AI</span>
+        <span class="nav-label">ข้อมูลและบันทึก</span>
         <button onclick="sw('knowledge')" id="nav-knowledge" class="nav-btn">
-            <span class="nv-ic"><i class="fa-solid fa-brain"></i></span>คลังความรู้ AI
+            <span class="nv-ic"><i class="fa-solid fa-book-open"></i></span>คลังความรู้
         </button>
         <button onclick="sw('chatlogs')" id="nav-chatlogs" class="nav-btn">
             <span class="nv-ic"><i class="fa-solid fa-comments"></i></span>ประวัติการแชท
