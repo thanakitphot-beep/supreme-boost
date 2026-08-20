@@ -309,7 +309,7 @@ body.indicator-auth input { background: rgba(15,23,42,.72) !important; border-co
 body.indicator-auth input:focus { border-color: #22d3ee !important; box-shadow: 0 0 0 3px rgba(6,182,212,.12) !important; }
 body.indicator-auth button[type="submit"] { background: linear-gradient(135deg,#06b6d4,#3b82f6) !important; box-shadow: 0 8px 20px rgba(6,182,212,.22) !important; }
 
-body.indicator-app { background: #0f172a; color: #f8fafc; }
+body.indicator-app { --t1:#f8fafc; --t2:#cbd5e1; --t3:#94a3b8; --s1:rgba(255,255,255,.04); --s2:rgba(255,255,255,.08); --b1:rgba(255,255,255,.08); --b2:rgba(255,255,255,.16); --v1:#7c3aed; --v2:#8b5cf6; --v3:#c4b5fd; --c1:#06b6d4; --c2:#67e8f9; --g1:#10b981; --g2:#6ee7b7; --a1:#f59e0b; --a2:#fcd34d; --r1:#f43f5e; --r2:#fda4af; background: #0f172a; color: #f8fafc; }
 body.indicator-app .sidebar,
 body.indicator-app .topbar,
 body.indicator-app .sb-foot { background: #1e293b !important; border-color: rgba(255,255,255,.07) !important; }
@@ -342,6 +342,9 @@ body.indicator-app .tbl tbody tr:hover { background: rgba(255,255,255,.035) !imp
 body.indicator-app .tbl tbody td { color: #cbd5e1 !important; border-bottom-color: rgba(255,255,255,.07) !important; }
 body.indicator-app .tbl tbody td [style*="color:var(--t1)"] { color: #f8fafc !important; }
 body.indicator-app .tbl tbody td [style*="color:var(--t3)"] { color: #94a3b8 !important; }
+body.indicator-app [style*="color:var(--t1)"] { color: #f8fafc !important; }
+body.indicator-app [style*="color:var(--t2)"] { color: #cbd5e1 !important; }
+body.indicator-app [style*="color:var(--t3)"] { color: #94a3b8 !important; }
 body.indicator-app .btn-gh,
 body.indicator-app .btn-gh-vl,
 body.indicator-app .btn-gh-am,
