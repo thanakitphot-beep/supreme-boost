@@ -69,9 +69,9 @@ class ModelRouter {
     }
 
     getProvider(name) {
-        // Force gemini since the Vercel environment has a broken openai configuration
-        const providerName = 'gemini';
-        return { name: providerName, instance: this.providers[providerName] || this.providers['gemini'] };
+        // Use the provider name from config or fallback to groq
+        const providerName = name || 'groq';
+        return { name: providerName, instance: this.providers[providerName] || this.providers['groq'] };
     }
 
     async generateWithRetry(payload, options = {}, requestId) {

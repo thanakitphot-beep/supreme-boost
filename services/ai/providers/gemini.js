@@ -5,8 +5,8 @@ class GeminiProvider extends BaseProvider {
         const apiKey = this.config.apiKey || process.env.GEMINI_API_KEY;
         if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
-        // Force gemini-2.5-flash since Vercel has the wrong model name
-        const model = 'gemini-2.5-flash';
+        // Use config model or fallback to gemini-2.5-flash
+        const model = this.config.model || process.env.AI_NORMAL_MODEL || 'gemini-2.5-flash';
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
         
         // Convert messages to Gemini format
