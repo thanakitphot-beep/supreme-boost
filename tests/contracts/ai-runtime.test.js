@@ -39,4 +39,14 @@ describe('AI runtime guardrails', () => {
         const base = { prompt: 'สถานะคำสั่งซื้อ', title: 'ร้านตัวอย่าง', locale: 'th', history: [] };
         expect(semanticCache._makeKey({ ...base, tenantId: 'tenant-a' })).not.toBe(semanticCache._makeKey({ ...base, tenantId: 'tenant-b' }));
     });
+
+    test('keeps every configured provider available after primary and fallback', () => {
+        withEnv({ OPENAI_API_KEY: 'openai', GROQ_API_KEY: 'groq', GEMINI_API_KEY: 'gemini', AI_PRIMARY_PROVIDER: 'openai', AI_FALLBACK_PROVIDER: 'groq' }, () => {
+            const router = new routerModule.ModelRouter();
+            const candidates = [router.getProvider(process.env.AI_PRIMARY_PROVIDER), router.getProvider(process.env.AI_FALLBACK_PROVIDER || 'groq')]
+                .concat(['gemini', 'groq', 'openai', 'local'].map(name => router.getProvider(name)))
+                .filter((provider, index, list) => list.findIndex(item => item.name === provider.name) === index);
+            expect(candidates.map(candidate => candidate.name)).toContain('gemini');
+        });
+    });
 });

@@ -124,7 +124,9 @@ class ModelRouter {
         const deadlineAt = options.deadlineAt || Date.now() + boundedInteger(process.env.AI_TOTAL_TIMEOUT_MS, 22000, 5000, 30000);
         const primary = this.getProvider(process.env.AI_PRIMARY_PROVIDER);
         const fallback = this.getProvider(process.env.AI_FALLBACK_PROVIDER || 'groq');
-        const candidates = primary.name === fallback.name ? [primary] : [primary, fallback];
+        const candidates = [primary, fallback]
+            .concat(['gemini', 'groq', 'openai', 'local'].map(name => this.getProvider(name)))
+            .filter((provider, index, list) => list.findIndex(item => item.name === provider.name) === index);
         let lastError = null;
 
         for (const currentProvider of candidates) {
