@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 describe('Shared product visual system', () => {
     const pages = [
@@ -30,5 +31,12 @@ describe('Shared product visual system', () => {
         expect(source).toContain('/api/handoff');
         expect(source).toContain('data.status !== "ok"');
         expect(source).toContain('siteKey: cfg.siteKey');
+    });
+
+    test('admin control center inline scripts compile', () => {
+        const html = fs.readFileSync(path.resolve(__dirname, '../../admin-dashboard.html'), 'utf8');
+        const scripts = [...html.matchAll(/<script>\s*([\s\S]*?)<\/script>/gi)].map(match => match[1]);
+        expect(scripts.length).toBeGreaterThan(0);
+        scripts.forEach(script => expect(() => new vm.Script(script)).not.toThrow());
     });
 });

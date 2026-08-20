@@ -402,6 +402,14 @@
         <button onclick="sw('settings')" id="nav-settings" class="nav-btn">
             <span class="nv-ic"><i class="fa-solid fa-sliders"></i></span>ตั้งค่าระบบ
         </button>
+        <span class="nav-label">คำสั่งและบริการ</span>
+        <button onclick="sw('operations')" id="nav-operations" class="nav-btn">
+            <span class="nv-ic"><i class="fa-solid fa-table-cells-large"></i></span>คำสั่งระบบ
+        </button>
+        <button onclick="sw('handoffs')" id="nav-handoffs" class="nav-btn">
+            <span class="nv-ic"><i class="fa-solid fa-headset"></i></span>คิวเจ้าหน้าที่
+            <span class="nv-badge" id="bdg-handoffs">0</span>
+        </button>
         <span class="nav-label">ข้อมูลและบันทึก</span>
         <button onclick="sw('knowledge')" id="nav-knowledge" class="nav-btn">
             <span class="nv-ic"><i class="fa-solid fa-book-open"></i></span>คลังความรู้
@@ -434,8 +442,10 @@
         <div class="tp-r">
             <div class="clk"><i class="fa-regular fa-clock"></i><span id="clk">—</span></div>
             <div class="ver-badge">v2.0</div>
+            <button class="ref-btn" onclick="printDashboard()" title="พิมพ์หน้าปัจจุบัน"><i class="fa-solid fa-print"></i></button>
             <button class="ref-btn" onclick="doRefresh()" title="รีเฟรช"><i class="fa-solid fa-rotate-right"></i></button>
         </div>
+
     </header>
     <div class="content">
 
@@ -463,6 +473,23 @@
                     <div class="skel" style="height:42px;margin-bottom:7px"></div>
                     <div class="skel" style="height:42px;width:70%"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- OPERATIONS -->
+        <div id="tab-operations" class="tab-pane">
+            <div class="sec-hdr"><div><div class="sec-title">คำสั่งระบบ</div><div class="sec-sub">คำสั่งที่ใช้บ่อย รายงาน และสถานะ runtime ในหน้าเดียว</div></div><button onclick="loadOperations()" class="btn btn-gh-vl btn-sm"><i class="fa-solid fa-rotate-right"></i> อัปเดตสถานะ</button></div>
+            <div class="op-grid">
+                <button class="op-command" onclick="sw('tenants');setTimeout(openAdd,300)"><i class="fa-solid fa-user-plus"></i><span>เพิ่มลูกค้า</span><small>สร้างบัญชีและ API key</small></button>
+                <button class="op-command" onclick="exportTenantsCSV()"><i class="fa-solid fa-file-csv"></i><span>ส่งออกลูกค้า</span><small>ดาวน์โหลดรายงาน CSV</small></button>
+                <button class="op-command" onclick="printDashboard()"><i class="fa-solid fa-print"></i><span>พิมพ์รายงาน</span><small>พิมพ์หน้าที่กำลังเปิด</small></button>
+                <button class="op-command" onclick="sw('billing')"><i class="fa-solid fa-receipt"></i><span>ตรวจสอบการชำระเงิน</span><small>คำขอที่รออนุมัติ</small></button>
+                <button class="op-command" onclick="sw('handoffs')"><i class="fa-solid fa-headset"></i><span>คิวเจ้าหน้าที่</span><small>รับเรื่องจากผู้เข้าชม</small></button>
+                <button class="op-command" onclick="sw('settings')"><i class="fa-solid fa-sliders"></i><span>ตั้งค่าบริการ</span><small>การชำระเงินและระบบ</small></button>
+            </div>
+            <div class="card op-runtime-card">
+                <div class="sec-hdr" style="margin-bottom:12px"><div><div class="sec-title" style="font-size:.92rem">สถานะ runtime</div><div class="sec-sub">ตรวจสอบฐานข้อมูลและ provider ที่กำลังใช้งาน</div></div><span id="ops-runtime-status" class="badge">กำลังตรวจสอบ</span></div>
+                <div id="ops-runtime-details" class="runtime-details"><div class="skel" style="height:42px;width:100%"></div></div>
             </div>
         </div>
 
@@ -660,6 +687,12 @@
             <div id="cl-list"><div class="empty card" style="padding:60px"><i class="fa-solid fa-comments"></i><h4>เลือกลูกค้าเพื่อดูประวัติ</h4><p>Log การแชทจะปรากฏที่นี่</p></div></div>
         </div>
 
+        <!-- HANDOFF QUEUE -->
+        <div id="tab-handoffs" class="tab-pane">
+            <div class="sec-hdr"><div><div class="sec-title">คิวเจ้าหน้าที่</div><div class="sec-sub">คำขอช่วยเหลือจากผู้เข้าชมที่สร้าง ticket จริง พร้อมสถานะการดำเนินการ</div></div><button onclick="loadHandoffs()" class="btn btn-gh-vl btn-sm"><i class="fa-solid fa-rotate-right"></i> รีเฟรช</button></div>
+            <div id="handoff-list" class="handoff-list"><div class="empty card" style="padding:50px"><i class="fa-solid fa-headset"></i><p>กำลังโหลดคิวเจ้าหน้าที่...</p></div></div>
+        </div>
+
     </div>
 </main>
 </div>
@@ -793,7 +826,7 @@ document.getElementById('clk').textContent=new Date().toLocaleTimeString('th-TH'
 document.getElementById('qrFile').addEventListener('change',e=>{document.getElementById('qrname').textContent=e.target.files[0]?.name||'ยังไม่เลือกไฟล์'});
 
 // ====TABS====
-const TMeta={overview:['ภาพรวมระบบ','Dashboard Overview'],tenants:['จัดการลูกค้า','Tenant Management'],billing:['อนุมัติเติมเงิน','Billing Requests'],payment:['ช่องทางรับเงิน','Payment Methods'],settings:['ตั้งค่าระบบ','System Settings'],knowledge:['คลังความรู้ AI','RAG Knowledge Base'],chatlogs:['ประวัติการแชท','Chat History Logs']};
+const TMeta={overview:['ภาพรวมระบบ','Dashboard Overview'],operations:['คำสั่งระบบ','Operations Center'],tenants:['จัดการลูกค้า','Tenant Management'],billing:['อนุมัติเติมเงิน','Billing Requests'],payment:['ช่องทางรับเงิน','Payment Methods'],settings:['ตั้งค่าระบบ','System Settings'],handoffs:['คิวเจ้าหน้าที่','Human Support Queue'],knowledge:['คลังความรู้','Knowledge Sources'],chatlogs:['ประวัติการแชท','Chat History Logs']};
 function sw(id){
     document.querySelectorAll('.tab-pane').forEach(e=>e.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(e=>e.classList.remove('active'));
@@ -807,6 +840,8 @@ function sw(id){
     if(id==='billing')loadB();
     if(id==='payment')loadPM();
     if(id==='settings')loadS();
+    if(id==='operations')loadOperations();
+    if(id==='handoffs')loadHandoffs();
     if(id==='knowledge')initKBPage();
     if(id==='chatlogs')initCLPage();
 }
@@ -818,6 +853,44 @@ function doRefresh(){
     sw(id);
 }
 function logout(){localStorage.removeItem('admin_token');window.location.href='/admin-login.html'}
+function printDashboard(){window.print()}
+function safeHtml(value){const d=document.createElement('div');d.textContent=String(value||'');return d.innerHTML}
+
+async function loadOperations(){
+    const badge=document.getElementById('ops-runtime-status'),details=document.getElementById('ops-runtime-details');
+    badge.textContent='กำลังตรวจสอบ';
+    try{
+        const res=await fetch('/api/v1/health');
+        const data=await res.json();
+        const checks=data.checks||{},runtime=data.runtime||{};
+        badge.textContent=data.status==='healthy'?'พร้อมใช้งาน':'ต้องตรวจสอบ';
+        badge.className='badge badge-'+(data.status==='healthy'?'active':'pending');
+        details.innerHTML=[
+            ['ฐานข้อมูล',checks.mongo||'unknown'],
+            ['Provider หลัก',runtime.primary||'unknown'],
+            ['Provider สำรอง',runtime.fallback||'unknown'],
+            ['Cache',checks.cache||'unknown'],
+            ['Uptime',data.uptime||'—']
+        ].map(item=>`<div class="runtime-row"><span>${safeHtml(item[0])}</span><strong>${safeHtml(item[1])}</strong></div>`).join('');
+    }catch(e){badge.textContent='ตรวจสอบไม่สำเร็จ';badge.className='badge badge-suspended';details.innerHTML='<div class="runtime-row"><span>ไม่สามารถดึงสถานะ runtime ได้</span></div>'}
+}
+
+async function loadHandoffs(){
+    const list=document.getElementById('handoff-list');
+    list.innerHTML='<div class="skel" style="height:84px;margin-bottom:10px"></div><div class="skel" style="height:84px"></div>';
+    try{
+        const data=await fetchAPI('handoffs'),tickets=data.tickets||[];
+        const queued=tickets.filter(ticket=>['queued','in_progress'].includes(ticket.status)).length;
+        const badge=document.getElementById('bdg-handoffs');
+        badge.textContent=queued;badge.style.display=queued?'flex':'none';
+        if(!tickets.length){list.innerHTML='<div class="empty card" style="padding:50px"><i class="fa-solid fa-headset"></i><h4>ไม่มีคำขอรอรับเรื่อง</h4><p>คำขอจากผู้เข้าชมจะแสดงที่นี่</p></div>';return}
+        list.innerHTML=tickets.map(ticket=>`<article class="handoff-item"><div class="handoff-head"><div><span class="badge badge-${ticket.status==='resolved'||ticket.status==='closed'?'active':ticket.priority==='high'?'pending':'pkg'}">${safeHtml(ticket.status||'queued')}</span><strong>${safeHtml(ticket.id)}</strong></div><time>${safeHtml(fmtDate(ticket.created_at))}</time></div><p>${safeHtml(ticket.reason||'Visitor requested support')}</p><small>${safeHtml(ticket.summary||ticket.page&&ticket.page.url||'ไม่มีสรุปเพิ่มเติม')}</small><div class="handoff-actions">${ticket.status==='queued'?`<button class="btn btn-gh-vl btn-sm" onclick="updateHandoff('${ticket.id}','in_progress')">รับเรื่อง</button>`:''}${!['resolved','closed'].includes(ticket.status)?`<button class="btn btn-gn btn-sm" onclick="updateHandoff('${ticket.id}','resolved')">ปิดเรื่อง</button>`:''}<button class="btn btn-gh btn-sm" onclick="cpy('${String(ticket.id).replace(/'/g,"\\'")}')">คัดลอกเลขอ้างอิง</button></div></article>`).join('');
+    }catch(e){list.innerHTML='<div class="empty card" style="padding:50px"><i class="fa-solid fa-triangle-exclamation"></i><p>ไม่สามารถโหลดคิวเจ้าหน้าที่ได้</p></div>'}
+}
+
+async function updateHandoff(id,status){
+    try{await fetchAPI('update_handoff','POST',{id,status});toast(status==='resolved'?'ปิดคำขอแล้ว':'รับเรื่องแล้ว','success');loadHandoffs()}catch(e){toast('อัปเดตสถานะไม่สำเร็จ','error')}
+}
 
 // ====OVERVIEW====
 async function loadOv(){

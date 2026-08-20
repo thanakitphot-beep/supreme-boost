@@ -84,6 +84,10 @@ module.exports = async function handler(req, res) {
                 const filtered = (data || []).filter(l => l.metadata && l.metadata.tenantId === tenantId).slice(0, 50);
                 return res.status(200).json({ logs: filtered });
             }
+            if (action === 'handoffs') {
+                const data = await db.collection('handoff_tickets').find({}).sort({ created_at: -1 }).limit(100).toArray();
+                return res.status(200).json({ tickets: data || [] });
+            }
         }
 
         if (req.method === "POST") {
@@ -272,6 +276,16 @@ module.exports = async function handler(req, res) {
                 payload.updated_at = new Date().toISOString();
                 
                 await db.collection('settings').updateOne({ id: tenantId }, { $set: payload }, { upsert: true });
+                return res.status(200).json({ success: true });
+            }
+
+            if (action === 'update_handoff') {
+                const id = String(body.id || '');
+                const status = String(body.status || '');
+                if (!id || !['queued', 'in_progress', 'resolved', 'closed'].includes(status)) {
+                    return res.status(400).json({ error: 'Invalid handoff update' });
+                }
+                await db.collection('handoff_tickets').updateOne({ id }, { $set: { status, updated_at: new Date().toISOString() } });
                 return res.status(200).json({ success: true });
             }
 

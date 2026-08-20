@@ -368,3 +368,58 @@ body.indicator-app .badge-rejected { background: rgba(244,63,94,.14) !important;
 body.indicator-app .badge-pkg { background: rgba(139,92,246,.14) !important; color: #c4b5fd !important; border-color: rgba(139,92,246,.3) !important; }
 body.indicator-app .card .fi,
 body.indicator-app .srch .fi { background: rgba(15,23,42,.78) !important; color: #f8fafc !important; }
+body.indicator-app .sc-val,
+body.indicator-app .sc.vl .sc-val,
+body.indicator-app .sc.cy .sc-val,
+body.indicator-app .sc.gn .sc-val,
+body.indicator-app .sc.am .sc-val { color: #f8fafc !important; -webkit-text-fill-color: #f8fafc !important; background: none !important; }
+body.indicator-app .sc-lbl { color: #cbd5e1 !important; }
+body.indicator-app .sc-sub,
+body.indicator-app .sec-sub,
+body.indicator-app .tp-sub { color: #94a3b8 !important; }
+body.indicator-app .qk-btn { background: rgba(30,41,59,.78) !important; border-color: rgba(255,255,255,.1) !important; box-shadow: none !important; }
+body.indicator-app .qk-btn:hover { background: rgba(255,255,255,.08) !important; border-color: rgba(139,92,246,.35) !important; transform: none !important; }
+body.indicator-app .qk-btn span { color: #e2e8f0 !important; }
+body.indicator-app .qk-btn i { color: #a78bfa !important; }
+body.indicator-app .rec-item { color: #e2e8f0 !important; }
+body.indicator-app .rec-item:hover { background: rgba(255,255,255,.04) !important; }
+body.indicator-app .op-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+body.indicator-app .op-command { min-height:108px; padding:16px; text-align:left; display:flex; flex-direction:column; align-items:flex-start; gap:8px; background:rgba(30,41,59,.78); color:#f8fafc; border:1px solid rgba(255,255,255,.1); border-radius:10px; cursor:pointer; font-family:inherit; }
+body.indicator-app .op-command:hover { background:rgba(255,255,255,.08); border-color:rgba(139,92,246,.42); }
+body.indicator-app .op-command i { color:#a78bfa; font-size:1rem; }
+body.indicator-app .op-command span { font-weight:700; font-size:.86rem; }
+body.indicator-app .op-command small { color:#94a3b8; font-size:.72rem; }
+body.indicator-app .op-runtime-card { padding:18px; }
+body.indicator-app .runtime-details { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+body.indicator-app .runtime-row { background:rgba(15,23,42,.56); border:1px solid rgba(255,255,255,.08); border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:5px; color:#94a3b8; font-size:.72rem; }
+body.indicator-app .runtime-row strong { color:#f8fafc; font-size:.82rem; overflow-wrap:anywhere; }
+body.indicator-app .handoff-list { display:grid; gap:10px; }
+body.indicator-app .handoff-item { background:rgba(30,41,59,.78); border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:16px; color:#e2e8f0; }
+body.indicator-app .handoff-head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:10px; }
+body.indicator-app .handoff-head>div { display:flex; align-items:center; gap:10px; min-width:0; }
+body.indicator-app .handoff-head strong { font-family:'JetBrains Mono',monospace; font-size:.75rem; color:#c4b5fd; overflow-wrap:anywhere; }
+body.indicator-app .handoff-head time,
+body.indicator-app .handoff-item small { color:#94a3b8; font-size:.72rem; }
+body.indicator-app .handoff-item p { margin:0 0 6px; color:#f8fafc; }
+body.indicator-app .handoff-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:14px; }
+@media (max-width: 900px) {
+  body.indicator-app .op-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  body.indicator-app .runtime-details { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media print {
+  body.indicator-app { background:#fff !important; color:#111827 !important; }
+  body.indicator-app .sidebar,
+  body.indicator-app .topbar,
+  body.indicator-app #twrap,
+  body.indicator-app .modal-ov { display:none !important; }
+  body.indicator-app .main,
+  body.indicator-app .content { display:block !important; background:#fff !important; padding:0 !important; overflow:visible !important; }
+  body.indicator-app .tab-pane { display:none !important; }
+  body.indicator-app .tab-pane.active { display:block !important; }
+  body.indicator-app .card,
+  body.indicator-app .tbl-wrap,
+  body.indicator-app .handoff-item { background:#fff !important; color:#111827 !important; border-color:#d1d5db !important; box-shadow:none !important; }
+  body.indicator-app .tbl tbody td,
+  body.indicator-app .tbl thead th,
+  body.indicator-app .sc-val { color:#111827 !important; -webkit-text-fill-color:#111827 !important; }
+}
