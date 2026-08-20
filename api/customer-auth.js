@@ -9,6 +9,12 @@ function hashPassword(password) {
     return crypto.createHash('sha256').update(password).digest('hex');
 }
 
+function passwordMatches(tenant, password) {
+    if (!tenant || typeof password !== 'string' || !password) return false;
+    const hashed = hashPassword(password);
+    return tenant.password === hashed || tenant.password === password;
+}
+
 function publicTenant(tenant) {
     return {
         id: tenant.id,
@@ -74,7 +80,18 @@ module.exports = async function handler(req, res) {
 
                 // Do not bind a Google identity to a password account solely by email.
                 const existingEmail = await db.collection('tenants').findOne({ email: profile.email });
-                if (existingEmail) return res.status(409).json({ error: 'This email already has an account. Sign in with its password before linking Google.' });
+                if (existingEmail) {
+                    const suppliedUsername = String(body.username || '').trim();
+                    if (suppliedUsername !== existingEmail.username || !passwordMatches(existingEmail, body.password)) {
+                        return res.status(409).json({ error: 'This email already has an account. Enter its existing username and password, then choose Google again to link it.' });
+                    }
+                    const now = new Date().toISOString();
+                    const googleAuth = { sub: profile.sub, email: profile.email, email_verified: true, linked_at: now, last_login_at: now };
+                    const updates = { 'auth.google': googleAuth };
+                    if (existingEmail.password === body.password && existingEmail.password !== hashPassword(body.password)) updates.password = hashPassword(body.password);
+                    await db.collection('tenants').updateOne({ id: existingEmail.id }, { $set: updates });
+                    return res.status(200).json({ success: true, tenant: publicTenant({ ...existingEmail, auth: { google: googleAuth } }) });
+                }
 
                 const googleUsername = await uniqueGoogleUsername(db, profile.email);
                 if (!googleUsername) return res.status(503).json({ error: 'Unable to create a unique account name. Please try again.' });
@@ -151,7 +168,7 @@ module.exports = async function handler(req, res) {
                     return res.status(401).json({ error: "Invalid Username or Password" });
                 }
 
-                const hashMatch = tenant.password === crypto.createHash('sha256').update(password).digest('hex');
+                const hashMatch = tenant.password === hashPassword(password);
                 const plainMatch = tenant.password === password;
 
                 if (!plainMatch && !hashMatch) {

@@ -90,7 +90,7 @@
                 const res = await fetch('/api/customer-auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'google', credential: response.credential })
+                    body: JSON.stringify({ action: 'google', credential: response.credential, username: document.getElementById('username').value, password: document.getElementById('password').value })
                 });
                 const data = await res.json();
                 if (!res.ok || !data.success) throw new Error(data.error || 'Google Sign-In failed');
