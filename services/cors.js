@@ -4,7 +4,12 @@
 // so that runtime env changes and tests work correctly.
 
 function getAllowedDomains() {
-    return (process.env.CORS_ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+    const configured = (process.env.CORS_ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+    try {
+        const renderUrl = new URL(String(process.env.RENDER_EXTERNAL_URL || ''));
+        if (renderUrl.protocol === 'https:' || renderUrl.protocol === 'http:') configured.push(renderUrl.origin);
+    } catch (_) { }
+    return [...new Set(configured)];
 }
 
 function strictCorsEnabled() {

@@ -189,4 +189,23 @@ describe('services/cors — ENFORCE_STRICT_CORS flag', () => {
         delete process.env.ENFORCE_STRICT_CORS;
         delete process.env.CORS_ALLOWED_ORIGINS;
     });
+
+    test('Render service origin is allowed without duplicating it in the allowlist', () => {
+        const previousStrict = process.env.ENFORCE_STRICT_CORS;
+        const previousRenderUrl = process.env.RENDER_EXTERNAL_URL;
+        const previousAllowedOrigins = process.env.CORS_ALLOWED_ORIGINS;
+        process.env.ENFORCE_STRICT_CORS = 'true';
+        process.env.RENDER_EXTERNAL_URL = 'https://indicator-web-chat.onrender.com/';
+        delete process.env.CORS_ALLOWED_ORIGINS;
+        const req = mockReq({ headers: { origin: 'https://indicator-web-chat.onrender.com' } });
+        const res = mockRes();
+        setCorsHeaders(req, res);
+        expect(res._headers['access-control-allow-origin']).toBe('https://indicator-web-chat.onrender.com');
+        if (previousStrict === undefined) delete process.env.ENFORCE_STRICT_CORS;
+        else process.env.ENFORCE_STRICT_CORS = previousStrict;
+        if (previousRenderUrl === undefined) delete process.env.RENDER_EXTERNAL_URL;
+        else process.env.RENDER_EXTERNAL_URL = previousRenderUrl;
+        if (previousAllowedOrigins === undefined) delete process.env.CORS_ALLOWED_ORIGINS;
+        else process.env.CORS_ALLOWED_ORIGINS = previousAllowedOrigins;
+    });
 });
