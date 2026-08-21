@@ -383,7 +383,7 @@
         document.body.appendChild(overlay);
     }
 
-    const AUTH = { Authorization: `Bearer ${tenant.api_key}`, 'Content-Type': 'application/json' };
+    const AUTH = { 'Content-Type': 'application/json' };
 
     function updateTenantUI() {
         document.getElementById('tenantName').textContent = tenant.company_name || tenant.username || '—';
@@ -397,7 +397,10 @@
 
     // Fetch fresh profile in background
     fetch('/api/tenant?action=profile', { headers: AUTH })
-        .then(res => res.json())
+        .then(res => {
+            if (res.status === 401) { logout(); throw new Error('Session expired'); }
+            return res.json();
+        })
         .then(data => {
             if (data.tenant) {
                 tenant = data.tenant;
@@ -607,6 +610,7 @@
 
     // ---- Logout ----
     function logout() {
+        fetch('/api/customer-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' } }).catch(() => {});
         localStorage.removeItem('tenant_data');
         window.location.href = '/customer-login';
     }

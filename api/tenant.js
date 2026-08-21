@@ -3,17 +3,19 @@ const { connectToDatabase } = require('./_mongodb.js');
 const { setCorsHeaders } = require('../services/cors');
 const { checkRateLimit } = require('../services/rateLimit');
 const { tenantIsActive } = require('../services/tenantAccess');
+const { verifyAccessJWT } = require('./_auth');
 
-// Very basic authentication: For tenants, they pass `Bearer api_key_here`
-// In a real app we'd use JWT, but since they have their api_key in localStorage, we verify that.
+function readCookie(req, name) {
+    const source = String(req.headers.cookie || '');
+    const part = source.split(';').map(value => value.trim()).find(value => value.startsWith(name + '='));
+    if (!part) return '';
+    try { return decodeURIComponent(part.slice(name.length + 1)); } catch (_) { return ''; }
+}
+
 async function authenticateTenant(req, db) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-    const apiKey = authHeader.split(' ')[1];
-    
-    if (!apiKey) return null;
-    const tenant = await db.collection('tenants').findOne({ api_key: apiKey });
-    return tenant;
+    const claims = verifyAccessJWT(readCookie(req, 'tenant_session'));
+    if (!claims || claims.role !== 'tenant' || !claims.tenantId) return null;
+    return db.collection('tenants').findOne({ id: claims.tenantId });
 }
 
 module.exports = async function handler(req, res) {

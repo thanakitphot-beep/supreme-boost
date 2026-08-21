@@ -749,8 +749,11 @@
                     renderAuthUI(tenant);
 
                     // Fetch fresh profile in background
-                    fetch('/api/tenant?action=profile', { headers: { 'Authorization': `Bearer ${tenant.api_key}` } })
-                        .then(res => res.json())
+                    fetch('/api/tenant?action=profile')
+                        .then(res => {
+                            if (res.status === 401) { logoutCustomer(); throw new Error('Session expired'); }
+                            return res.json();
+                        })
                         .then(data => {
                             if (data.tenant) {
                                 const oldStr = localStorage.getItem('customer_data');
@@ -778,7 +781,9 @@
         }
 
         function logoutCustomer() {
+            fetch('/api/customer-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' } }).catch(() => {});
             localStorage.removeItem('customer_data');
+            localStorage.removeItem('tenant_data');
             checkAuthStatus();
         }
 

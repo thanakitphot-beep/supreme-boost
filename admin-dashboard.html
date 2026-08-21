@@ -797,6 +797,7 @@
         <div class="mh"><div class="mh-top"><div><p class="m-ey" style="color:var(--g2)">Manual Add</p><h2 class="m-title">เพิ่มลูกค้าใหม่</h2></div><button class="m-close" onclick="closeAdd()"><i class="fa-solid fa-xmark"></i></button></div></div>
         <div class="mb">
             <div class="fg"><label class="fl">ชื่อบริษัท / ร้านค้า <span style="color:var(--r2)">*</span></label><input type="text" id="ad-co" class="fi" placeholder="เช่น ร้าน ABC"></div>
+            <div class="fg"><label class="fl">โดเมนเว็บไซต์ลูกค้า</label><textarea id="ad-origins" class="fi" rows="2" placeholder="https://shop.example.com" style="resize:vertical;font-family:'JetBrains Mono',monospace;font-size:.76rem"></textarea><div style="font-size:.66rem;color:var(--t3);margin-top:5px">ใส่ origin ที่จะฝัง widget เพื่อให้ระบบเจน code สำหรับบริษัทนี้ได้ทันที</div></div>
             <div class="fg"><label class="fl">แพ็กเกจ</label><select id="ad-pkg" class="fi fi-sel"><option value="basic">🟢 Starter (Basic)</option><option value="pro">🔵 Pro Matrix</option><option value="enterprise">🟣 Enterprise</option></select></div>
             <div class="fg" style="margin-bottom:0"><label class="fl">ระยะเวลา</label><select id="ad-dur" class="fi fi-sel"><option value="1">1 เดือน</option><option value="3">3 เดือน</option><option value="6">6 เดือน</option><option value="12">1 ปี (12 เดือน)</option><option value="unlimited">♾️ ไม่หมดอายุ (Lifetime)</option></select></div>
         </div>
@@ -1147,13 +1148,13 @@ async function delMng(){
 }
 
 // ====MODAL ADD====
-function openAdd(){document.getElementById('ad-co').value='';document.getElementById('ad-pkg').value='basic';document.getElementById('ad-dur').value='1';document.getElementById('modal-add').classList.add('show');setTimeout(()=>document.getElementById('ad-co').focus(),300)}
+function openAdd(){document.getElementById('ad-co').value='';document.getElementById('ad-origins').value='';document.getElementById('ad-pkg').value='basic';document.getElementById('ad-dur').value='1';document.getElementById('modal-add').classList.add('show');setTimeout(()=>document.getElementById('ad-co').focus(),300)}
 function closeAdd(){document.getElementById('modal-add').classList.remove('show')}
 async function submitAdd(){
     const co=document.getElementById('ad-co').value.trim();
     if(!co){toast('กรุณากรอกชื่อบริษัท','error');return}
     const btn=document.getElementById('ad-btn');btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> กำลังเพิ่ม...';btn.disabled=true;
-    try{const r=await fetchAPI('add_tenant','POST',{company_name:co,package_type:document.getElementById('ad-pkg').value,duration_months:document.getElementById('ad-dur').value});toast(`เพิ่ม "${co}" สำเร็จ! 🎉`,'success');closeAdd();loadT()}
+    try{const r=await fetchAPI('add_tenant','POST',{company_name:co,allowed_origins:document.getElementById('ad-origins').value,package_type:document.getElementById('ad-pkg').value,duration_months:document.getElementById('ad-dur').value});toast(`เพิ่ม "${co}" สำเร็จ! 🎉`,'success');closeAdd();loadT()}
     catch(e){toast('เกิดข้อผิดพลาด: '+e.message,'error')}
     btn.innerHTML='<i class="fa-solid fa-plus"></i> เพิ่มลูกค้า';btn.disabled=false;
 }

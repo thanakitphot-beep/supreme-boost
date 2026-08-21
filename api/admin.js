@@ -126,6 +126,7 @@ module.exports = async function handler(req, res) {
             if (action === 'add_tenant') {
                 const { company_name, package_type, duration_months, allowed_origins } = body;
                 if (!company_name) return res.status(400).json({ error: "Company name required" });
+                const origins = normalizeAllowedOrigins(allowed_origins);
 
                 const apiKey = 'sk_live_' + crypto.randomBytes(12).toString('hex');
                 let expires_at = null;
@@ -143,8 +144,8 @@ module.exports = async function handler(req, res) {
                     password: hashPassword(company_name.trim()),
                     api_key: apiKey,
                     package_type: package_type || 'basic',
-                    allowed_origins: normalizeAllowedOrigins(allowed_origins),
-                    status: 'active',
+                    allowed_origins: origins,
+                    status: origins.length ? 'active' : 'pending',
                     expires_at,
                     created_at: new Date().toISOString()
                 };
