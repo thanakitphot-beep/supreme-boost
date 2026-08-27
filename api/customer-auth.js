@@ -104,11 +104,14 @@ module.exports = async function handler(req, res) {
                 }
 
                 // Do not bind a Google identity to a password account solely by email.
-                const existingEmail = await db.collection('tenants').findOne({ email: profile.email });
-                if (existingEmail) {
-                    const suppliedUsername = String(body.username || '').trim();
+                const suppliedUsername = String(body.username || '').trim();
+                const emailAccountExists = await db.collection('tenants').findOne({ email: profile.email }, { projection: { id: 1 } });
+                if (emailAccountExists) {
+                    const existingEmail = suppliedUsername
+                        ? await db.collection('tenants').findOne({ email: profile.email, username: suppliedUsername })
+                        : null;
                     const passwordCheck = await passwordMatches(existingEmail, body.password);
-                    if (suppliedUsername !== existingEmail.username || !passwordCheck.matches) {
+                    if (!existingEmail || !passwordCheck.matches) {
                         return res.status(409).json({ error: 'This email already has an account. Enter its existing username and password, then choose Google again to link it.' });
                     }
                     const now = new Date().toISOString();

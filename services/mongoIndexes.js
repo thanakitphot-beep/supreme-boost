@@ -2,7 +2,8 @@
 
 const CRITICAL_INDEXES = [
     { collection: 'tenants', name: 'tenant_api_key_unique', key: { api_key: 1 }, unique: true, sparse: true },
-    { collection: 'tenants', name: 'tenant_email_unique', key: { email: 1 }, unique: true, sparse: true },
+    { collection: 'tenants', name: 'tenant_username_unique', key: { username: 1 }, unique: true, sparse: true },
+    { collection: 'tenants', name: 'tenant_google_subject_unique', key: { 'auth.google.sub': 1 }, unique: true, sparse: true },
     { collection: 'handoff_tickets', name: 'handoff_tenant_idempotency', key: { tenant_id: 1, idempotency_key: 1 }, unique: true },
     { collection: 'rate_limit_windows', name: 'rate_limit_window_unique', key: { key: 1, window_start: 1 }, unique: true },
     { collection: 'rate_limit_windows', name: 'rate_limit_expiry', key: { expires_at: 1 }, expireAfterSeconds: 0 },

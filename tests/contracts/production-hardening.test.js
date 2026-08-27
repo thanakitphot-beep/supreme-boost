@@ -8,6 +8,7 @@ const { validateResponse } = require('../../services/ai/responseValidator');
 const intelligenceBridge = require('../../services/intelligenceBridge');
 const server = require('../../server');
 const { issueRegistrationGrant, readRegistrationGrant } = require('../../services/registrationGrant');
+const { CRITICAL_INDEXES } = require('../../services/mongoIndexes');
 
 async function requestFromLocalServer(pathname) {
     const app = http.createServer(server);
@@ -86,5 +87,15 @@ describe('Production hardening', () => {
         expect(readRegistrationGrant({ headers: { cookie } }, 'other@example.com')).toBeNull();
         if (previous === undefined) delete process.env.JWT_SECRET;
         else process.env.JWT_SECRET = previous;
+    });
+
+    test('enforces tenant identity keys without requiring one email per company', () => {
+        const tenantIndexes = CRITICAL_INDEXES.filter(index => index.collection === 'tenants');
+        expect(tenantIndexes.map(index => index.name)).toEqual(expect.arrayContaining([
+            'tenant_api_key_unique',
+            'tenant_username_unique',
+            'tenant_google_subject_unique'
+        ]));
+        expect(tenantIndexes.some(index => index.key.email === 1)).toBe(false);
     });
 });

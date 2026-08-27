@@ -15,7 +15,6 @@ async function main() {
     await Promise.all([
         db.collection('tenants').createIndex({ api_key: 1 }, { unique: true, sparse: true, name: 'tenant_api_key_unique' }),
         db.collection('tenants').createIndex({ username: 1 }, { unique: true, sparse: true, name: 'tenant_username_unique' }),
-        db.collection('tenants').createIndex({ email: 1 }, { unique: true, sparse: true, name: 'tenant_email_unique' }),
         db.collection('tenants').createIndex({ 'auth.google.sub': 1 }, { unique: true, sparse: true, name: 'tenant_google_subject_unique' }),
         db.collection('tenants').createIndex({ allowed_origins: 1, status: 1 }, { name: 'tenant_origin_status' }),
         db.collection('knowledge_chunks').createIndex({ tenant_id: 1, created_at: -1 }, { name: 'knowledge_tenant_created' }),
