@@ -4,10 +4,9 @@ const { authConfigured, signToken, verifyAccessJWT } = require('./_auth.js');
 const { normalizeAllowedOrigins } = require('../services/tenantAccess');
 const { setCorsHeaders } = require('../services/cors');
 const { checkRateLimit } = require('../services/rateLimit');
-
-function hashPassword(password) {
-    return crypto.createHash('sha256').update(password).digest('hex');
-}
+const { generateInitialPassword, hashPassword, passwordIsValid } = require('../services/passwords');
+const { activateBillingRequest } = require('../services/billing');
+const { canonicalPlanId } = require('../services/plans');
 
 function adminTenant(tenant) {
     if (!tenant) return tenant;
@@ -27,7 +26,7 @@ module.exports = async function handler(req, res) {
     if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === "OPTIONS") return res.status(200).end();
 
-    if (!checkRateLimit(req, res, 'admin')) return;
+    if (!await checkRateLimit(req, res, 'admin')) return;
     const url = new URL(req.url, `http://${req.headers.host}`);
     const action = url.searchParams.get('action');
 
@@ -46,7 +45,7 @@ module.exports = async function handler(req, res) {
         if (req.method === "GET") {
             if (action === 'stats') {
                 const tenantsCount = await db.collection('tenants').countDocuments();
-                const pendingBilling = await db.collection('billing_requests').countDocuments({ status: 'pending' });
+                const pendingBilling = await db.collection('billing_requests').countDocuments({ status: { $in: ['pending', 'verified_pending_approval'] } });
                 return res.status(200).json({ tenants: tenantsCount || 0, pendingBilling: pendingBilling || 0 });
             }
             if (action === 'tenants') {
@@ -63,7 +62,8 @@ module.exports = async function handler(req, res) {
             }
             if (action === 'settings') {
                 const data = await db.collection('settings').findOne({ id: 'global' });
-                return res.status(200).json({ settings: data || {} });
+                const { stripe_secret_key, slipok_api_key, ...settings } = data || {};
+                return res.status(200).json({ settings });
             }
             if (action === 'get_tenant_settings') {
                 const tenantId = url.searchParams.get('tenantId');
@@ -113,12 +113,22 @@ module.exports = async function handler(req, res) {
             if (action === 'update_tenant') {
                 const { id, status, package_type, expires_at, allowed_origins } = body;
                 const updateData = {};
-                if (status !== undefined) updateData.status = status;
-                if (package_type !== undefined) updateData.package_type = package_type;
+                if (status !== undefined) {
+                    if (!['active', 'suspended', 'pending'].includes(status)) return res.status(400).json({ error: 'Invalid tenant status' });
+                    updateData.status = status;
+                    if (status === 'suspended') updateData.suspension_reason = 'admin';
+                }
+                if (package_type !== undefined) {
+                    const planId = canonicalPlanId(package_type);
+                    if (!planId) return res.status(400).json({ error: 'Invalid package type' });
+                    updateData.package_type = planId;
+                }
                 if (expires_at !== undefined) updateData.expires_at = expires_at;
                 if (allowed_origins !== undefined) updateData.allowed_origins = normalizeAllowedOrigins(allowed_origins);
 
-                await db.collection('tenants').updateOne({ id }, { $set: updateData });
+                const tenantUpdate = { $set: updateData };
+                if (status === 'active') tenantUpdate.$unset = { suspension_reason: '' };
+                await db.collection('tenants').updateOne({ id }, tenantUpdate);
                 const tenant = await db.collection('tenants').findOne({ id });
                 return res.status(200).json({ success: true, tenant: adminTenant(tenant) });
             }
@@ -126,9 +136,17 @@ module.exports = async function handler(req, res) {
             if (action === 'add_tenant') {
                 const { company_name, package_type, duration_months, allowed_origins } = body;
                 if (!company_name) return res.status(400).json({ error: "Company name required" });
+                const planId = canonicalPlanId(package_type || 'starter');
+                if (!planId) return res.status(400).json({ error: 'Invalid package type' });
                 const origins = normalizeAllowedOrigins(allowed_origins);
+                const username = company_name.trim();
+                if (!username) return res.status(400).json({ error: 'Company name required' });
+                if (await db.collection('tenants').findOne({ username })) {
+                    return res.status(409).json({ error: 'A tenant with this username already exists' });
+                }
 
                 const apiKey = 'sk_live_' + crypto.randomBytes(12).toString('hex');
+                const initialPassword = generateInitialPassword();
                 let expires_at = null;
                 
                 if (duration_months !== 'unlimited') {
@@ -140,10 +158,10 @@ module.exports = async function handler(req, res) {
                 const newTenant = {
                     id: crypto.randomUUID(),
                     company_name,
-                    username: company_name.trim(),
-                    password: hashPassword(company_name.trim()),
+                    username,
+                    password: await hashPassword(initialPassword),
                     api_key: apiKey,
-                    package_type: package_type || 'basic',
+                    package_type: planId,
                     allowed_origins: origins,
                     status: origins.length ? 'active' : 'pending',
                     expires_at,
@@ -151,7 +169,9 @@ module.exports = async function handler(req, res) {
                 };
                 
                 await db.collection('tenants').insertOne(newTenant);
-                return res.status(200).json({ success: true, tenant: adminTenant(newTenant) });
+                // This is the only response that contains the generated
+                // credential. The admin must deliver it through a secure channel.
+                return res.status(200).json({ success: true, tenant: adminTenant(newTenant), initialPassword });
             }
 
             if (action === 'approve_billing') {
@@ -159,31 +179,19 @@ module.exports = async function handler(req, res) {
                 
                 const request = await db.collection('billing_requests').findOne({ id });
                 if (!request) throw new Error("Request not found");
-                if (request.status !== 'pending') return res.status(400).json({ error: "Already processed" });
-
-                const apiKey = 'sk_live_' + crypto.randomBytes(12).toString('hex');
-                const expiry = new Date();
-                expiry.setMonth(expiry.getMonth() + (request.package_type === 'Pro' ? 1 : 12));
-
-                const newTenant = {
-                    id: crypto.randomUUID(),
-                    company_name: request.tenant_name,
-                    api_key: apiKey,
-                    package_type: request.package_type,
-                    status: 'active',
-                    allowed_origins: [],
-                    expires_at: expiry.toISOString(),
-                    created_at: new Date().toISOString()
-                };
-                
-                await db.collection('tenants').insertOne(newTenant);
-                await db.collection('billing_requests').updateOne({ id }, { $set: { status: 'approved' } });
-
-                return res.status(200).json({ success: true, apiKey: apiKey });
+                if (!['pending', 'verified_pending_approval'].includes(request.status) || request.provider === 'stripe') {
+                    return res.status(400).json({ error: 'Billing request cannot be manually approved' });
+                }
+                const tenant = await activateBillingRequest(db, id, { provider: request.provider || 'manual', providerReference: request.provider_reference });
+                return res.status(200).json({ success: true, tenant: adminTenant(tenant) });
             }
 
             if (action === 'reject_billing') {
-                await db.collection('billing_requests').updateOne({ id: body.id }, { $set: { status: 'rejected' } });
+                const result = await db.collection('billing_requests').updateOne(
+                    { id: body.id, status: { $in: ['pending', 'verified_pending_approval'] } },
+                    { $set: { status: 'rejected', updated_at: new Date().toISOString() } }
+                );
+                if (!result.modifiedCount) return res.status(400).json({ error: 'Billing request cannot be rejected' });
                 return res.status(200).json({ success: true });
             }
 
@@ -209,7 +217,10 @@ module.exports = async function handler(req, res) {
                     updateData.username = username.trim();
                 }
                 if (new_password !== undefined && new_password.trim() !== '') {
-                    updateData.password = hashPassword(new_password.trim());
+                    if (!passwordIsValid(new_password.trim())) {
+                        return res.status(400).json({ error: 'Password must be at least 12 characters' });
+                    }
+                    updateData.password = await hashPassword(new_password.trim());
                 }
                 if (regenerate_key) {
                     updateData.api_key = 'sk_live_' + crypto.randomBytes(12).toString('hex');
@@ -227,7 +238,8 @@ module.exports = async function handler(req, res) {
             if (action === 'delete_billing') {
                 const { id } = body;
                 if (!id) return res.status(400).json({ error: 'Billing ID required' });
-                await db.collection('billing_requests').deleteOne({ id });
+                const result = await db.collection('billing_requests').deleteOne({ id, status: { $nin: ['paid', 'approved'] } });
+                if (!result.deletedCount) return res.status(400).json({ error: 'Paid billing ledger entries cannot be deleted' });
                 return res.status(200).json({ success: true });
             }
 
@@ -256,13 +268,17 @@ module.exports = async function handler(req, res) {
             }
 
             if (action === 'save_settings') {
+                const paymentMode = String(body.payment_mode || 'manual').toLowerCase();
+                if (!['manual', 'slipok', 'stripe', 'both'].includes(paymentMode)) return res.status(400).json({ error: 'Invalid payment mode' });
                 const payload = {
-                    payment_mode: body.payment_mode || 'manual',
-                    stripe_secret_key: body.stripe_secret_key || '',
-                    slipok_api_key: body.slipok_api_key || '',
-                    slipok_branch_id: body.slipok_branch_id || ''
+                    payment_mode: paymentMode,
+                    updated_at: new Date().toISOString()
                 };
-                await db.collection('settings').updateOne({ id: 'global' }, { $set: payload }, { upsert: true });
+                await db.collection('settings').updateOne(
+                    { id: 'global' },
+                    { $set: payload, $unset: { stripe_secret_key: '', slipok_api_key: '', slipok_branch_id: '' } },
+                    { upsert: true }
+                );
                 return res.status(200).json({ success: true });
             }
 

@@ -19,6 +19,7 @@ const { enabled: intelligenceEnabled, answerWithIntelligence } = require('../ser
 const { maskPII, maskDOMSnapshot } = require('../services/safety');
 const { checkRateLimit } = require('../services/rateLimit');
 const { applyPluginCors, authorizePluginRequest } = require('../services/tenantAccess');
+const { consumeUsage, entitlementsFor } = require('../services/plans');
 const { connectToDatabase } = require('./_mongodb');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -37,6 +38,7 @@ const MAX_ENTITY_TEXT = 700;
 const MAX_ENTITY_DESCRIPTION = 600;
 const MAX_BRAIN_PAGE_CHARS = 5000;
 const MAX_BRAIN_ENTITY_ITEMS = 30;
+const MAX_TENANT_KNOWLEDGE_MATCHES = 5;
 const ALLOWED_TENANT_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gpt-5.6-terra', 'gpt-5.6-sol', 'llama-3.3-70b-versatile']);
 
 const GROUNDED_INTENTS = new Set([
@@ -53,6 +55,7 @@ const GROUNDED_INTENTS = new Set([
 // "owned" is the default: provider-independent resolver is authoritative
 // for website facts/actions. Set INDICATOR_AGENT_MODE=legacy only as rollback.
 function usesIndicatorAgent() {
+    if (process.env.NODE_ENV === 'production') return true;
     return String(process.env.INDICATOR_AGENT_MODE || 'owned').toLowerCase() !== 'legacy';
 }
 
@@ -74,23 +77,61 @@ function cleanOptionalText(value, maxLength) {
 }
 
 function knowledgeScore(query, chunk) {
-    const terms = cleanText(query, 300).toLowerCase().split(/\s+/).filter(term => term.length > 2);
-    const haystack = `${chunk.title || ''} ${chunk.source || ''} ${chunk.content || ''}`.toLowerCase();
-    return terms.reduce((score, term) => score + (haystack.includes(term) ? 1 : 0), 0);
+    const normalizedQuery = cleanText(query, 300).toLocaleLowerCase('th-TH');
+    const title = cleanText(chunk && (chunk.title || chunk.source), 300).toLocaleLowerCase('th-TH');
+    const content = cleanText(chunk && chunk.content, 2400).toLocaleLowerCase('th-TH');
+    const haystack = `${title} ${content}`;
+    if (!normalizedQuery || !haystack) return 0;
+
+    const terms = normalizedQuery.match(/[\p{L}\p{M}\p{N}]{3,}/gu) || [];
+    let score = terms.reduce((total, term) => total + (haystack.includes(term) ? 4 : 0), 0);
+    if (title.includes(normalizedQuery)) score += 30;
+    else if (content.includes(normalizedQuery)) score += 20;
+
+    // Thai questions often have no spaces. Rank a chunk by its longest shared
+    // Thai phrase so "ร้านเปิดวันไหน" can retrieve "ร้านเปิดทุกวัน".
+    const thaiQuery = normalizedQuery.replace(/[^\p{Script=Thai}\p{M}]/gu, '');
+    const thaiContent = haystack.replace(/[^\p{Script=Thai}\p{M}]/gu, '');
+    for (let length = Math.min(12, thaiQuery.length); length >= 5; length--) {
+        let found = false;
+        for (let index = 0; index <= thaiQuery.length - length; index++) {
+            if (thaiContent.includes(thaiQuery.slice(index, index + length))) {
+                score += length * 2;
+                found = true;
+                break;
+            }
+        }
+        if (found) break;
+    }
+    return score;
 }
 
 async function getTenantKnowledgeContext(tenantId, query) {
-    if (!tenantId || tenantId === 'demo' || !query) return '';
+    if (!tenantId || tenantId === 'demo' || !query) return [];
     const db = await connectToDatabase();
-    if (!db) return '';
+    if (!db) return [];
     const chunks = await db.collection('knowledge_chunks').find({ tenant_id: tenantId }).sort({ created_at: -1 }).limit(50).toArray();
     return chunks
         .map(chunk => ({ chunk, score: knowledgeScore(query, chunk) }))
         .filter(item => item.score > 0)
         .sort((left, right) => right.score - left.score)
-        .slice(0, 5)
-        .map(item => `[Source: ${item.chunk.title || item.chunk.source || 'Tenant knowledge'}]\n${cleanText(item.chunk.content, 1600)}`)
-        .join('\n\n');
+        .slice(0, MAX_TENANT_KNOWLEDGE_MATCHES)
+        .map(item => ({
+            id: cleanText(String(item.chunk.id || item.chunk._id || ''), 160),
+            title: cleanText(item.chunk.title || item.chunk.source || 'Tenant knowledge', 240),
+            source: cleanText(item.chunk.url || item.chunk.source, 500),
+            content: cleanText(item.chunk.content, 1600),
+            revision: cleanText(item.chunk.updated_at || item.chunk.created_at, 80),
+            score: item.score
+        }))
+        .filter(item => item.id && item.content);
+}
+
+function formatTenantKnowledge(matches) {
+    if (!Array.isArray(matches)) return '';
+    return matches.map(match => {
+        return `[Source: ${match.title || 'Tenant knowledge'} | id=${match.id}]\n${match.content}`;
+    }).join('\n\n');
 }
 
 async function logTenantEvent(tenantId, type, message, metadata = {}) {
@@ -103,6 +144,24 @@ async function logTenantEvent(tenantId, type, message, metadata = {}) {
         message: cleanText(message, 500),
         metadata: { tenantId, ...metadata },
         timestamp: new Date().toISOString()
+    });
+}
+
+function logChatCompletion(tenantId, payload, result, requestId, startedAt, cacheHit) {
+    const sources = Array.isArray(result && result.sources) ? result.sources : [];
+    const sourceIds = sources
+        .map(source => cleanText(source && source.id, 160))
+        .filter(Boolean)
+        .slice(0, MAX_TENANT_KNOWLEDGE_MATCHES);
+
+    return logTenantEvent(tenantId, 'chat_completed', 'Chat response completed', {
+        requestId,
+        resolver: usesIndicatorAgent() ? 'indicator-agent' : 'legacy',
+        status: cleanText(result && result.status, 40) || 'ok',
+        cacheHit: Boolean(cacheHit),
+        latencyMs: Math.max(0, Date.now() - startedAt),
+        tenantKnowledgeMatches: Array.isArray(payload.tenantKnowledge) ? payload.tenantKnowledge.length : 0,
+        sourceIds
     });
 }
 
@@ -369,7 +428,7 @@ function safeBrainOnlyAction(action) {
     if (['warp', 'warp_cross_page', 'navigate', 'highlight'].includes(type)) return null;
 
     // Keep only existing widget actions that do not select page content.
-    if (['handoff', 'speech', 'confetti', 'plugin_action'].includes(type)) return action;
+    if (['handoff', 'speech'].includes(type)) return action;
     return null;
 }
 
@@ -495,7 +554,7 @@ async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'chat')) {
+    if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'chat')) {
         return;
     }
 
@@ -525,9 +584,12 @@ async function handler(req, res) {
 
         const rawPrompt = cleanText(body.prompt, MAX_PROMPT_CHARS);
         const siteProfile = resolveSiteProfile(cleanText(body.siteKey || body.apiKey, 300));
+        const isProactive = body.proactive === true;
+        if (!rawPrompt && !isProactive) return res.status(400).json({ error: 'กรุณาพิมพ์ข้อความก่อนส่ง' });
 
         if (
-            process.env.INDICATOR_STRICT_SITE_ORIGIN === 'true' &&
+            (process.env.INDICATOR_STRICT_SITE_ORIGIN === 'true' || process.env.NODE_ENV === 'production') &&
+            siteProfile &&
             req.headers.origin &&
             !originIsAllowed(siteProfile, req.headers.origin)
         ) {
@@ -541,12 +603,19 @@ async function handler(req, res) {
         }
 
         const requestId = generateRequestId();
+        const startedAt = Date.now();
         const tenantId = tenant.tenantInfo && tenant.tenantInfo.id || 'demo';
+        const entitlements = tenant.tenantInfo && tenant.tenantInfo.entitlements || entitlementsFor(tenant.tenantInfo);
+        if (!await checkRateLimit(req, res, 'chat', { principal: `tenant:${tenantId}`, limit: entitlements.chatPerMinute })) return;
+        const usage = await consumeUsage(tenant.tenantInfo, 'chat');
+        if (!usage.allowed) {
+            return res.status(usage.status || 429).json({ status: 'blocked', error: usage.reason, reply: 'โควตาการใช้งานของบัญชีนี้หมดแล้ว กรุณาติดต่อผู้ดูแลระบบ', action: null, interactive: null });
+        }
         logTenantEvent(tenantId, 'chat', `Chat request from ${tenant.tenantInfo && (tenant.tenantInfo.company_name || tenantId) || tenantId}`, { requestId }).catch(() => { });
         const tenantSettings = await getTenantRuntimeSettings(tenantId).catch(() => ({}));
         const payload = {
             prompt: maskPII(rawPrompt),
-            isProactive: body.proactive === true,
+            isProactive,
             domSnapshot: maskDOMSnapshot(body.domSnapshot),
             siteDNA: sanitizeDNA(body.siteDNA),
             pageContent: maskPII(cleanText(body.pageContent, MAX_PAGE_CHARS)),
@@ -560,10 +629,6 @@ async function handler(req, res) {
             tenantSettings,
             siteProfile
         };
-
-        if (!rawPrompt && !payload.isProactive) {
-            return res.status(400).json({ error: 'กรุณาพิมพ์ข้อความก่อนส่ง' });
-        }
 
         // Learn only already-masked, public page information. These systems are
         // tenant/profile-separated and reject private routes internally.
@@ -590,6 +655,10 @@ async function handler(req, res) {
         payload.expertKnowledge = getSiteKnowledge(siteProfile);
 
         const conversationId = `${tenantId}:${payload.conversationId || requestId}`;
+        // The owned agent has its own short-term cache. Give it the same
+        // tenant-scoped key as the durable memory manager to prevent context
+        // from one tenant ever being reused by another.
+        payload.conversationId = conversationId;
         const mergedHistory = (await memoryManager.getMergedHistory(
             conversationId,
             payload.history
@@ -602,8 +671,10 @@ async function handler(req, res) {
             }
             await memoryManager.addMessage(conversationId, 'user', payload.prompt);
         }
+        payload.history = mergedHistory;
 
-        payload.ragContext = await getTenantKnowledgeContext(tenantId, rawPrompt).catch(() => '');
+        payload.tenantKnowledge = await getTenantKnowledgeContext(tenantId, rawPrompt).catch(() => []);
+        payload.ragContext = formatTenantKnowledge(payload.tenantKnowledge);
         if (!payload.ragContext && rawPrompt && supabase) {
             const ragTenantId = tenantId;
             try {
@@ -627,11 +698,23 @@ async function handler(req, res) {
             const cached = semanticCache.get(payload);
             if (cached) {
                 console.log('[Cache] HIT — returning cached response');
-                return res.status(200).json({
+                const cachedResult = normalizeResult(cached);
+                if (cachedResult.reply && cachedResult.status !== 'error' && cachedResult.status !== 'silent_abort') {
+                    await memoryManager.addMessage(conversationId, 'assistant', cachedResult.reply);
+                }
+                const response = {
                     ...cached,
                     expertise: payload.expertiseStatus,
-                    learning: payload.learningStatus
-                });
+                    learning: payload.learningStatus,
+                    metadata: {
+                        ...(cached.metadata || {}),
+                        requestId,
+                        cacheHit: true,
+                        tenantKnowledgeMatches: payload.tenantKnowledge.length
+                    }
+                };
+                logChatCompletion(tenantId, payload, response, requestId, startedAt, true).catch(() => { });
+                return res.status(200).json(response);
             }
         }
 
@@ -656,6 +739,7 @@ async function handler(req, res) {
                 userMessage: payload.prompt,
                 metadata: { requestId }
             }));
+            result.action = safeBrainOnlyAction(result.action);
         }
 
         result = normalizeResult(result);
@@ -671,6 +755,9 @@ async function handler(req, res) {
                 ...(result.metadata || {}),
                 requestId,
                 resolver: usesIndicatorAgent() ? 'indicator-agent' : 'legacy',
+                cacheHit: false,
+                tenantKnowledgeMatches: payload.tenantKnowledge.length,
+                usageRemaining: usage.remaining,
                 structuredEntities: payload.siteDNA && Array.isArray(payload.siteDNA.entityIndex)
                     ? payload.siteDNA.entityIndex.length
                     : 0
@@ -680,6 +767,8 @@ async function handler(req, res) {
                 semanticCache.set(payload, result);
             }
         }
+
+        logChatCompletion(tenantId, payload, result, requestId, startedAt, false).catch(() => { });
 
         return res.status(200).json(result);
     } catch (error) {
@@ -706,3 +795,4 @@ module.exports.cacheStats = function cacheStats(req, res) {
 // public API routes.
 module.exports.__sanitizeDNA = sanitizeDNA;
 module.exports.__cacheEligible = cacheEligible;
+module.exports.__formatTenantKnowledge = formatTenantKnowledge;

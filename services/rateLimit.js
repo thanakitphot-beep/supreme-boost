@@ -1,160 +1,126 @@
-// OMEGA-JARVIS v3.0.0 — Rate Limiter Service
-// Sliding window algorithm — per IP and per API Key
-// Supports in-memory (serverless) mode by default
+'use strict';
 
-const WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10);   // 1 minute
-const MAX_REQUESTS = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10); // per window
-const CHAT_MAX = parseInt(process.env.RATE_LIMIT_CHAT_MAX || '30', 10);          // stricter for chat
-const BURST_MAX = parseInt(process.env.RATE_LIMIT_BURST || '10', 10);            // max burst per 5s
+const crypto = require('crypto');
+const { connectToDatabase } = require('../api/_mongodb');
+const { incrementBoundedCounter } = require('./mongoCounter');
 
-// In-memory store for Token Bucket: { key → { tokens, lastRefill, burstTokens, lastBurstRefill, violations } }
 const store = new Map();
-const blocklist = new Map(); // key -> unblockTime
 
-// Cleanup every 10 minutes — remove inactive buckets and expired blocklists.
-// unref keeps this maintenance timer from preventing graceful shutdown/tests.
-const cleanupTimer = setInterval(() => {
-    const now = Date.now();
-    for (const [key, unblockTime] of blocklist.entries()) {
-        if (now > unblockTime) blocklist.delete(key);
-    }
-    for (const [key, bucket] of store.entries()) {
-        if (now - bucket.lastRefill > WINDOW_MS * 2) {
-            store.delete(key);
-        }
-    }
-}, 10 * 60 * 1000);
-cleanupTimer.unref?.();
-
-function getBucket(key, limit, burstLimit) {
-    const now = Date.now();
-    let bucket = store.get(key);
-    
-    if (!bucket) {
-        bucket = {
-            tokens: limit,
-            lastRefill: now,
-            burstTokens: burstLimit,
-            lastBurstRefill: now,
-            violations: 0
-        };
-        store.set(key, bucket);
-    } else {
-        // Refill main tokens based on elapsed time (tokens per millisecond)
-        const timePassed = now - bucket.lastRefill;
-        const refillRate = limit / WINDOW_MS;
-        const newTokens = Math.floor(timePassed * refillRate);
-        if (newTokens > 0) {
-            bucket.tokens = Math.min(limit, bucket.tokens + newTokens);
-            bucket.lastRefill = now;
-        }
-
-        // Refill burst tokens (refill over 5 seconds)
-        const burstTimePassed = now - bucket.lastBurstRefill;
-        const burstRefillRate = burstLimit / 5000;
-        const newBurstTokens = Math.floor(burstTimePassed * burstRefillRate);
-        if (newBurstTokens > 0) {
-            bucket.burstTokens = Math.min(burstLimit, bucket.burstTokens + newBurstTokens);
-            bucket.lastBurstRefill = now;
-        }
-    }
-    return bucket;
+function positiveInteger(value, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-/**
- * Main rate limit middleware
- * @param {object} req - HTTP request
- * @param {object} res - HTTP response wrapper
- * @param {string} routeType - 'chat' | 'api' | 'admin'
- * @returns {boolean} - true if allowed, false if rate limited
- */
-function checkRateLimit(req, res, routeType = 'api') {
-    // Extract identifier: API key > IP
-    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown')
-        .split(',')[0].trim();
-    const apiKey = req.body?.apiKey || req.headers['x-api-key'] || '';
-    const identifier = apiKey ? `key:${apiKey}` : `ip:${ip}`;
+function limitsFor(routeType) {
+    const standard = positiveInteger(process.env.RATE_LIMIT_MAX_REQUESTS, 100);
+    if (routeType === 'chat') return positiveInteger(process.env.RATE_LIMIT_CHAT_MAX, 30);
+    if (routeType === 'auth') return positiveInteger(process.env.RATE_LIMIT_AUTH_MAX, 10);
+    if (routeType === 'admin') return positiveInteger(process.env.RATE_LIMIT_ADMIN_MAX, 30);
+    if (routeType === 'billing') return positiveInteger(process.env.RATE_LIMIT_BILLING_MAX, 20);
+    return standard;
+}
 
-    // Blocklist check
+function windowMs() {
+    return positiveInteger(process.env.RATE_LIMIT_WINDOW_MS, 60_000);
+}
+
+function requestIp(req) {
+    const trustedProxy = process.env.TRUST_PROXY_HEADERS === 'true';
+    const forwarded = trustedProxy ? String(req.headers['x-forwarded-for'] || '') : '';
+    if (forwarded) {
+        const chain = forwarded.split(',').map(value => value.trim()).filter(Boolean);
+        const hops = positiveInteger(process.env.TRUSTED_PROXY_HOPS, 1);
+        return chain[Math.max(0, chain.length - hops)] || 'unknown';
+    }
+    if (trustedProxy && req.headers['x-real-ip']) return String(req.headers['x-real-ip']).trim();
+    return req.socket && req.socket.remoteAddress || 'unknown';
+}
+
+function principalFor(req, override) {
+    if (override) return override;
+    return `ip:${requestIp(req)}`;
+}
+
+function opaqueKey(value) {
+    const secret = String(process.env.RATE_LIMIT_SECRET || process.env.JWT_SECRET || 'local-rate-limit');
+    return crypto.createHmac('sha256', secret).update(String(value)).digest('base64url');
+}
+
+function sendLimited(res, limit, resetAt, status = 429, message = 'Rate limit exceeded. Please try again shortly.') {
+    if (!res) return;
+    const retryAfter = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+    res.setHeader('Retry-After', String(retryAfter));
+    res.setHeader('X-RateLimit-Limit', String(limit));
+    res.setHeader('X-RateLimit-Remaining', '0');
+    res.status(status).json({ error: message, retryAfter, limit });
+}
+
+function consumeLocal(key, limit) {
     const now = Date.now();
-    if (blocklist.has(identifier) && now < blocklist.get(identifier)) {
-        if (res) {
-            const retryAfter = Math.ceil((blocklist.get(identifier) - now) / 1000);
-            res.setHeader('Retry-After', retryAfter);
-            res.setHeader('X-RateLimit-Remaining', '0');
-            res.status(429).json({
-                error: 'Too Many Requests — you are temporarily blocked.',
-                retryAfter: retryAfter
-            });
+    const duration = windowMs();
+    const start = now - now % duration;
+    const id = `${key}:${start}`;
+    const count = Number(store.get(id) || 0) + 1;
+    store.set(id, count);
+    if (store.size > 5000) {
+        for (const candidate of store.keys()) {
+            const timestamp = Number(candidate.slice(candidate.lastIndexOf(':') + 1));
+            if (timestamp + duration <= now) store.delete(candidate);
         }
-        return false;
-    } else if (blocklist.has(identifier)) {
-        blocklist.delete(identifier); // unblock if expired
+    }
+    return { allowed: count <= limit, remaining: Math.max(0, limit - count), resetAt: start + duration };
+}
+
+async function consumeShared(key, limit) {
+    const db = await connectToDatabase();
+    if (!db) return null;
+    const now = Date.now();
+    const duration = windowMs();
+    const start = new Date(now - now % duration);
+    const resetAt = new Date(start.getTime() + duration);
+    const result = await incrementBoundedCounter(
+        db.collection('rate_limit_windows'),
+        { key, window_start: start },
+        'count',
+        limit,
+        { expires_at: new Date(resetAt.getTime() + duration) }
+    );
+    return { allowed: result.allowed, remaining: Math.max(0, limit - result.count), resetAt: resetAt.getTime() };
+}
+
+async function checkRateLimit(req, res, routeType = 'api', options = {}) {
+    const limit = positiveInteger(options.limit, limitsFor(routeType));
+    const principal = principalFor(req, options.principal);
+    const key = opaqueKey(`${routeType}:${principal}`);
+    let result;
+
+    try {
+        result = await consumeShared(key, limit);
+    } catch (_) {
+        result = null;
+    }
+    if (!result) {
+        if (process.env.NODE_ENV === 'production') {
+            sendLimited(res, limit, Date.now() + windowMs(), 503, 'Rate limit service is unavailable');
+            return false;
+        }
+        result = consumeLocal(key, limit);
     }
 
-    const limit = routeType === 'chat' ? CHAT_MAX : MAX_REQUESTS;
-    const bucket = getBucket(identifier, limit, BURST_MAX);
-
-    // Burst protection (Token bucket approach for bursts)
-    if (bucket.burstTokens <= 0) {
-        if (res) {
-            res.setHeader('Retry-After', '5');
-            res.setHeader('X-RateLimit-Limit', String(limit));
-            res.setHeader('X-RateLimit-Remaining', '0');
-            res.status(429).json({
-                error: 'Burst limit exceeded. Please slow down.',
-                retryAfter: 5
-            });
-        }
+    if (!result.allowed) {
+        sendLimited(res, limit, result.resetAt);
         return false;
     }
-
-    // Main window limit
-    if (bucket.tokens <= 0) {
-        bucket.violations++;
-        // Auto-block repeated offenders (5 violations = block)
-        if (bucket.violations >= 5) {
-            blocklist.set(identifier, now + (WINDOW_MS * 10)); // block for 10x window
-            bucket.violations = 0; // reset after block
-        }
-        if (res) {
-            res.setHeader('Retry-After', Math.ceil(WINDOW_MS / 1000));
-            res.setHeader('X-RateLimit-Limit', String(limit));
-            res.setHeader('X-RateLimit-Remaining', '0');
-            res.status(429).json({
-                error: 'Rate limit exceeded. Too many requests.',
-                retryAfter: Math.ceil(WINDOW_MS / 1000),
-                limit,
-                window_ms: WINDOW_MS
-            });
-        }
-        return false;
-    }
-
-    // Allowed — deduct tokens and set headers
-    bucket.tokens--;
-    bucket.burstTokens--;
-    
     if (res) {
         res.setHeader('X-RateLimit-Limit', String(limit));
-        res.setHeader('X-RateLimit-Remaining', String(Math.floor(bucket.tokens)));
-        res.setHeader('X-RateLimit-Reset', String(Math.ceil((now + WINDOW_MS) / 1000)));
+        res.setHeader('X-RateLimit-Remaining', String(result.remaining));
+        res.setHeader('X-RateLimit-Reset', String(Math.ceil(result.resetAt / 1000)));
     }
     return true;
 }
 
-/**
- * Get aggregate stats for /metrics endpoint
- */
 function getRateLimiterStats() {
-    return {
-        tracked_identifiers: store.size,
-        blocklisted: blocklist.size,
-        window_ms: WINDOW_MS,
-        max_requests: MAX_REQUESTS,
-        chat_max: CHAT_MAX,
-        burst_max: BURST_MAX
-    };
+    return { mode: process.env.NODE_ENV === 'production' ? 'mongo-required' : 'mongo-with-local-fallback', local_windows: store.size, window_ms: windowMs() };
 }
 
-module.exports = { checkRateLimit, getRateLimiterStats };
+module.exports = { checkRateLimit, getRateLimiterStats, __opaqueKey: opaqueKey, __requestIp: requestIp };

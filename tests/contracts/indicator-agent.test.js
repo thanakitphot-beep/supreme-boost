@@ -5,34 +5,34 @@ const vm = require('vm');
 const { resolveSiteProfile, originIsAllowed, inferSiteIdentity } = require('../../services/siteProfiles');
 
 describe('INDICATOR owned agent — contract', () => {
-    test('finds the actual MegaStore running shoe', () => {
+    test('finds an INDICATOR subscription plan', () => {
         const result = runIndicatorAgent({
-            prompt: 'ช่วยหารองเท้าวิ่ง Nike ให้หน่อย',
-            url: 'http://localhost:3000/megastore.html',
+            prompt: 'ช่วยหาแพ็กเกจ Pro Matrix ให้หน่อย',
+            url: 'http://localhost:3000/',
             locale: 'th',
             siteProfile: resolveSiteProfile('INDICATOR_TEST')
         });
         expect(result.status).toBe('ok');
-        expect(result.reply).toContain('รองเท้าวิ่ง Nike Air');
-        expect(result.action).toMatchObject({ type: 'warp', targetText: 'รองเท้าวิ่ง Nike Air' });
+        expect(result.reply).toContain('แพ็กเกจ Pro Matrix');
+        expect(result.action).toMatchObject({ type: 'navigate', url: '/pricing.html#pro' });
         expect(result.cssCommand).toBe('');
     });
 
-    test('understands a natural brand request without requiring the word product', () => {
+    test('understands a natural plan request without requiring the word package', () => {
         const result = runIndicatorAgent({
-            prompt: 'อยากได้ nike',
-            url: 'http://localhost:3000/megastore.html',
+            prompt: 'อยากได้ Pro Matrix',
+            url: 'http://localhost:3000/',
             locale: 'th',
             siteProfile: resolveSiteProfile('INDICATOR_TEST')
         });
-        expect(result.reply).toContain('รองเท้าวิ่ง Nike Air');
-        expect(result.action).toMatchObject({ type: 'warp' });
+        expect(result.reply).toContain('แพ็กเกจ Pro Matrix');
+        expect(result.action).toMatchObject({ type: 'navigate' });
     });
 
     test('checks the site before answering an availability question outside known product categories', () => {
         const result = runIndicatorAgent({
             prompt: 'ร้านนี้มีต้นไม้ไหม',
-            url: 'http://localhost:3000/megastore.html',
+            url: 'http://localhost:3000/',
             locale: 'th',
             siteProfile: resolveSiteProfile('INDICATOR_TEST')
         });
@@ -44,7 +44,7 @@ describe('INDICATOR owned agent — contract', () => {
     test('lists recommendations without navigating to an unrelated webpage', () => {
         const result = runIndicatorAgent({
             prompt: 'ร้านนี้มีอะไรแนะนำบ้าง',
-            url: 'http://localhost:3000/megastore.html',
+            url: 'http://localhost:3000/',
             locale: 'th',
             siteProfile: resolveSiteProfile('INDICATOR_TEST')
         });
@@ -57,7 +57,7 @@ describe('INDICATOR owned agent — contract', () => {
     test('searches the current catalog before crawling when a Thai product request is imprecise', () => {
         const result = runIndicatorAgent({
             prompt: 'อยากได้แบบกางเกง 3 ส่วน',
-            url: 'http://localhost:3000/megastore.html',
+            url: 'http://localhost:3000/',
             locale: 'th',
             siteProfile: resolveSiteProfile('INDICATOR_TEST'),
             siteDNA: {
@@ -76,7 +76,7 @@ describe('INDICATOR owned agent — contract', () => {
     test('answers a category question with matching products instead of a page summary', () => {
         const result = runIndicatorAgent({
             prompt: 'มีกางเกงอะไรบ้าง',
-            url: 'http://localhost:3000/megastore.html',
+            url: 'http://localhost:3000/',
             locale: 'th',
             siteProfile: { id: 'unit-category-list', permissions: ['navigate_same_origin'] },
             siteDNA: {
@@ -96,7 +96,7 @@ describe('INDICATOR owned agent — contract', () => {
     test('tolerates Thai spelling variation while retaining the customer product constraint', () => {
         const result = runIndicatorAgent({
             prompt: 'อยากด้ายกางแกงวอม 3 ส่วน',
-            url: 'http://localhost:3000/megastore.html',
+            url: 'http://localhost:3000/',
             locale: 'th',
             siteProfile: { id: 'unit-typo-match', permissions: ['navigate_same_origin'] },
             siteDNA: {
@@ -138,51 +138,51 @@ describe('INDICATOR owned agent — contract', () => {
         expect(result.reply).toContain('Designing Calm Interfaces');
     });
 
-    test('uses the last assistant reply to answer a follow-up product question', () => {
+    test('uses the last assistant reply to answer a follow-up plan question', () => {
         const first = runIndicatorAgent({
-            prompt: 'ช่วยหารองเท้าวิ่ง Nike ให้หน่อย',
-            url: 'http://localhost:3000/megastore.html',
+            prompt: 'ช่วยหาแพ็กเกจ Pro Matrix ให้หน่อย',
+            url: 'http://localhost:3000/',
             locale: 'th',
             siteProfile: resolveSiteProfile('INDICATOR_TEST')
         });
         const followUp = runIndicatorAgent({
-            prompt: 'มันคือรองเท้าอะไร',
-            url: 'http://localhost:3000/megastore.html',
+            prompt: 'มันคือแพ็กเกจอะไร',
+            url: 'http://localhost:3000/',
             locale: 'th',
             siteProfile: resolveSiteProfile('INDICATOR_TEST'),
             history: [
-                { role: 'user', text: 'ช่วยหารองเท้าวิ่ง Nike ให้หน่อย' },
+                { role: 'user', text: 'ช่วยหาแพ็กเกจ Pro Matrix ให้หน่อย' },
                 { role: 'assistant', text: first.reply }
             ]
         });
-        expect(followUp.reply).toContain('รองเท้าวิ่ง Nike Air คือ');
-        expect(followUp.reply).toContain('Air Max Cushioning');
-        expect(followUp.sources[0]).toMatchObject({ type: 'conversation_catalog', id: 'nike-air' });
+        expect(followUp.reply).toContain('แพ็กเกจ Pro Matrix คือ');
+        expect(followUp.reply).toContain('10,000 ข้อความ');
+        expect(followUp.sources[0]).toMatchObject({ type: 'conversation_catalog', id: 'plan-pro' });
     });
 
-    test('keeps product-detail follow-ups grounded and requests optional research', () => {
+    test('keeps plan-detail follow-ups grounded and requests optional research', () => {
         const profile = resolveSiteProfile('INDICATOR_TEST');
         const first = runIndicatorAgent({
-            prompt: 'ช่วยหารองเท้าวิ่ง Nike ให้หน่อย', url: 'http://localhost:3000/megastore.html', locale: 'th', siteProfile: profile
+            prompt: 'ช่วยหาแพ็กเกจ Pro Matrix ให้หน่อย', url: 'http://localhost:3000/', locale: 'th', siteProfile: profile
         });
         const result = runIndicatorAgent({
-            prompt: 'นุ่มแค่ไหน', url: 'http://localhost:3000/megastore.html', locale: 'th', siteProfile: profile,
+            prompt: 'เหมาะกับอะไร', url: 'http://localhost:3000/', locale: 'th', siteProfile: profile,
             history: [{ role: 'assistant', text: first.reply }]
         });
         expect(result.reply).toContain('ยังไม่มีข้อมูลยืนยัน');
-        expect(result.reply).toContain('Air Max Cushioning');
-        expect(result.researchRequest).toMatchObject({ subject: 'รองเท้าวิ่ง Nike Air', question: 'นุ่มแค่ไหน' });
+        expect(result.reply).toContain('แพ็กเกจ Pro Matrix');
+        expect(result.researchRequest).toMatchObject({ subject: 'แพ็กเกจ Pro Matrix', question: 'เหมาะกับอะไร' });
     });
 
     test('uses cited external research only when the server supplies it', () => {
         const profile = resolveSiteProfile('INDICATOR_TEST');
         const result = runIndicatorAgent({
-            prompt: 'นุ่มแค่ไหน', url: 'http://localhost:3000/megastore.html', locale: 'th', siteProfile: profile,
-            history: [{ role: 'assistant', text: 'เจอ รองเท้าวิ่ง Nike Air ราคา 2,790 บาท ครับ' }],
-            externalResearch: { results: [{ title: 'Independent review', snippet: 'Reviewer notes a soft, cushioned ride.', url: 'https://reviews.example/nike-air' }] }
+            prompt: 'เหมาะกับอะไร', url: 'http://localhost:3000/', locale: 'th', siteProfile: profile,
+            history: [{ role: 'assistant', text: 'เจอ แพ็กเกจ Pro Matrix ราคา 2,490 บาท ครับ' }],
+            externalResearch: { results: [{ title: 'Independent review', snippet: 'Reviewer recommends the plan for growing websites.', url: 'https://reviews.example/pro-matrix' }] }
         });
         expect(result.reply).toContain('Independent review');
-        expect(result.sources[0]).toMatchObject({ type: 'external_research', url: 'https://reviews.example/nike-air' });
+        expect(result.sources[0]).toMatchObject({ type: 'external_research', url: 'https://reviews.example/pro-matrix' });
     });
 
     test('searches the rest of the site when a requested product is not indexed on this page', () => {
@@ -223,6 +223,44 @@ describe('INDICATOR owned agent — contract', () => {
         expect(result.action).toMatchObject({ type: 'navigate', url: '/contact' });
     });
 
+    test('answers from tenant knowledge and cites the tenant-owned chunk', () => {
+        const result = runIndicatorAgent({
+            prompt: 'ร้านเปิดวันไหน',
+            url: 'https://shop.example/',
+            locale: 'th',
+            siteProfile: { id: 'tenant-knowledge-test', permissions: ['navigate_same_origin'] },
+            tenantKnowledge: [{
+                id: 'tenant-hours-1',
+                title: 'เวลาทำการร้าน',
+                source: 'https://shop.example/contact',
+                content: 'ร้านเปิดทุกวัน 09:00-18:00 น. ติดต่อทีมงานได้ผ่านหน้า Contact',
+                score: 24
+            }]
+        });
+        expect(result.reply).toContain('ร้านเปิดทุกวัน 09:00-18:00');
+        expect(result.sources[0]).toMatchObject({ type: 'tenant_knowledge', id: 'tenant-hours-1', url: '/contact' });
+        expect(result.action).toMatchObject({ type: 'navigate', url: '/contact' });
+    });
+
+    test('cites an external tenant knowledge source without navigating away from the site', () => {
+        const result = runIndicatorAgent({
+            prompt: 'นโยบายคืนสินค้าคืออะไร',
+            url: 'https://shop.example/',
+            locale: 'th',
+            siteProfile: { id: 'tenant-external-knowledge', permissions: ['navigate_same_origin'] },
+            tenantKnowledge: [{
+                id: 'tenant-return-policy',
+                title: 'นโยบายคืนสินค้า',
+                source: 'https://policy.example/returns',
+                content: 'รับคืนสินค้าภายใน 30 วัน เมื่อมีหลักฐานการสั่งซื้อและสินค้าอยู่ในสภาพเดิม',
+                score: 20
+            }]
+        });
+        expect(result.reply).toContain('รับคืนสินค้าภายใน 30 วัน');
+        expect(result.sources[0]).toMatchObject({ type: 'tenant_knowledge', id: 'tenant-return-policy', url: 'https://policy.example/returns' });
+        expect(result.action).toBeNull();
+    });
+
     test('keeps the widget response schema', () => {
         const result = runIndicatorAgent({ prompt: 'สรุปหน้านี้', pageContent: 'ข้อมูลสำคัญของหน้าปัจจุบัน', locale: 'th' });
         expect(typeof result.reply).toBe('string');
@@ -234,7 +272,7 @@ describe('INDICATOR owned agent — contract', () => {
     test('keeps an explicit site profile isolated from demonstration knowledge', () => {
         const profile = resolveSiteProfile('INDICATOR_ISOLATED_DEMO');
         const result = runIndicatorAgent({
-            prompt: 'หารองเท้าวิ่ง Nike ให้หน่อย',
+            prompt: 'หาแพ็กเกจ Pro Matrix ให้หน่อย',
             url: 'https://books.example/',
             locale: 'th',
             siteProfile: profile
@@ -265,6 +303,9 @@ describe('INDICATOR owned agent — contract', () => {
         const source = fs.readFileSync(path.resolve(__dirname, '../../src/widget/main.js'), 'utf8');
         expect(bundle).toContain('case"navigate"');
         expect(source).toContain('safeNavigationUrl');
+        expect(source).toContain('sourceSummary');
+        expect(source).not.toContain('case "inject_html"');
+        expect(source).not.toContain('case "plugin_action"');
         expect(source).toContain("credentials: 'omit'");
         expect(source).toContain('new URL(rawUrl, location.href)');
         expect(source).toContain('destination.origin !== location.origin');

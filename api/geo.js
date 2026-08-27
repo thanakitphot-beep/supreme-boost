@@ -1,10 +1,12 @@
 const { setCorsHeaders } = require('../services/cors');
+const { checkRateLimit } = require('../services/rateLimit');
 
 module.exports = async function geoHandler(req, res) {
     if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     
     if (req.method === "OPTIONS") return res.status(200).end();
     if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+    if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'api')) return;
 
     // Extract IP from Vercel headers (x-forwarded-for or x-real-ip)
     let ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket.remoteAddress;

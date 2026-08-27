@@ -114,6 +114,41 @@ function safeSameOriginUrl(value, currentUrl) {
     }
 }
 
+function tenantKnowledgePage(chunk, index, currentUrl) {
+    if (!chunk || typeof chunk !== 'object') return null;
+    const content = safeText(chunk.content, 1600);
+    if (!content) return null;
+
+    const title = safeText(chunk.title || 'Tenant knowledge', 220);
+    const source = safeText(chunk.source || chunk.url, 500);
+    let sourceUrl = '';
+    let actionUrl = '';
+    if (/^(?:https?:\/\/|\/)/i.test(source)) {
+        try {
+            const current = new URL(String(currentUrl || '/'), 'https://indicator.local');
+            const destination = new URL(source, current);
+            if (/^https?:$/i.test(destination.protocol)) {
+                sourceUrl = destination.origin === current.origin
+                    ? `${destination.pathname}${destination.search}${destination.hash}`
+                    : destination.href;
+                if (destination.origin === current.origin) actionUrl = sourceUrl;
+            }
+        } catch (_) { }
+    }
+
+    return {
+        id: safeText(chunk.id || `tenant-knowledge-${index + 1}`, 160),
+        title,
+        url: sourceUrl,
+        actionUrl,
+        sourceUrl,
+        sourceType: 'tenant_knowledge',
+        content,
+        keywords: [title, source].filter(Boolean),
+        confidence: Number.isFinite(chunk.score) ? Number(chunk.score) : 0
+    };
+}
+
 function normalizeRuntimeEntity(entity, index, currentUrl) {
     if (entity && typeof entity === 'object' && !Array.isArray(entity)) {
         const name = safeText(entity.title || entity.name || entity.label, 220);
@@ -287,6 +322,13 @@ function runtimeKnowledge(payload) {
     knowledge.pages = [...knowledge.pages, ...learned.pages];
     knowledge.catalog = [...knowledge.catalog, ...learned.catalog];
     knowledge.glossary = [...knowledge.glossary, ...learned.glossary];
+
+    const tenantPages = (Array.isArray(payload && payload.tenantKnowledge) ? payload.tenantKnowledge : [])
+        .map((chunk, index) => tenantKnowledgePage(chunk, index, payload && payload.url))
+        .filter(Boolean);
+    // Tenant-owned knowledge is considered before shared/static content, while
+    // the current page remains first below for live navigation accuracy.
+    knowledge.pages = [...tenantPages, ...knowledge.pages];
 
     const siteDNA = payload && payload.siteDNA && typeof payload.siteDNA === 'object' ? payload.siteDNA : {};
     const currentUrl = String(payload && payload.url || '/');
@@ -536,10 +578,12 @@ function bestProductMatch(items, prompt) {
 
 // Server-side short-term memory to preserve context better than client payload alone
 const memoryCache = new Map();
+const MAX_MEMORY_CONVERSATIONS = 1000;
 
 function recentHistory(payload) {
     const convId = payload && payload.conversationId ? String(payload.conversationId) : null;
-    let serverHistory = convId ? (memoryCache.get(convId) || []).slice() : [];
+    const serverMemoryEnabled = process.env.NODE_ENV !== 'production';
+    let serverHistory = serverMemoryEnabled && convId ? (memoryCache.get(convId) || []).slice() : [];
     const clientHistory = Array.isArray(payload && payload.history) ? payload.history : [];
 
     const merged = [...clientHistory, ...serverHistory].map(item => ({
@@ -559,20 +603,24 @@ function recentHistory(payload) {
         if (!last || last.role !== 'user' || last.text !== promptText) deduped.push({ role: 'user', text: promptText });
     }
 
-    if (convId) {
+    if (serverMemoryEnabled && convId) {
+        memoryCache.delete(convId);
         memoryCache.set(convId, deduped.slice(-MAX_CONTEXT_MESSAGES * 2));
+        while (memoryCache.size > MAX_MEMORY_CONVERSATIONS) memoryCache.delete(memoryCache.keys().next().value);
     }
     return deduped.slice(-MAX_CONTEXT_MESSAGES);
 }
 
 function updateServerMemory(conversationId, assistantReply) {
-    if (!conversationId) return;
+    if (!conversationId || process.env.NODE_ENV === 'production') return;
     let history = memoryCache.get(conversationId) || [];
     history.push({ role: 'assistant', text: safeText(assistantReply, 1000) });
     if (history.length > MAX_CONTEXT_MESSAGES * 2) {
         history = history.slice(-MAX_CONTEXT_MESSAGES * 2);
     }
+    memoryCache.delete(conversationId);
     memoryCache.set(conversationId, history);
+    while (memoryCache.size > MAX_MEMORY_CONVERSATIONS) memoryCache.delete(memoryCache.keys().next().value);
 }
 
 function productFromHistory(knowledge, payload) {
@@ -833,15 +881,18 @@ function findContent(knowledge, payload, prompt, matchedPage = null) {
     }
     const destination = `${page.url || '/'}${page.anchor ? `#${String(page.anchor).replace(/^#/, '')}` : ''}`;
     const pageTitle = ((page.headings && page.headings[0]) || page.title || '').replace(/^h[1-6]:/i, '');
+    const actionUrl = Object.prototype.hasOwnProperty.call(page, 'actionUrl') ? page.actionUrl : destination;
+    const source = { type: page.sourceType || (page.learned ? 'learned_public_page' : 'page'), id: page.id, title: safeText(page.title, 220) };
+    if (page.sourceUrl || destination) source.url = page.sourceUrl || destination;
     return base(`พบ "${pageTitle || page.title}" ครับ ผมพาไปยังจุดที่เกี่ยวข้องให้แล้ว`, {
-        action: actionFor({
+        action: actionUrl ? actionFor({
             title: pageTitle || page.title,
-            url: destination,
+            url: actionUrl,
             currentUrl: payload.url,
             keywords: (page.headings || []).map(h => String(h).replace(/^h[1-6]:/i, '')),
             permissions: payload.siteProfile && payload.siteProfile.permissions
-        }),
-        sources: [{ type: 'page', id: page.id, url: destination }]
+        }) : null,
+        sources: [source]
     });
 }
 
@@ -893,15 +944,18 @@ function answerFromWebsiteKnowledge(knowledge, payload, prompt) {
     const excerpt = excerptFor(page, prompt);
     if (!excerpt) return null;
     const destination = `${page.url || '/'}${page.anchor ? `#${String(page.anchor).replace(/^#/, '')}` : ''}`;
+    const actionUrl = Object.prototype.hasOwnProperty.call(page, 'actionUrl') ? page.actionUrl : destination;
+    const source = { type: page.sourceType || (page.learned ? 'learned_public_page' : 'page'), id: page.id, title: safeText(page.title, 220) };
+    if (page.sourceUrl || destination) source.url = page.sourceUrl || destination;
     return base(`จากหน้า “${page.title}”: ${excerpt}`, {
-        action: actionFor({
+        action: actionUrl ? actionFor({
             title: page.headings && page.headings[0] || page.title,
-            url: destination,
+            url: actionUrl,
             currentUrl: payload.url,
             keywords: page.headings || [],
             permissions: payload.siteProfile && payload.siteProfile.permissions
-        }),
-        sources: [{ type: page.learned ? 'learned_public_page' : 'page', id: page.id, url: destination }]
+        }) : null,
+        sources: [source]
     });
 }
 
@@ -917,6 +971,9 @@ function runIndicatorAgent(payload = {}) {
     const contextualProduct = productFromHistory(knowledge, payload);
     let intent = intentFor(prompt);
     const productMatch = bestProductMatch(knowledge.catalog, prompt);
+    const tenantKnowledgeAnswer = answerFromWebsiteKnowledge(knowledge, payload, prompt);
+    const hasTenantKnowledgeAnswer = tenantKnowledgeAnswer && tenantKnowledgeAnswer.sources &&
+        tenantKnowledgeAnswer.sources[0] && tenantKnowledgeAnswer.sources[0].type === 'tenant_knowledge';
     // A brand-only request such as "อยากได้ nike" is still a product request
     // when the brand occurs in the approved catalog.  Specific policy/article
     // wording remains a content request and is not overridden.
@@ -928,7 +985,15 @@ function runIndicatorAgent(payload = {}) {
         intent = 'search_unified';
     }
     let result;
-    if (contextualProduct && asksAboutPreviousProduct(prompt)) {
+    if (
+        hasTenantKnowledgeAnswer &&
+        !productMatch &&
+        ['answer', 'search_unified', 'find_content', 'define_term'].includes(intent)
+    ) {
+        // A tenant's approved policy/FAQ is a stronger answer than a generic
+        // website-wide search. Its action remains constrained by source origin.
+        result = tenantKnowledgeAnswer;
+    } else if (contextualProduct && asksAboutPreviousProduct(prompt)) {
         result = explainProduct(contextualProduct, payload);
     } else switch (intent) {
         case 'recommend_products': result = recommendProducts(knowledge); break;

@@ -2,6 +2,9 @@
 .env
 node_modules/
 data/site-expertise.json
+data/knowledge-ledger.json
+data/tenants.json
+indicator-ai/*.egg-info/
 
 .vercel
 .env*

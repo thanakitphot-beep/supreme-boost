@@ -4,9 +4,9 @@ services:
     runtime: node
     region: singapore
     plan: free
-    buildCommand: "npm ci && npm run build"
+    buildCommand: "npm ci && npm run build && npm run db:indexes"
     startCommand: "node server.js"
-    healthCheckPath: /api/v1/health
+    healthCheckPath: /api/v1/livez
     autoDeploy: true
 
     envVars:
@@ -23,7 +23,15 @@ services:
       - key: REQUIRE_TENANT_API_KEY
         value: "true"
       - key: INDICATOR_ALLOW_FIRST_PARTY_DEMO
+        value: "false"
+      - key: INDICATOR_STRICT_SITE_ORIGIN
         value: "true"
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
+      - key: RATE_LIMIT_SECRET
+        generateValue: true
 
       # ==========================================
       # AI Keys — ตั้งค่าใน Render Dashboard
@@ -79,6 +87,8 @@ services:
         sync: false
       - key: MONGODB_DB_NAME
         value: indicator_db
+      - key: MONGODB_MAX_POOL_SIZE
+        value: "10"
 
       # Auth
       - key: JWT_SECRET
@@ -97,3 +107,29 @@ services:
         sync: false
       - key: SMTP_PASS
         sync: false
+      - key: SMTP_FROM
+        sync: false
+
+      # Free preview uses manual approval until provider secrets are configured.
+      - key: PAYMENT_MODE
+        value: manual
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_STARTER
+        sync: false
+      - key: STRIPE_PRICE_PRO
+        sync: false
+      - key: STRIPE_SUCCESS_URL
+        sync: false
+      - key: STRIPE_CANCEL_URL
+        sync: false
+      - key: SLIPOK_API_KEY
+        sync: false
+      - key: SLIPOK_BRANCH_ID
+        sync: false
+      - key: SLIPOK_RECEIVER_ACCOUNT
+        sync: false
+      - key: SLIPOK_MAX_AGE_SECONDS
+        value: "86400"

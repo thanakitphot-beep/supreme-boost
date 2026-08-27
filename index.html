@@ -569,8 +569,8 @@
                     errorMsg.classList.remove('hidden');
                     return;
                 }
-                if (password.length < 6) {
-                    errorMsg.innerText = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+                if (password.length < 12) {
+                    errorMsg.innerText = 'รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร';
                     errorMsg.classList.remove('hidden');
                     return;
                 }
@@ -877,6 +877,40 @@
 
         // === Checkout logic ===
         let currentMode = 'manual';
+        let currentProvider = 'manual';
+        let checkoutProviders = [];
+        let checkoutPaymentMethods = [];
+
+        function renderCheckoutPayment() {
+            const container = document.getElementById('payment-methods-container');
+            const slipGroup = document.getElementById('slip-group');
+            const btn = document.getElementById('btn-submit');
+            const aiBadge = document.getElementById('ai-verify-badge');
+            const selector = checkoutProviders.length > 1
+                ? `<select class="w-full mb-3 bg-slate-800 border border-slate-600 rounded-xl p-3 text-white" onchange="choosePaymentProvider(this.value)">${checkoutProviders.map(provider => `<option value="${provider}" ${provider===currentProvider?'selected':''}>${provider==='stripe'?'Stripe / บัตรเครดิต':'SlipOK / โอนเงิน'}</option>`).join('')}</select>`
+                : '';
+            if (currentProvider === 'stripe') {
+                container.innerHTML = selector + '<div class="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-center"><i class="fa-brands fa-stripe text-3xl text-blue-400 mb-2"></i><p class="text-sm text-slate-300">รองรับบัตรเครดิตผ่าน Stripe</p></div>';
+                slipGroup.classList.add('hidden');
+                document.getElementById('slipFile').required = false;
+                btn.innerText = 'ดำเนินการชำระเงิน (Stripe)';
+                return;
+            }
+            slipGroup.classList.remove('hidden');
+            document.getElementById('slipFile').required = true;
+            aiBadge.classList.toggle('hidden', currentProvider !== 'slipok');
+            btn.innerText = currentProvider === 'slipok' ? 'อัปโหลดสลิปและตรวจสอบ' : 'ส่งสลิปเพื่อรออนุมัติ';
+            const methods = checkoutPaymentMethods.length
+                ? checkoutPaymentMethods.map(m => `<div class="bg-slate-800 p-4 rounded-xl border border-slate-700"><div class="font-bold text-white">${m.bank_name}</div><div class="text-cyan-400 font-mono text-lg">${m.account_number}</div><div class="text-sm text-slate-400">${m.account_name}</div></div>`).join('')
+                : '<div class="text-red-400 text-sm">ยังไม่มีช่องทางชำระเงิน กรุณาติดต่อแอดมิน</div>';
+            container.innerHTML = selector + methods;
+        }
+
+        function choosePaymentProvider(provider) {
+            currentProvider = provider;
+            renderCheckoutPayment();
+        }
+
         async function openCheckout(pkgName, amount) {
             document.getElementById('checkout-pkg').innerText = pkgName;
             document.getElementById('pkgType').value = pkgName;
@@ -887,42 +921,10 @@
                 const res = await fetch('/api/checkout');
                 const data = await res.json();
                 currentMode = data.paymentMode || 'manual';
-                const container = document.getElementById('payment-methods-container');
-                const slipGroup = document.getElementById('slip-group');
-                const btn = document.getElementById('btn-submit');
-                const aiBadge = document.getElementById('ai-verify-badge');
-
-                if (currentMode === 'stripe') {
-                    container.innerHTML = '<div class="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-center"><i class="fa-brands fa-stripe text-3xl text-blue-400 mb-2"></i><p class="text-sm text-slate-300">รองรับบัตรเครดิตและพร้อมเพย์ (ชำระเงินอัตโนมัติ)</p></div>';
-                    slipGroup.classList.add('hidden');
-                    document.getElementById('slipFile').required = false;
-                    btn.innerText = 'ดำเนินการชำระเงิน (Stripe)';
-                } else {
-                    slipGroup.classList.remove('hidden');
-                    document.getElementById('slipFile').required = true;
-                    if (currentMode === 'slipok') {
-                        aiBadge.classList.remove('hidden');
-                        btn.innerText = 'อัปโหลดสลิป & ตรวจสอบ AI';
-                    } else {
-                        aiBadge.classList.add('hidden');
-                        btn.innerText = 'ส่งสลิปและรอรับ API Key';
-                    }
-
-                    if (data.paymentMethods && data.paymentMethods.length > 0) {
-                        container.innerHTML = data.paymentMethods.map(m => `
-                            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between">
-                                <div>
-                                    <div class="font-bold text-white">${m.bank_name}</div>
-                                    <div class="text-cyan-400 font-mono text-lg">${m.account_number}</div>
-                                    <div class="text-sm text-slate-400">${m.account_name}</div>
-                                </div>
-                                ${m.qr_base64 ? `<img src="${m.qr_base64}" class="w-16 h-16 rounded border border-slate-600 cursor-zoom-in transition hover:scale-105" onclick="openQrModal('${m.qr_base64}')">` : ''}
-                            </div>
-                        `).join('');
-                    } else {
-                        container.innerHTML = '<div class="text-red-400 text-sm">ยังไม่มีช่องทางชำระเงิน กรุณาติดต่อแอดมิน</div>';
-                    }
-                }
+                checkoutProviders = data.providers || [currentMode];
+                checkoutPaymentMethods = data.paymentMethods || [];
+                currentProvider = checkoutProviders.includes('stripe') ? 'stripe' : checkoutProviders[0] || 'manual';
+                renderCheckoutPayment();
             } catch (err) {
                 document.getElementById('payment-methods-container').innerHTML = '<div class="text-red-400 text-sm">โหลดข้อมูลช่องทางชำระเงินล้มเหลว</div>';
             }
@@ -950,7 +952,8 @@
             const payload = {
                 companyName: document.getElementById('coName').value,
                 email: document.getElementById('coEmail').value,
-                packageType: document.getElementById('pkgType').value
+                packageType: document.getElementById('pkgType').value,
+                paymentProvider: currentProvider
             };
 
             const submitData = async () => {
@@ -983,7 +986,7 @@
                 btn.disabled = false;
             };
 
-            if (currentMode !== 'stripe') {
+            if (currentProvider !== 'stripe') {
                 const file = document.getElementById('slipFile').files[0];
                 const reader = new FileReader();
                 reader.readAsDataURL(file);

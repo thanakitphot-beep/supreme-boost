@@ -1,54 +1,9 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const socketIo = require('socket.io');
 const keepAlive = require('./services/keepAlive');
-const { isOriginAllowed, setCorsHeaders } = require('./services/cors');
-
-// ─── Global System Logs Interceptor ───
-global.systemLogs = [];
-const MAX_LOGS = 200;
-let io = null; // Added io reference
-
-function addLog(type, args, tenantId = null) {
-    const message = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
-    const logEntry = {
-        timestamp: new Date().toISOString(),
-        type: type,
-        message: message,
-        tenantId: tenantId
-    };
-    global.systemLogs.push(logEntry);
-    if (global.systemLogs.length > MAX_LOGS) {
-        global.systemLogs.shift();
-    }
-    // Emit log via socket to specific tenant room if provided, else broadcast globally
-    if (io) {
-        if (tenantId) {
-            io.to(tenantId).emit('system-log', logEntry);
-        } else {
-            io.emit('system-log', logEntry);
-        }
-    }
-}
-
-const originalLog = console.log;
-console.log = function(...args) {
-    addLog('INFO', args);
-    originalLog.apply(console, args);
-};
-
-const originalError = console.error;
-console.error = function(...args) {
-    addLog('ERROR', args);
-    originalError.apply(console, args);
-};
-
-const originalWarn = console.warn;
-console.warn = function(...args) {
-    addLog('WARN', args);
-    originalWarn.apply(console, args);
-};
+const { setCorsHeaders } = require('./services/cors');
+const { closeDatabase } = require('./api/_mongodb');
 
 // ─── Metrics and Rate Limiter ───
 const { requestCounter } = require('./api/v1/health.js');
@@ -82,8 +37,6 @@ loadEnv();
 
 const chatHandler = require('./api/chat.js');
 const crawlHandler = require('./api/crawl.js');
-const learnHandler = require('./api/learn.js');
-const learningFeedbackHandler = require('./api/learning-feedback.js');
 const adminHandler = require('./api/admin.js');
 
 const MIME = {
@@ -103,7 +56,29 @@ const MIME = {
     '.md': 'text/plain; charset=utf-8'
 };
 
+const PUBLIC_STATIC_PREFIXES = ['/supreme-boost/', '/styles/'];
+const PRIVATE_STATIC_PREFIXES = ['/api/', '/data/', '/docs/', '/indicator-ai/', '/k8s/', '/services/', '/src/', '/tests/'];
+const PUBLIC_ROOT_FILES = new Set(['/robots.txt', '/sitemap.xml', '/ICON.jpg']);
+const PUBLIC_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf']);
+
+function isPublicStaticPath(pathname) {
+    if (typeof pathname !== 'string' || !pathname.startsWith('/') || pathname.includes('..') || pathname.includes('\\')) return false;
+    if (pathname.startsWith('/.')) return false;
+    if (PRIVATE_STATIC_PREFIXES.some(prefix => pathname.startsWith(prefix))) return false;
+    if (PUBLIC_ROOT_FILES.has(pathname)) return true;
+    if (/^\/[a-z0-9_-]+\.html$/i.test(pathname)) return true;
+    if (PUBLIC_STATIC_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
+        return ['.js', '.css', ...PUBLIC_IMAGE_EXTENSIONS].includes(path.extname(pathname).toLowerCase());
+    }
+    return PUBLIC_IMAGE_EXTENSIONS.has(path.extname(pathname).toLowerCase());
+}
+
 function serveStatic(req, res, pathname) {
+    if (!isPublicStaticPath(pathname) && !['/', '/admin', '/login', '/pricing', '/customer-login', '/dashboard', '/customer-dashboard'].includes(pathname)) {
+        res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h1>404 Not Found</h1>');
+        return;
+    }
     let filePath = path.join(__dirname, pathname);
     if (pathname === '/') {
         filePath = path.join(__dirname, 'index.html');
@@ -126,11 +101,14 @@ function serveStatic(req, res, pathname) {
         }
         const ext = path.extname(filePath).toLowerCase();
         const contentType = MIME[ext] || 'application/octet-stream';
-        res.writeHead(200, {
+        const headers = {
             'Content-Type': contentType,
-            'Access-Control-Allow-Origin': '*',
             'Cache-Control': 'no-cache'
-        });
+        };
+        if (pathname.startsWith('/supreme-boost/')) {
+            headers['Access-Control-Allow-Origin'] = '*';
+        }
+        res.writeHead(200, headers);
         res.end(data);
     });
 }
@@ -168,7 +146,7 @@ function wrapRes(res) {
 }
 
 // ─── Shared handler used by both Vercel Lambda and local server ──
-function handleRequest(req, res) {
+async function handleRequest(req, res) {
     // ✅ FIX 8: ใช้ WHATWG URL API แทน url.parse() ที่ deprecated
     let parsedUrl;
     try {
@@ -197,25 +175,35 @@ function handleRequest(req, res) {
         return;
     }
 
-    const routeType = pathname.includes('/chat') ? 'chat' : 'api';
-    if (!checkRateLimit(req, wrapRes(res), routeType)) {
-        if (requestCounter) requestCounter.error++;
-        return;
+    const routeType = pathname.includes('/chat')
+        ? 'chat'
+        : ['/api/auth', '/api/customer-auth', '/api/otp'].includes(pathname)
+            ? 'auth'
+            : pathname === '/api/admin'
+                ? 'admin'
+                : pathname === '/api/checkout'
+                    ? 'billing'
+                    : 'api';
+    const probeRoute = ['/api/v1/livez', '/api/v1/readyz'].includes(pathname);
+    const rateLimitedRoute = pathname.startsWith('/api/') || pathname === '/metrics';
+    if (rateLimitedRoute && !probeRoute) {
+        if (!await checkRateLimit(req, wrapRes(res), routeType)) {
+            if (requestCounter) requestCounter.error++;
+            return;
+        }
+        req._rateLimitChecked = true;
     }
-    req._rateLimitChecked = true;
 
     const API_HANDLERS = {
         '/api/chat': chatHandler,
         '/api/v1/chat': chatHandler, // New v1 endpoint
         '/api/crawl': crawlHandler,
         '/api/handoff': require('./api/handoff.js'),
-        '/api/learn': learnHandler,
-        '/api/learning-feedback': learningFeedbackHandler,
         '/api/admin': adminHandler,
         '/api/checkout': require('./api/checkout.js'),
+        '/api/stripe-webhook': require('./api/stripe-webhook.js'),
         '/api/geo': require('./api/geo.js'),
         '/api/tenant': require('./api/tenant.js'),
-        '/api/settings': require('./api/settings.js'),
         '/api/auth': require('./api/auth.js'),
         '/api/customer-auth': require('./api/customer-auth.js'),
         '/api/otp': require('./api/otp.js'),
@@ -224,6 +212,8 @@ function handleRequest(req, res) {
         '/api/knowledge/crawl': require('./api/knowledge.js'),
         '/api/knowledge/search': require('./api/knowledge.js'),
         '/api/v1/health': require('./api/v1/health.js'),
+        '/api/v1/livez': require('./api/v1/livez.js'),
+        '/api/v1/readyz': require('./api/v1/readyz.js'),
         '/metrics': require('./api/v1/health.js'),
         '/api/v1/memory': require('./api/v1/memory.js')
     };
@@ -255,7 +245,7 @@ function handleRequest(req, res) {
         '.json': 'application/json'
     };
     const ext = path.extname(pathname).toLowerCase();
-    if (ext && extmap[ext]) {
+    if (ext && extmap[ext] && isPublicStaticPath(pathname)) {
         const filePath = path.join(__dirname, pathname);
         if (fs.existsSync(filePath)) {
             res.writeHead(200, { 'Content-Type': extmap[ext] });
@@ -270,6 +260,7 @@ function handleRequest(req, res) {
 
 // ─── On Vercel, export the handler ──
 module.exports = handleRequest;
+module.exports.__isPublicStaticPath = isPublicStaticPath;
 
 // ─── Local dev: create HTTP server ──
 if (require.main === module) {
@@ -294,6 +285,7 @@ if (require.main === module) {
                 res.end(JSON.stringify({ error: 'Request body too large' }));
                 return;
             }
+            req.rawBody = body;
             try { req.body = JSON.parse(body); }
             catch { req.body = {}; }
             Promise.resolve(handleRequest(req, res)).catch(() => {
@@ -304,39 +296,6 @@ if (require.main === module) {
             });
         });
     });
-
-    // Initialize socket.io (WebSocket for Real-time logs, Audio Streaming, and Tenant Isolation)
-    io = socketIo(server, { 
-        cors: { origin: (origin, callback) => callback(null, isOriginAllowed(origin)) },
-        pingTimeout: 60000,
-        pingInterval: 25000 
-    });
-    
-    io.on('connection', (socket) => {
-        console.log(`✅ Client connected via WebSocket: ${socket.id}`);
-        
-        // Tenant Isolation: Join specific tenant room
-        socket.on('join-tenant', (tenantId) => {
-            if (tenantId) {
-                socket.join(tenantId);
-                console.log(`🔒 Socket ${socket.id} joined tenant room: ${tenantId}`);
-                // Send initial logs to this specific admin dashboard
-                socket.emit('initial-logs', global.systemLogs.filter(log => !log.tenantId || log.tenantId === tenantId));
-            }
-        });
-
-        // Send global logs if no tenant specified (backward compatibility)
-        socket.emit('initial-logs', global.systemLogs);
-        
-        socket.on('audio-stream', (data) => {
-            // Placeholder for OMEGA-JARVIS Phase 3 (Voice)
-        });
-        
-        socket.on('disconnect', (reason) => {
-            console.log(`❌ Client disconnected: ${socket.id} (Reason: ${reason})`);
-        });
-    });
-    global.io = io;
 
     server.listen(PORT, HOSTNAME, () => {
         console.log(`\n✅ INDICATOR WEB CHAT Server is running!`);
@@ -353,4 +312,11 @@ if (require.main === module) {
         // เปิด Keep-Alive เพื่อป้องกัน Render Free Plan Sleep
         keepAlive.start();
     });
+
+    const shutdown = () => {
+        server.close(() => closeDatabase().catch(() => {}).finally(() => process.exit(0)));
+        setTimeout(() => process.exit(1), 10_000).unref();
+    };
+    process.once('SIGTERM', shutdown);
+    process.once('SIGINT', shutdown);
 }

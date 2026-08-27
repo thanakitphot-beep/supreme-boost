@@ -2,6 +2,16 @@ const db = require("./_db.js");
 const auth = require("./_auth.js");
 const cheerio = require('cheerio');
 const { isSafeUrl } = require('../services/ssrfBlocker');
+const { checkRateLimit } = require('../services/rateLimit');
+const { setCorsHeaders } = require('../services/cors');
+const { consumeUsage, loadEntitledTenant } = require('../services/plans');
+
+async function entitledKnowledgeTenant(isGlobalAdmin, tenantId) {
+    if (isGlobalAdmin) return { admin: true };
+    const tenant = await loadEntitledTenant(tenantId);
+    if (!tenant || !tenant.entitlements.features.knowledge) return null;
+    return tenant;
+}
 
 // ============================================================
 // SUPREME INTELLIGENCE CRAWLER — Enterprise RAG Engine v3.0
@@ -226,8 +236,10 @@ async function fetchPage(url) {
         if (!res.ok) return null;
         const contentType = res.headers.get('content-type') || '';
         if (!contentType.includes('html')) return null;
+        const contentLength = Number(res.headers.get('content-length') || 0);
+        if (contentLength > 500_000) return null;
         const html = await res.text();
-        return html;
+        return html.length <= 500_000 ? html : null;
     } catch (e) {
         clearTimeout(timeout);
         return null;
@@ -235,11 +247,10 @@ async function fetchPage(url) {
 }
 
 module.exports = async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
+    if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ success: false, message: 'Origin is not allowed' });
     if (req.method === 'OPTIONS') return res.status(200).end();
+
+    if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'api')) return;
 
     const authHeader = req.headers['authorization'];
     let token = '';
@@ -249,7 +260,7 @@ module.exports = async function handler(req, res) {
     if (!auth.verifyToken(token)) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     // Validate tenant ownership
-    const decoded = auth.verifyJWT(token);
+    const decoded = auth.verifyAccessJWT(token);
     const isGlobalAdmin = decoded?.role === 'admin' || auth.verifyToken(token) && !decoded; // HMAC fallback is admin
 
     try {
@@ -262,15 +273,21 @@ module.exports = async function handler(req, res) {
                 return res.status(403).json({ success: false, message: 'Forbidden: Tenant mismatch' });
             }
 
+            if (!await entitledKnowledgeTenant(isGlobalAdmin, tenantId)) return res.status(403).json({ success: false, message: 'Knowledge is not available for this tenant plan' });
             const chunks = await db.getKnowledge(tenantId);
             return res.status(200).json({ success: true, data: chunks });
         }
 
         if (req.method === 'DELETE') {
             const body = req.body || {};
-            if (!body.id) return res.status(400).json({ success: false, message: 'Missing id' });
-            const success = await db.deleteKnowledge(body.id);
-            if (!success) return res.status(500).json({ success: false, message: 'Failed to delete chunk' });
+            const { id, tenantId } = body;
+            if (!id || !tenantId) return res.status(400).json({ success: false, message: 'Missing id or tenantId' });
+            if (!isGlobalAdmin && decoded?.tenantId !== tenantId) {
+                return res.status(403).json({ success: false, message: 'Forbidden: Tenant mismatch' });
+            }
+            if (!await entitledKnowledgeTenant(isGlobalAdmin, tenantId)) return res.status(403).json({ success: false, message: 'Knowledge is not available for this tenant plan' });
+            const success = await db.deleteKnowledge(tenantId, id);
+            if (!success) return res.status(404).json({ success: false, message: 'Knowledge chunk not found' });
             return res.status(200).json({ success: true, message: 'Chunk deleted' });
         }
 
@@ -288,12 +305,18 @@ module.exports = async function handler(req, res) {
                     return res.status(403).json({ success: false, message: 'Forbidden: Tenant mismatch' });
                 }
 
+                const entitledTenant = await entitledKnowledgeTenant(isGlobalAdmin, tenantId);
+                if (!entitledTenant) return res.status(403).json({ success: false, message: 'Knowledge crawling is not available for this tenant plan' });
                 const geminiKey = process.env.GEMINI_API_KEY;
                 if (!geminiKey) return res.status(500).json({ success: false, message: 'Missing GEMINI_API_KEY' });
 
                 // Step 1: Fetch main page
                 const mainHtml = await fetchPage(url);
                 if (!mainHtml) return res.status(400).json({ success: false, message: 'Cannot fetch the URL. Check if it is accessible.' });
+                if (!isGlobalAdmin) {
+                    const usage = await consumeUsage(entitledTenant, 'crawl');
+                    if (!usage.allowed) return res.status(usage.status || 429).json({ success: false, message: usage.reason });
+                }
 
                 const $ = cheerio.load(mainHtml);
                 const { title, structuredChunks } = extractContent($, url);
@@ -365,11 +388,19 @@ module.exports = async function handler(req, res) {
                     return res.status(403).json({ success: false, message: 'Forbidden: Tenant mismatch' });
                 }
 
+                const entitledTenant = await entitledKnowledgeTenant(isGlobalAdmin, tenantId);
+                if (!entitledTenant) return res.status(403).json({ success: false, message: 'Knowledge is not available for this tenant plan' });
+
                 const geminiKey = process.env.GEMINI_API_KEY;
                 if (!geminiKey) return res.status(500).json({ success: false, message: 'Missing GEMINI_API_KEY' });
 
-                const cleaned = text.replace(/\s+/g, ' ').trim();
-                const chunks = smartChunk(cleaned, 600, 80);
+                const cleaned = String(text).replace(/\s+/g, ' ').trim().slice(0, 50_000);
+                if (!cleaned) return res.status(400).json({ success: false, message: 'Knowledge text cannot be empty' });
+                if (!isGlobalAdmin) {
+                    const usage = await consumeUsage(entitledTenant, 'knowledge');
+                    if (!usage.allowed) return res.status(usage.status || 429).json({ success: false, message: usage.reason });
+                }
+                const chunks = smartChunk(cleaned, 600, 80).slice(0, 100);
                 const fakeUrl = 'text:' + Date.now();
                 let savedCount = 0;
                 for (let i = 0; i < chunks.length; i++) {

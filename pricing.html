@@ -207,7 +207,7 @@
                 body: JSON.stringify({
                     companyName, email,
                     packageType: selectedPlan.name,
-                    amount: selectedPlan.price,
+                    paymentProvider: 'slipok',
                     slipBase64: slipBase64
                 })
             });
@@ -228,8 +228,8 @@
                 document.getElementById('pluginCodeDisplay').textContent = code;
                 document.getElementById('pluginCodeBox').style.display = 'block';
             } else if (data.success) {
-                document.getElementById('successSubtitle').textContent = 'รอการอนุมัติสลิปโอนเงิน';
-                document.getElementById('pendingNotice').style.display = 'block';
+                document.getElementById('successSubtitle').textContent = data.activated ? 'ชำระเงินสำเร็จและเปิดแพ็กเกจแล้ว' : 'รอการอนุมัติสลิปโอนเงิน';
+                document.getElementById('pendingNotice').style.display = data.activated ? 'none' : 'block';
             } else {
                 throw new Error(data.error || 'เกิดข้อผิดพลาด');
             }

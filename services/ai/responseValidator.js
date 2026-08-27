@@ -34,6 +34,18 @@ function safeParseJson(text) {
     }
 }
 
+function safeAction(action) {
+    if (!action || typeof action !== 'object') return null;
+    const type = String(action.type || '').toLowerCase();
+    if (type === 'handoff') {
+        return { type, priority: action.priority === 'high' ? 'high' : 'normal' };
+    }
+    if (type === 'speech' && typeof action.text === 'string') {
+        return { type, text: action.text.replace(/\s+/g, ' ').trim().slice(0, 500) };
+    }
+    return null;
+}
+
 function validateResponse(rawResponse, requestId) {
     logEvent('info', 'Validating response', { requestId });
     const parsed = safeParseJson(rawResponse);
@@ -59,6 +71,10 @@ function validateResponse(rawResponse, requestId) {
 
     // Ensure metadata exists
     parsed.metadata = parsed.metadata || {};
+    // Provider output is never allowed to control DOM mutation, plugin loading,
+    // script injection, or navigation. Website navigation comes from the
+    // deterministic resolver, not an arbitrary model response.
+    parsed.action = safeAction(parsed.action);
 
     return {
         isValid: true,
@@ -69,5 +85,6 @@ function validateResponse(rawResponse, requestId) {
 
 module.exports = {
     validateResponse,
-    RESPONSE_SCHEMA
+    RESPONSE_SCHEMA,
+    safeAction
 };

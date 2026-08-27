@@ -76,20 +76,6 @@
     if (window.__SUPREME_BOOST_READY__) return;
     window.__SUPREME_BOOST_READY__ = true;
 
-    // --- Plugin Architecture API ---
-    window.SupremeBoost = window.SupremeBoost || {};
-    window.SupremeBoost.plugins = window.SupremeBoost.plugins || {};
-    window.SupremeBoost.registerPlugin = function (name, pluginObj) {
-        if (!name || !pluginObj) return false;
-        window.SupremeBoost.plugins[name] = pluginObj;
-        console.log("[SupremeBoost] Plugin registered:", name);
-        if (typeof pluginObj.onInit === 'function') {
-            pluginObj.onInit();
-        }
-        return true;
-    };
-    // --------------------------------
-
     function ready(cb) { if (document.readyState !== "loading") { cb(); return; } document.addEventListener("DOMContentLoaded", cb, { once: true }); setTimeout(cb, 2000); }
     function retry(fn, n) { if (n === void 0) n = INIT_RETRY_TIMES; var a = 0, go = function () { a++; try { if (document.body && fn()) return; } catch (e) { console.error("[SB] init", a, e); } if (a < n) setTimeout(go, INIT_RETRY_DELAY); else console.warn("[SB] init failed"); }; go(); }
     function getScript() { return _cs || document.querySelector('script[src*="boost.js"]'); }
@@ -995,7 +981,8 @@
                     var data = await askAI(cfg, state, text, rl);
                     AmbientUI.setBrainPhase(null);
                     var reply = mergeCmd(cmd, data.reply || "");
-                    updateMsg(load, reply || strs.noReply, true);
+                    var displayReply = (reply || strs.noReply) + sourceSummary(data.sources, state.locale);
+                    updateMsg(load, displayReply, true);
                     pushHist(state, "assistant", reply || "");
                     SessionDB.setPref("history", state.history);
 
@@ -1081,10 +1068,10 @@
                 }
             }
             var d = await r.json().catch(function () { return {}; });
-            if (!d || d.status === "silent_abort") return { reply: "", cssCommand: "", action: null, interactive: null };
-            if (d.status === "blocked" && d.reply) return { reply: "⚠️ " + d.reply, cssCommand: "", action: d.action && d.action.type === "disable_widget" ? d.action : null, interactive: null };
+            if (!d || d.status === "silent_abort") return { reply: "", cssCommand: "", action: null, interactive: null, sources: [] };
+            if (d.status === "blocked" && d.reply) return { reply: "⚠️ " + d.reply, cssCommand: "", action: d.action && d.action.type === "disable_widget" ? d.action : null, interactive: null, sources: [] };
             if (!r.ok) throw new Error("HTTP " + r.status);
-            return { reply: d.reply || "", cssCommand: d.cssCommand || "", action: d.action || null, interactive: d.interactive || null };
+            return { reply: d.reply || "", cssCommand: d.cssCommand || "", action: d.action || null, interactive: d.interactive || null, sources: Array.isArray(d.sources) ? d.sources : [] };
         } finally { clearTimeout(to); }
     }
 
@@ -1095,6 +1082,7 @@
     function pushHist(s, r, t) { if (!t) return; s.history.push({ role: r, text: String(t).slice(0, 1200) }); if (s.history.length > MAX_HISTORY) s.history.splice(0, s.history.length - MAX_HISTORY); }
     function autoGrow(i) { i.style.height = "auto"; i.style.height = Math.min(i.scrollHeight, 120) + "px"; }
     function maskHist(h) { if (!Array.isArray(h)) return []; return h.slice(-MAX_HISTORY).map(function (i) { return { role: i.role === "assistant" ? "assistant" : "user", text: maskPII(String(i.text || "").slice(0, 1000)) }; }).filter(function (i) { return i.text; }); }
+    function sourceSummary(sources, locale) { var labels = []; if (!Array.isArray(sources)) return ""; sources.slice(0, 3).forEach(function (source) { var title = String(source && source.title || "").replace(/\s+/g, " ").trim().slice(0, 100); if (title && labels.indexOf(title) === -1) labels.push(title); }); return labels.length ? "\n\n" + (locale === "th" ? "แหล่งข้อมูล" : "Source") + ": " + labels.join(" | ") : ""; }
 
     function localCmd(text, loc) {
         var v = String(text || "").toLowerCase(), h = document.documentElement, s = t(loc);
@@ -1515,15 +1503,6 @@
         if (!act || !act.type) return;
         var handle = function () {
             switch (act.type) {
-                case "plugin_action":
-                    if (!act.pluginName) return;
-                    var plugin = window.SupremeBoost.plugins[act.pluginName];
-                    if (plugin && typeof plugin.execute === 'function') {
-                        plugin.execute(act.payload || {}, { locale: _st ? _st.locale : "en", addMessage: function (msg) { addMsg(_msgs, "assistant", msg); } });
-                    } else {
-                        console.warn("[SupremeBoost] Plugin not found or not executable:", act.pluginName);
-                    }
-                    break;
                 case "handoff":
                     requestHandoff(_st ? _st.locale : "en", "User requested human agent via chat.", act.priority);
                     break;
@@ -1595,10 +1574,8 @@
                         console.warn("[INDICATOR WEB CHAT] Widget Disabled: SaaS License Validation Failed.");
                     }
                     break;
-                case "confetti": loadScript("https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js", function () { if (window.confetti) window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, zIndex: 2147483647 }); }); break;
                 case "highlight": if (act.selector) { var el = document.querySelector(act.selector); if (el) { if (interceptSyntheticEvent(el, act, _st ? _st.locale : "en")) return; var o = el.style.outline; var ot = el.style.transition; el.style.transition = "outline 0.3s ease"; el.style.outline = "4px solid #facc15"; el.style.outlineOffset = "4px"; setTimeout(function () { el.style.outline = "4px solid transparent"; setTimeout(function () { el.style.outline = o; el.style.transition = ot; }, 300); }, 1500); el.scrollIntoView({ behavior: "smooth", block: "center" }); } } break;
                 case "speech": if (act.text && window.speechSynthesis) { var u = new SpeechSynthesisUtterance(act.text); var lang = detectLocale(); u.lang = lang === "th" ? "th-TH" : lang === "ja" ? "ja-JP" : lang === "zh" ? "zh-CN" : "en-US"; window.speechSynthesis.speak(u); } break;
-                case "inject_html": if (act.html && act.containerSelector) { var c = document.querySelector(act.containerSelector); if (c) { if (interceptSyntheticEvent(c, act, _st ? _st.locale : "en")) return; c.insertAdjacentHTML('beforeend', act.html); } } break;
             }
         };
         if (!safetyShield(act, _st ? _st.locale : "en", handle, function () { if (_msgs) addMsg(_msgs, "assistant", "⛔ " + t(_st ? _st.locale : "en", "safetyDeny")); })) { return; }

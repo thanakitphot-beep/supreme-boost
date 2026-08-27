@@ -6,6 +6,7 @@ const { connectToDatabase } = require('./_mongodb');
 const { maskPII } = require('../services/safety');
 const { checkRateLimit } = require('../services/rateLimit');
 const { applyPluginCors, authorizePluginRequest } = require('../services/tenantAccess');
+const { consumeUsage, entitlementsFor } = require('../services/plans');
 
 function cleanText(value, max) {
     return maskPII(String(value || '').replace(/\s+/g, ' ').trim()).slice(0, max);
@@ -56,7 +57,7 @@ module.exports = async function handoffHandler(req, res) {
     if (!await applyPluginCors(req, res)) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'api')) return;
+    if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'api')) return;
 
     const body = typeof req.body === 'object' && req.body ? req.body : {};
     const access = await authorizePluginRequest({ apiKey: body.apiKey, origin: req.headers.origin });
@@ -64,17 +65,15 @@ module.exports = async function handoffHandler(req, res) {
     if (!access.tenant || access.tenant.id === 'demo') {
         return res.status(200).json({ status: 'unavailable', message: 'หน้านี้เป็นตัวอย่าง จึงยังไม่มีเจ้าหน้าที่สำหรับรับเรื่อง' });
     }
+    const entitlements = access.tenant.entitlements || entitlementsFor(access.tenant);
+    if (!entitlements.features.handoff) return res.status(403).json({ error: 'This plan does not include human handoff' });
+    if (!await checkRateLimit(req, res, 'api', { principal: `tenant:${access.tenant.id}`, limit: entitlements.chatPerMinute })) return;
 
     const db = await connectToDatabase();
     if (!db) return res.status(503).json({ error: 'Support queue is temporarily unavailable' });
 
     const tenantId = access.tenant.id;
     const idempotencyKey = cleanText(body.idempotencyKey, 120) || crypto.randomUUID();
-    const existing = await db.collection('handoff_tickets').findOne({ tenant_id: tenantId, idempotency_key: idempotencyKey });
-    if (existing) {
-        return res.status(200).json({ status: existing.status, ticketId: existing.id, contact: existing.contact || {}, message: 'คำขอของคุณอยู่ในคิวแล้ว' });
-    }
-
     const settings = await db.collection('settings').findOne({ id: tenantId }) || {};
     const contact = safeContact(settings);
     const now = new Date().toISOString();
@@ -83,7 +82,7 @@ module.exports = async function handoffHandler(req, res) {
         id: `handoff_${crypto.randomUUID()}`,
         tenant_id: tenantId,
         idempotency_key: idempotencyKey,
-        status: 'queued',
+        status: 'reserving',
         priority,
         reason: cleanText(body.reason, 500),
         summary: cleanText(body.summary, 1600),
@@ -96,7 +95,21 @@ module.exports = async function handoffHandler(req, res) {
         created_at: now,
         updated_at: now
     };
-    await db.collection('handoff_tickets').insertOne(ticket);
+    try {
+        await db.collection('handoff_tickets').insertOne(ticket);
+    } catch (error) {
+        if (!error || error.code !== 11000) throw error;
+        const existing = await db.collection('handoff_tickets').findOne({ tenant_id: tenantId, idempotency_key: idempotencyKey });
+        if (existing && existing.status === 'quota_rejected') return res.status(429).json({ error: 'Monthly handoff quota reached' });
+        return res.status(existing && existing.status === 'reserving' ? 202 : 200).json({ status: existing && existing.status || 'queued', ticketId: existing && existing.id, contact: existing && existing.contact || {}, message: 'คำขอเดิมกำลังดำเนินการหรืออยู่ในคิวแล้ว' });
+    }
+    const usage = await consumeUsage(access.tenant, 'handoff');
+    if (!usage.allowed) {
+        await db.collection('handoff_tickets').updateOne({ id: ticket.id }, { $set: { status: 'quota_rejected', updated_at: new Date().toISOString() } });
+        return res.status(usage.status || 429).json({ error: usage.reason });
+    }
+    ticket.status = 'queued';
+    await db.collection('handoff_tickets').updateOne({ id: ticket.id }, { $set: { status: 'queued', updated_at: new Date().toISOString() } });
     ticket.status = await notifySupport(ticket);
     if (ticket.status !== 'queued') {
         await db.collection('handoff_tickets').updateOne({ id: ticket.id }, { $set: { status: ticket.status, updated_at: new Date().toISOString() } });

@@ -40,6 +40,24 @@ describe('AI runtime guardrails', () => {
         expect(semanticCache._makeKey({ ...base, tenantId: 'tenant-a' })).not.toBe(semanticCache._makeKey({ ...base, tenantId: 'tenant-b' }));
     });
 
+    test('separates cache entries by conversation and knowledge revision', () => {
+        const base = {
+            tenantId: 'tenant-a',
+            prompt: 'ร้านเปิดวันไหน',
+            title: 'ร้านตัวอย่าง',
+            locale: 'th',
+            history: [],
+            tenantKnowledge: [{ id: 'hours', revision: '2026-08-25', content: 'ร้านเปิดทุกวัน 09:00-18:00' }]
+        };
+        expect(semanticCache._makeKey({ ...base, conversationId: 'tenant-a:one' }))
+            .not.toBe(semanticCache._makeKey({ ...base, conversationId: 'tenant-a:two' }));
+        expect(semanticCache._makeKey(base))
+            .not.toBe(semanticCache._makeKey({
+                ...base,
+                tenantKnowledge: [{ id: 'hours', revision: '2026-08-26', content: 'ร้านเปิดวันจันทร์-ศุกร์ 09:00-18:00' }]
+            }));
+    });
+
     test('keeps every configured provider available after primary and fallback', () => {
         withEnv({ OPENAI_API_KEY: 'openai', GROQ_API_KEY: 'groq', GEMINI_API_KEY: 'gemini', AI_PRIMARY_PROVIDER: 'openai', AI_FALLBACK_PROVIDER: 'groq' }, () => {
             const router = new routerModule.ModelRouter();

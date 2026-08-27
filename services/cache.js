@@ -4,7 +4,7 @@ const semanticCache = {
     // Keeping it in every key prevents a reply produced by an older agent
     // policy from being served after a deployment (the exact issue that can
     // make a greeting appear to ignore a newly added conversational rule).
-    _answerPolicyVersion: '2026-08-15-intelligence-v2',
+    _answerPolicyVersion: '2026-08-25-tenant-knowledge-v3',
     _store: new Map(),
     _maxSize: 100,
     _ttlMs: 600000,
@@ -24,6 +24,7 @@ const semanticCache = {
         let parts = [
             this._answerPolicyVersion,
             payload.tenantId || 'anonymous-tenant',
+            payload.conversationId || 'no-conversation',
             (payload.prompt || "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 200),
             (payload.title || "").toLowerCase().slice(0, 50),
             payload.isProactive ? "proactive" : "reactive",
@@ -46,6 +47,17 @@ const semanticCache = {
             for (let i = 0; i < words.length; i++) { freq[words[i]] = (freq[words[i]] || 0) + 1; }
             let topWords = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
             parts.push(topWords.join(","));
+        }
+        if (Array.isArray(payload.tenantKnowledge)) {
+            const revision = payload.tenantKnowledge.slice(0, 5).map(item => {
+                const id = String(item && item.id || '').slice(0, 160);
+                const updated = String(item && (item.revision || item.updated_at || item.created_at) || '').slice(0, 80);
+                const content = String(item && item.content || '').slice(0, 1600);
+                return `${id}:${updated}:${this._hash(content)}`;
+            }).join('|');
+            parts.push(`tenant-knowledge:${revision}`);
+        } else if (payload.ragContext) {
+            parts.push(`rag:${this._hash(String(payload.ragContext).slice(0, 6000))}`);
         }
         return this._hash(parts.join("|"));
     },

@@ -82,7 +82,7 @@ function unauthorizedOrigin(res) {
 module.exports = async function handler(req, res) {
     if (!setCorsHeaders(req, res) && req.headers.origin) return unauthorizedOrigin(res);
     if (req.method === 'OPTIONS') return res.status(200).end();
-    if (!checkRateLimit(req, res, 'auth')) return;
+    if (!await checkRateLimit(req, res, 'auth')) return;
     if (!authConfigured()) return res.status(503).json({ success: false, message: 'Authentication is not configured' });
 
     if (req.method === 'POST') {

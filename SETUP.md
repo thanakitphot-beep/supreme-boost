@@ -30,33 +30,37 @@ Open the URL shown in terminal (usually `http://127.0.0.1:3000`)
 
 ---
 
-## Deploy to Vercel (Production)
+## Production Deployment
 
 ### Prerequisites
-- Vercel account (free at https://vercel.com)
-- GitHub account with the cloned/forked repository
+- MongoDB replica set
+- SMTP account
+- Stripe and/or SlipOK server-side credentials
+- HTTPS API domain and exact customer origins
 
 ### Steps
 
-1. **Connect to Vercel**
-   - Go to https://vercel.com
-   - Click "New Project"
-   - Import your GitHub repository
+1. **Configure secrets**
+   - Set every required value from `.env.example` in the platform secret manager.
+   - Keep `REQUIRE_TENANT_API_KEY=true`, strict CORS enabled, and the public demo disabled.
 
-2. **Configure application data**
-   - Commit the approved knowledge registry or connect it to your tenant database.
-   - Keep `INDICATOR_AGENT_MODE` unset or set it to `owned`.
+2. **Migrate and verify dependencies**
+   ```bash
+   npm run db:indexes
+   npm run preflight:dependencies
+   ```
 
 3. **Deploy**
-   - Vercel will automatically deploy when you push to GitHub
-   - Note your deployment URL (e.g., `supreme-boost-prod.vercel.app`)
+   - Render uses `render.yaml`; Docker uses `docker-compose.yml`.
+   - For Vercel, run the Mongo migration as a separate release step.
 
-4. **Embed on Your Website**
-   - Use this code on any website:
+4. **Verify and embed**
+   - Run `npm run preflight:live`, then use the tenant API key and registered origin:
    ```html
-   <script src="https://supreme-boost-prod.vercel.app/supreme-boost/boost.js"
-           data-shop-prompt="Your shop name and info"
-           defer>
+    <script src="https://supreme-boost-prod.vercel.app/supreme-boost/boost.js"
+            data-api-key="TENANT_API_KEY"
+            data-backend-url="https://YOUR-API-DOMAIN/api/chat"
+            defer>
    </script>
    ```
 
@@ -112,8 +116,10 @@ Open the URL shown in terminal (usually `http://127.0.0.1:3000`)
 - Widget will fallback to page content if API fails
 
 ### CORS errors
-- This shouldn't happen as CORS is enabled in vercel.json
-- If it does, check that your domain is using HTTPS
+- Set `ENFORCE_STRICT_CORS=true` and add the exact HTTPS website origin to
+  `CORS_ALLOWED_ORIGINS`.
+- Register that same origin in the tenant's `allowed_origins` before embedding
+  the widget. A tenant API key copied to another website is rejected.
 
 ### Need help?
 - Check the main README.md
@@ -130,10 +136,6 @@ supreme-boost/
 │   └── chat.js              # Serverless API endpoint
 ├── supreme-boost/
 │   └── boost.js             # Embed widget script
-├── plugins/
-│   ├── chat.js              # Chat widget component
-│   ├── darkmode.js          # Dark mode toggle
-│   └── manager.js           # Plugin manager
 ├── index.html               # Demo page
 ├── embed-example.html       # Embed example page
 ├── package.json             # Dependencies

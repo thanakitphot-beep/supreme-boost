@@ -2,8 +2,9 @@ const crypto = require('crypto');
 const { connectToDatabase } = require('./_mongodb.js');
 const { setCorsHeaders } = require('../services/cors');
 const { checkRateLimit } = require('../services/rateLimit');
-const { tenantIsActive } = require('../services/tenantAccess');
+const { normalizeAllowedOrigins, tenantIsActive } = require('../services/tenantAccess');
 const { verifyAccessJWT } = require('./_auth');
+const { consumeUsage, entitlementsFor, usageSnapshot } = require('../services/plans');
 
 function readCookie(req, name) {
     const source = String(req.headers.cookie || '');
@@ -21,7 +22,7 @@ async function authenticateTenant(req, db) {
 module.exports = async function handler(req, res) {
     if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === "OPTIONS") return res.status(200).end();
-    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'api')) return;
+    if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'api')) return;
 
     const db = await connectToDatabase();
     if (!db) return res.status(503).json({ error: "Database is not configured" });
@@ -44,6 +45,7 @@ module.exports = async function handler(req, res) {
                 return res.status(200).json({ settings: settings || {} });
             }
             if (action === 'profile') {
+                const usage = await usageSnapshot(tenant);
                 return res.status(200).json({
                     tenant: {
                         id: tenant.id,
@@ -54,8 +56,10 @@ module.exports = async function handler(req, res) {
                         package_type: tenant.package_type,
                         expires_at: tenant.expires_at,
                         created_at: tenant.created_at,
-                        allowed_origins: Array.isArray(tenant.allowed_origins) ? tenant.allowed_origins : []
-                    }
+                        allowed_origins: Array.isArray(tenant.allowed_origins) ? tenant.allowed_origins : [],
+                        entitlements: entitlementsFor(tenant)
+                    },
+                    usage
                 });
             }
             if (action === 'knowledge') {
@@ -63,7 +67,7 @@ module.exports = async function handler(req, res) {
                 return res.status(200).json({ data: data || [] });
             }
             if (action === 'logs') {
-                const data = await db.collection('logs').find({ type: { $in: ['chat', 'handoff'] }, 'metadata.tenantId': tenant.id }).sort({ timestamp: -1 }).limit(100).toArray();
+                const data = await db.collection('logs').find({ type: { $in: ['chat', 'chat_completed', 'handoff'] }, 'metadata.tenantId': tenant.id }).sort({ timestamp: -1 }).limit(100).toArray();
                 return res.status(200).json({ logs: data || [] });
             }
         }
@@ -73,6 +77,11 @@ module.exports = async function handler(req, res) {
 
             if (action === 'save_settings') {
                 const payload = {};
+                let origins = null;
+                if (body.allowed_origins !== undefined) {
+                    origins = normalizeAllowedOrigins(body.allowed_origins);
+                    if (!origins.length) return res.status(400).json({ error: 'At least one exact HTTPS website origin is required' });
+                }
                 if (body.system_model !== undefined) payload.system_model = body.system_model;
                 if (body.system_prompt !== undefined) payload.system_prompt = body.system_prompt;
                 if (body.theme_color !== undefined) payload.theme_color = body.theme_color;
@@ -83,11 +92,18 @@ module.exports = async function handler(req, res) {
                 payload.updated_at = new Date().toISOString();
                 
                 await db.collection('settings').updateOne({ id: tenant.id }, { $set: payload }, { upsert: true });
+                if (origins) {
+                    await db.collection('tenants').updateOne({ id: tenant.id }, { $set: { allowed_origins: origins, updated_at: new Date().toISOString() } });
+                }
                 return res.status(200).json({ success: true });
             }
 
             if (action === 'add_knowledge') {
                 if (!body.text && !body.url) return res.status(400).json({ error: "No content provided" });
+                const content = String(body.text || '').replace(/\s+/g, ' ').trim().slice(0, 20_000);
+                if (!content && !body.url) return res.status(400).json({ error: 'Knowledge content cannot be empty' });
+                const usage = await consumeUsage(tenant, 'knowledge');
+                if (!usage.allowed) return res.status(usage.status || 429).json({ error: usage.reason });
                 const newId = crypto.randomUUID();
                 
                 // If it's a URL, we'd ideally trigger crawl.js, but since this is direct API, 
@@ -97,7 +113,7 @@ module.exports = async function handler(req, res) {
                     tenant_id: tenant.id,
                     type: body.url ? 'url' : 'text',
                     source: body.url || 'Manual Entry',
-                    content: body.text || `Reference: ${body.url}`,
+                    content: content || `Reference: ${String(body.url).slice(0, 500)}`,
                     created_at: new Date().toISOString()
                 };
                 await db.collection('knowledge_chunks').insertOne(chunk);

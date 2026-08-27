@@ -2,8 +2,9 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { checkRateLimit } = require('../services/rateLimit');
 const { setCorsHeaders } = require('../services/cors');
+const { appendCookie, issueRegistrationGrant } = require('../services/registrationGrant');
 
-const { saveOtp, getOtp, deleteOtp } = require('./_db.js');
+const { consumeOtp, saveOtp } = require('./_db.js');
 
 const OTP_COOKIE = 'indicator_otp_challenge';
 const OTP_TTL_MS = 5 * 60 * 1000;
@@ -29,7 +30,7 @@ function setOtpChallenge(res, email, otp) {
 
 function clearOtpChallenge(res) {
     const secure = process.env.VERCEL || process.env.NODE_ENV === 'production' ? '; Secure' : '';
-    res.setHeader('Set-Cookie', `${OTP_COOKIE}=; HttpOnly; SameSite=Strict; Path=/api/otp; Max-Age=0${secure}`);
+    appendCookie(res, `${OTP_COOKIE}=; HttpOnly; SameSite=Strict; Path=/api/otp; Max-Age=0${secure}`);
 }
 
 function readCookie(req, name) {
@@ -70,7 +71,7 @@ module.exports = async function handler(req, res) {
     if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === "OPTIONS") return res.status(200).end();
 
-    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'auth')) return;
+    if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'auth')) return;
 
     try {
         if (req.method === "POST") {
@@ -80,10 +81,11 @@ module.exports = async function handler(req, res) {
             if (!email) {
                 return res.status(400).json({ error: "Email is required" });
             }
+            if (!await checkRateLimit(req, res, 'auth', { principal: `otp-email:${String(email).trim().toLowerCase()}`, limit: 5 })) return;
 
             // 1. Request OTP
             if (action === 'request') {
-                const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                const generatedOtp = crypto.randomInt(100000, 1_000_000).toString();
                 const expiresAt = Date.now() + OTP_TTL_MS;
 
                 // ลอง save ใน MongoDB ก่อน ถ้าล้มเหลว fallback ไปใช้ signed cookie
@@ -95,6 +97,7 @@ module.exports = async function handler(req, res) {
                 }
 
                 if (!savedToMongo) {
+                    if (process.env.NODE_ENV === 'production') return res.status(503).json({ error: 'OTP service is temporarily unavailable' });
                     if (!setOtpChallenge(res, email, generatedOtp)) {
                         return res.status(503).json({ error: "OTP service is temporarily unavailable. Please try again later." });
                     }
@@ -102,7 +105,6 @@ module.exports = async function handler(req, res) {
 
                 // ส่งอีเมล
                 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-                    console.log(`[OTP] Attempting to send OTP ${generatedOtp} to ${email}...`);
                     try {
                         await transporter.sendMail({
                             from: process.env.SMTP_FROM || `"INDICATOR WEB CHAT" <${process.env.SMTP_USER}>`,
@@ -119,13 +121,13 @@ module.exports = async function handler(req, res) {
                                     <p style="color: #94a3b8; font-size: 12px; margin-top: 30px;">หากคุณไม่ได้ทำรายการนี้ กรุณาเพิกเฉยต่ออีเมลฉบับนี้</p>
                                    </div>`
                         });
-                        console.log(`[OTP] Email sent to ${email}`);
+                        console.log('[OTP] Email sent');
                     } catch (emailError) {
                         console.error("[OTP] Email send failed:", emailError);
                         return res.status(503).json({ error: "ไม่สามารถส่งอีเมลได้ กรุณาตรวจสอบการตั้งค่าอีเมลของเซิร์ฟเวอร์" });
                     }
                 } else {
-                    console.log(`[OTP-WARNING] SMTP not configured. Generated OTP for ${email}: ${generatedOtp}`);
+                    return res.status(503).json({ error: 'Email delivery is not configured. Please contact support.' });
                 }
 
                 return res.status(200).json({
@@ -140,32 +142,29 @@ module.exports = async function handler(req, res) {
                     return res.status(400).json({ error: "OTP is required for verification" });
                 }
 
-                // ลองหาใน MongoDB ก่อน ถ้าล้มเหลว/ไม่มีข้อมูล ให้ตรวจ cookie
-                let mongoVerified = null; // null = ไม่ได้ใช้ MongoDB, true/false = ผลการ verify
+                let mongoAvailable = false;
+                let mongoVerified = false;
                 try {
-                    const storedData = await getOtp(email);
-                    if (storedData) {
-                        // พบข้อมูลใน MongoDB → ตรวจสอบ
-                        if (Date.now() > storedData.expiresAt) {
-                            await deleteOtp(email).catch(() => {});
-                            return res.status(400).json({ error: "OTP has expired. Please request a new one." });
-                        }
-                        if (storedData.otp !== otp) {
-                            return res.status(400).json({ error: "Invalid OTP" });
-                        }
-                        await deleteOtp(email).catch(() => {});
-                        mongoVerified = true;
-                    }
+                    const consumed = await consumeOtp(email, otp);
+                    mongoAvailable = consumed.available;
+                    mongoVerified = Boolean(consumed.record);
                 } catch (dbErr) {
-                    console.warn('[OTP] MongoDB getOtp failed, trying cookie fallback:', dbErr.message);
+                    console.warn('[OTP] MongoDB consume failed, trying cookie fallback:', dbErr.message);
                 }
 
-                if (mongoVerified === null) {
-                    // ไม่มีข้อมูลใน MongoDB หรือ MongoDB ล้มเหลว → ตรวจจาก cookie
+                if (mongoAvailable && !mongoVerified) {
+                    return res.status(400).json({ error: 'Invalid or expired OTP. Please request a new one.' });
+                }
+                if (!mongoAvailable) {
+                    if (process.env.NODE_ENV === 'production') return res.status(503).json({ error: 'OTP service is temporarily unavailable' });
                     if (!verifyOtpChallenge(req, email, otp)) {
                         return res.status(400).json({ error: "Invalid or expired OTP. Please request a new one." });
                     }
                     clearOtpChallenge(res);
+                }
+
+                if (!issueRegistrationGrant(res, email)) {
+                    return res.status(503).json({ error: 'Registration verification is not configured' });
                 }
 
                 return res.status(200).json({

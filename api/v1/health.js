@@ -6,15 +6,42 @@ const { semanticCache } = require('../../services/cache');
 const { getRateLimiterStats } = require('../../services/rateLimit');
 const { setCorsHeaders } = require('../../services/cors');
 const router = require('../../services/ai/router');
+const { databaseIsReady } = require('../_mongodb');
+const { verifyAccessJWT } = require('../_auth');
+const { validateProductionConfig } = require('../../services/productionConfig');
+const { criticalIndexesAreReady, mongoSupportsTransactions } = require('../../services/mongoIndexes');
 const { connectToDatabase } = require('../_mongodb');
+
+let indexReadiness = { checkedAt: 0, ready: false };
+let topologyReadiness = { checkedAt: 0, ready: false };
+
+async function indexesAreReady() {
+    if (Date.now() - indexReadiness.checkedAt < 60_000) return indexReadiness.ready;
+    const db = await connectToDatabase();
+    const ready = Boolean(db && await criticalIndexesAreReady(db).catch(() => false));
+    indexReadiness = { checkedAt: Date.now(), ready };
+    return ready;
+}
+
+async function transactionsAreReady() {
+    if (Date.now() - topologyReadiness.checkedAt < 60_000) return topologyReadiness.ready;
+    const db = await connectToDatabase();
+    const ready = Boolean(db && await mongoSupportsTransactions(db).catch(() => false));
+    topologyReadiness = { checkedAt: Date.now(), ready };
+    return ready;
+}
+
+function operationsAuthorized(req) {
+    const authHeader = String(req.headers.authorization || '');
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    const claims = verifyAccessJWT(token);
+    if (claims && claims.role === 'admin') return true;
+    return Boolean(process.env.METRICS_TOKEN && token === process.env.METRICS_TOKEN);
+}
 
 const startTime = Date.now();
 const requestCounter = { total: 0, success: 0, error: 0, cached: 0 };
 const agentStats = { planner: 0, executor: 0, reviewer: 0, memory: 0, vision: 0 };
-
-// Export counters so other modules can increment them
-module.exports.requestCounter = requestCounter;
-module.exports.agentStats = agentStats;
 
 function getMemoryUsage() {
     try {
@@ -51,11 +78,34 @@ module.exports = async function handler(req, res) {
     const cacheStats = semanticCache.stats();
     const rateLimiterStats = getRateLimiterStats ? getRateLimiterStats() : {};
 
-    // --- GET /health ---
+    if (url.includes('/livez') && req.method === 'GET') {
+        return res.status(200).json({ status: 'live', uptime: uptime.formatted });
+    }
+
+    if (url.includes('/readyz') && req.method === 'GET') {
+        const production = process.env.NODE_ENV === 'production';
+        const mongo = production ? await databaseIsReady() : true;
+        const indexes = production && mongo ? await indexesAreReady() : !production;
+        const transactions = production && mongo ? await transactionsAreReady() : !production;
+        const configuration = production ? validateProductionConfig() : { ok: true };
+        const allOk = Boolean(mongo && indexes && transactions && configuration.ok);
+        return res.status(allOk ? 200 : 503).json({
+            status: allOk ? 'ready' : 'not_ready',
+            checks: { server: 'ok', mongo: mongo ? 'ok' : 'unavailable', indexes: indexes ? 'ok' : 'missing', transactions: transactions ? 'ok' : 'unsupported', configuration: configuration.ok ? 'ok' : 'invalid' }
+        });
+    }
+
+    // Detailed dependency and provider state is operational data, not a
+    // public probe response.
     if (url.includes('/health') && req.method === 'GET') {
+        if (!operationsAuthorized(req)) {
+            const production = process.env.NODE_ENV === 'production';
+            const mongo = production ? await databaseIsReady() : true;
+            return res.status(mongo ? 200 : 503).json({ status: mongo ? 'healthy' : 'degraded', version: '3.1.0', project: 'INDICATOR' });
+        }
         const runtime = router.runtimeStatus();
         const tenantRequired = process.env.REQUIRE_TENANT_API_KEY === 'true' || process.env.NODE_ENV === 'production';
-        const mongo = tenantRequired ? await connectToDatabase() : null;
+        const mongo = tenantRequired ? await databaseIsReady() : null;
         const checks = {
             server: 'ok',
             primary_provider: runtime.primaryConfigured ? 'ok' : 'missing',
@@ -65,9 +115,9 @@ module.exports = async function handler(req, res) {
             cache:       cacheStats.size <= 100        ? 'ok' : 'warn',
             keep_alive:  process.env.RENDER_EXTERNAL_URL ? 'active' : 'disabled'
         };
-        const allOk = checks.server === 'ok' && (runtime.primaryConfigured || runtime.fallbackConfigured) && (!tenantRequired || Boolean(mongo));
+        const allOk = checks.server === 'ok' && (!tenantRequired || Boolean(mongo));
 
-        return res.status(allOk ? 200 : 206).json({
+        return res.status(allOk ? 200 : 503).json({
             status: allOk ? 'healthy' : 'degraded',
             version: '3.1.0',
             project: 'INDICATOR',
@@ -81,6 +131,7 @@ module.exports = async function handler(req, res) {
 
     // --- GET /metrics ---
     if (url.includes('/metrics') && req.method === 'GET') {
+        if (!operationsAuthorized(req)) return res.status(401).json({ error: 'Unauthorized' });
         const hitRate = requestCounter.total > 0
             ? ((requestCounter.cached / requestCounter.total) * 100).toFixed(1)
             : '0.0';
@@ -125,5 +176,9 @@ module.exports = async function handler(req, res) {
         });
     }
 
-    return res.status(404).json({ error: 'Not found. Use /api/v1/health or /metrics' });
+    return res.status(404).json({ error: 'Not found. Use /api/v1/livez, /api/v1/readyz, or /metrics' });
 };
+
+module.exports.requestCounter = requestCounter;
+module.exports.agentStats = agentStats;
+module.exports.__operationsAuthorized = operationsAuthorized;

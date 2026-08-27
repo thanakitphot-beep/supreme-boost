@@ -9,9 +9,6 @@
 - `api/chat.js` - API endpoint ที่เรียก INDICATOR Agent และคืนค่า reply + action สำหรับ widget
 - `services/indicatorAgent.js` - Agent ของ INDICATOR สำหรับค้นสินค้า, นำทาง, คำศัพท์, สรุป และ handoff
 - `data/indicator-knowledge.json` - knowledge registry สำหรับหน้าเว็บ สินค้า และคำศัพท์
-- `plugins/chat.js` - widget แชท AI แบบปลั๊กอินแยกต่างหาก
-- `plugins/darkmode.js` - ปุ่มสลับโหมดมืดสำหรับหน้าเว็บ
-- `plugins/manager.js` - ตัวจัดการโหลดปลั๊กอิน
 - `vercel.json` - กำหนด header สำหรับไฟล์สคริปต์และปลั๊กอิน
 
 ## ฟีเจอร์เด่น
@@ -20,19 +17,22 @@
 - อ่านเนื้อหาหน้าเว็บเพื่อให้ AI ตอบคำถามตามบริบท
 - ปรับขนาดตัวอักษรและธีมหน้าจอโดยคำสั่งแชท
 - ฟอลล์แบ็กกรณี AI หลักใช้งานไม่ได้
-- รองรับการโฮสต์บน Vercel
+- รองรับ Render, Docker, Vercel และ Kubernetes
 
 ## การใช้งาน
 
-### สำหรับ Production (Deploy บน Vercel)
+### สำหรับ Production
 
-1. สร้างโปรเจคบน Vercel และเชื่อมต่อ GitHub หรือโฟลเดอร์นี้
-2. อัปเดต `data/indicator-knowledge.json` ด้วยข้อมูลสินค้าและหน้าเว็บของคุณ
-3. ฝังสคริปต์นี้ลงไปบนเว็บไซต์ใดก็ได้:
+1. คัดลอก `.env.example` ไปกำหนดใน secret manager ของ platform โดยไม่ commit secrets
+2. ใช้ MongoDB replica set แล้วรัน `npm run db:indexes` และ `npm run preflight:dependencies`
+3. ตั้ง exact `CORS_ALLOWED_ORIGINS` และ `allowed_origins` ของ tenant
+4. ก่อนเปิด traffic รัน `npm run preflight:live`
+5. ฝังสคริปต์ด้วย API key ของ tenant:
 
 ```html
 <script src="https://YOUR-VERCEL-DOMAIN.vercel.app/supreme-boost/boost.js"
-        data-shop-prompt="ร้านนี้ชื่อ INDICATOR Shop มีโปรส่งฟรีเมื่อซื้อครบ 1000 บาท"
+        data-api-key="TENANT_API_KEY"
+        data-backend-url="https://YOUR-API-DOMAIN/api/chat"
         defer>
 </script>
 ```
@@ -80,5 +80,5 @@ npm run dev
 ## ความสามารถ
 
 - Widget ที่ load จาก Vercel จะอ่าน origin ของสคริปต์เองและส่ง request ไปยัง `/api/chat` บน domain เดียวกัน
-- ระบบรองรับ CORS ทั้งหมด สามารถโหลดบนเว็บไซต์ใดก็ได้
+- Production อนุญาตเฉพาะ exact HTTPS origins ที่ลงทะเบียนไว้กับ tenant
 - ถ้า AI ตอบไม่ได้ ระบบจะพยายามใช้ข้อมูลบนหน้าเว็บเป็น fallback

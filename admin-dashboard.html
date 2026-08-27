@@ -595,9 +595,9 @@
                         <div style="width:30px;height:30px;border-radius:7px;background:rgba(6,182,212,.12);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-credit-card" style="color:var(--c2);font-size:.7rem"></i></div>
                         ระบบรับชำระเงิน
                     </div>
-                    <div class="fg"><label class="fl">โหมดการชำระเงิน</label><select id="payMode" class="fi fi-sel" onchange="togPayCfg()"><option value="manual">⚙️ อนุมัติสลิปด้วยตนเอง (Manual)</option><option value="slipok">🤖 AI ตรวจสลิปอัตโนมัติ (SlipOK)</option><option value="stripe">💳 ตัดบัตรเครดิต / PromptPay (Stripe)</option></select></div>
-                    <div id="cfg-slipok" style="display:none"><div style="padding:14px;background:rgba(6,182,212,.04);border:1px solid rgba(6,182,212,.12);border-radius:9px;margin-bottom:14px"><p style="font-size:.67rem;font-weight:700;color:var(--c2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px"><i class="fa-solid fa-robot" style="margin-right:5px"></i> SlipOK Configuration</p><div class="fg"><label class="fl">SlipOK API Key</label><input type="password" id="slKey" class="fi" placeholder="sk_slipok_..."></div><div class="fg" style="margin-bottom:0"><label class="fl">Branch ID</label><input type="text" id="slBranch" class="fi" placeholder="branch_xxx"></div></div></div>
-                    <div id="cfg-stripe" style="display:none"><div style="padding:14px;background:rgba(139,92,246,.04);border:1px solid rgba(139,92,246,.12);border-radius:9px;margin-bottom:14px"><p style="font-size:.67rem;font-weight:700;color:var(--v3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px"><i class="fa-brands fa-stripe-s" style="margin-right:5px"></i> Stripe Configuration</p><div class="fg" style="margin-bottom:0"><label class="fl">Stripe Secret Key</label><input type="password" id="stKey" class="fi" placeholder="sk_live_..."></div></div></div>
+                    <div class="fg"><label class="fl">โหมดการชำระเงิน</label><select id="payMode" class="fi fi-sel" onchange="togPayCfg()"><option value="manual">อนุมัติสลิปด้วยตนเอง (Manual)</option><option value="slipok">ตรวจสลิปอัตโนมัติ (SlipOK)</option><option value="stripe">บัตรเครดิต (Stripe)</option><option value="both">Stripe และ SlipOK</option></select></div>
+                    <div id="cfg-slipok" style="display:none"><div style="padding:14px;background:rgba(6,182,212,.04);border:1px solid rgba(6,182,212,.12);border-radius:9px;margin-bottom:14px"><p style="font-size:.67rem;font-weight:700;color:var(--c2);text-transform:uppercase;letter-spacing:.08em"><i class="fa-solid fa-robot" style="margin-right:5px"></i> ตั้งค่า <code>SLIPOK_API_KEY</code> และ <code>SLIPOK_BRANCH_ID</code> ใน environment ของ server</p></div></div>
+                    <div id="cfg-stripe" style="display:none"><div style="padding:14px;background:rgba(139,92,246,.04);border:1px solid rgba(139,92,246,.12);border-radius:9px;margin-bottom:14px"><p style="font-size:.67rem;font-weight:700;color:var(--v3);text-transform:uppercase;letter-spacing:.08em"><i class="fa-brands fa-stripe-s" style="margin-right:5px"></i> ตั้งค่า Stripe secret, webhook secret และ price IDs ใน environment ของ server</p></div></div>
                     <button onclick="saveSettings()" class="btn btn-vl" style="width:100%;justify-content:center"><i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า</button>
                 </div>
                 <!-- RIGHT: System Status -->
@@ -861,7 +861,7 @@ async function loadOperations(){
     const badge=document.getElementById('ops-runtime-status'),details=document.getElementById('ops-runtime-details');
     badge.textContent='กำลังตรวจสอบ';
     try{
-        const res=await fetch('/api/v1/health');
+        const res=await fetch('/api/v1/health',{headers:{Authorization:'Bearer '+localStorage.getItem('admin_token')}});
         const data=await res.json();
         const checks=data.checks||{},runtime=data.runtime||{};
         badge.textContent=data.status==='healthy'?'พร้อมใช้งาน':'ต้องตรวจสอบ';
@@ -1154,7 +1154,7 @@ async function submitAdd(){
     const co=document.getElementById('ad-co').value.trim();
     if(!co){toast('กรุณากรอกชื่อบริษัท','error');return}
     const btn=document.getElementById('ad-btn');btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> กำลังเพิ่ม...';btn.disabled=true;
-    try{const r=await fetchAPI('add_tenant','POST',{company_name:co,allowed_origins:document.getElementById('ad-origins').value,package_type:document.getElementById('ad-pkg').value,duration_months:document.getElementById('ad-dur').value});toast(`เพิ่ม "${co}" สำเร็จ! 🎉`,'success');closeAdd();loadT()}
+    try{const r=await fetchAPI('add_tenant','POST',{company_name:co,allowed_origins:document.getElementById('ad-origins').value,package_type:document.getElementById('ad-pkg').value,duration_months:document.getElementById('ad-dur').value});if(r.initialPassword)window.prompt('ส่งข้อมูลนี้ให้ลูกค้าผ่านช่องทางปลอดภัย รหัสนี้จะแสดงครั้งเดียว',`Username: ${r.tenant.username}\nInitial password: ${r.initialPassword}`);toast(`เพิ่ม "${co}" สำเร็จ! 🎉`,'success');closeAdd();loadT()}
     catch(e){toast('เกิดข้อผิดพลาด: '+e.message,'error')}
     btn.innerHTML='<i class="fa-solid fa-plus"></i> เพิ่มลูกค้า';btn.disabled=false;
 }
@@ -1166,17 +1166,17 @@ async function loadB(){
     g.innerHTML=rq.map(r=>`
         <div class="bc ${r.status==='pending'?'pend':''}">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-                <div><h4 style="font-size:.92rem;font-weight:700;color:var(--t1)">${r.tenant_name}</h4><p style="font-size:.73rem;color:var(--t2);margin-top:2px"><i class="fa-solid fa-box" style="margin-right:4px;color:var(--v3)"></i>${r.package_type}${r.amount?` · <span style="font-family:'JetBrains Mono',monospace;color:var(--t1)">${Number(r.amount).toLocaleString()} ฿</span>`:''}</p></div>
+                <div><h4 style="font-size:.92rem;font-weight:700;color:var(--t1)">${safeHtml(r.tenant_name)}</h4><p style="font-size:.73rem;color:var(--t2);margin-top:2px"><i class="fa-solid fa-box" style="margin-right:4px;color:var(--v3)"></i>${safeHtml(r.package_type)}${r.amount?` · <span style="font-family:'JetBrains Mono',monospace;color:var(--t1)">${Number(r.amount).toLocaleString()} ฿</span>`:''}</p></div>
                 <span class="badge badge-${r.status}"><span class="bd"></span>${r.status==='pending'?'รออนุมัติ':r.status==='approved'?'อนุมัติแล้ว':'ปฏิเสธ'}</span>
             </div>
-            ${r.contact_email?`<p style="font-size:.72rem;color:var(--t3);margin-bottom:9px"><i class="fa-solid fa-envelope" style="margin-right:5px"></i>${r.contact_email}</p>`:''}
+            ${r.contact_email?`<p style="font-size:.72rem;color:var(--t3);margin-bottom:9px"><i class="fa-solid fa-envelope" style="margin-right:5px"></i>${safeHtml(r.contact_email)}</p>`:''}
             ${r.slip_base64?`<img src="${r.slip_base64}" style="width:100%;height:130px;object-fit:cover;border-radius:9px;margin-bottom:10px;cursor:pointer;border:1px solid var(--b1)" onclick="window.open('${r.slip_base64}')">` :''}
             <p style="font-size:.65rem;color:var(--t3);margin-bottom:10px"><i class="fa-regular fa-clock" style="margin-right:4px"></i>${fmtDate(r.created_at)}</p>
             ${r.status==='pending'?`<div style="display:flex;gap:7px;margin-bottom:7px"><button onclick="appB('${r.id}')" class="btn btn-gn btn-sm" style="flex:1;justify-content:center"><i class="fa-solid fa-check" style="font-size:.68rem"></i> อนุมัติ & สร้าง Key</button><button onclick="rejB('${r.id}')" class="btn btn-rs btn-sm" style="flex:1;justify-content:center"><i class="fa-solid fa-xmark" style="font-size:.68rem"></i> ปฏิเสธ</button></div>`:''}
             <button onclick="delB('${r.id}')" class="btn btn-gh-rs btn-xs" style="width:100%;justify-content:center"><i class="fa-solid fa-trash" style="font-size:.62rem"></i> ลบรายการนี้</button>
         </div>`).join('');
 }
-async function appB(id){if(!confirm('ยืนยันอนุมัติ? ระบบจะสร้าง API Key ให้ลูกค้าทันที'))return;try{const r=await fetchAPI('approve_billing','POST',{id});toast('อนุมัติสำเร็จ! API Key: '+r.apiKey,'success');loadB()}catch(e){toast('เกิดข้อผิดพลาด','error')}}
+async function appB(id){if(!confirm('ยืนยันอนุมัติและเปิดแพ็กเกจให้บัญชีนี้?'))return;try{await fetchAPI('approve_billing','POST',{id});toast('อนุมัติและเปิดแพ็กเกจสำเร็จ','success');loadB()}catch(e){toast('เกิดข้อผิดพลาด','error')}}
 async function rejB(id){if(!confirm('ยืนยันปฏิเสธสลิปนี้?'))return;try{await fetchAPI('reject_billing','POST',{id});toast('ปฏิเสธคำขอเรียบร้อย','info');loadB()}catch(e){toast('เกิดข้อผิดพลาด','error')}}
 async function delB(id){if(!confirm('⚠️ ต้องการลบรายการนี้?'))return;try{await fetchAPI('delete_billing','POST',{id});toast('ลบรายการเรียบร้อยแล้ว!','success');loadB()}catch(e){toast('เกิดข้อผิดพลาด','error')}}
 
@@ -1211,9 +1211,9 @@ document.getElementById('bank-form').onsubmit=async e=>{
 };
 
 // ====SETTINGS====
-function togPayCfg(){const v=document.getElementById('payMode').value;document.getElementById('cfg-slipok').style.display=v==='slipok'?'':'none';document.getElementById('cfg-stripe').style.display=v==='stripe'?'':'none'}
-async function loadS(){const d=await fetchAPI('settings'),s=d.settings||{};document.getElementById('payMode').value=s.payment_mode||'manual';document.getElementById('stKey').value=s.stripe_secret_key||'';document.getElementById('slKey').value=s.slipok_api_key||'';document.getElementById('slBranch').value=s.slipok_branch_id||'';togPayCfg()}
-async function saveSettings(){const p={payment_mode:document.getElementById('payMode').value,stripe_secret_key:document.getElementById('stKey').value,slipok_api_key:document.getElementById('slKey').value,slipok_branch_id:document.getElementById('slBranch').value};try{await fetchAPI('save_settings','POST',p);toast('บันทึกการตั้งค่าทั้งหมดสำเร็จ! ✅','success')}catch(e){toast('เกิดข้อผิดพลาดในการบันทึก','error')}}
+function togPayCfg(){const v=document.getElementById('payMode').value;document.getElementById('cfg-slipok').style.display=['slipok','both'].includes(v)?'':'none';document.getElementById('cfg-stripe').style.display=['stripe','both'].includes(v)?'':'none'}
+async function loadS(){const d=await fetchAPI('settings'),s=d.settings||{};document.getElementById('payMode').value=s.payment_mode||'manual';togPayCfg()}
+async function saveSettings(){const p={payment_mode:document.getElementById('payMode').value};try{await fetchAPI('save_settings','POST',p);toast('บันทึกการตั้งค่าสำเร็จ','success')}catch(e){toast('เกิดข้อผิดพลาดในการบันทึก','error')}}
 
 loadOv();
 

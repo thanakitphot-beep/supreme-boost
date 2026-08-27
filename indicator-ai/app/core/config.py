@@ -28,6 +28,7 @@ if BaseSettings is not None:
         model_base_url: AnyHttpUrl | None = None
         model_name: str | None = None
         model_api_key: str | None = None
+        service_token: str | None = None
 else:
     class Settings(BaseModel):
         """Small fallback for development when optional packages are absent."""
@@ -44,6 +45,7 @@ else:
         model_base_url: AnyHttpUrl | None = os.getenv("INDICATOR_MODEL_BASE_URL") or None
         model_name: str | None = os.getenv("INDICATOR_MODEL_NAME") or None
         model_api_key: str | None = os.getenv("INDICATOR_MODEL_API_KEY") or None
+        service_token: str | None = os.getenv("INDICATOR_SERVICE_TOKEN") or None
 
 
 @lru_cache

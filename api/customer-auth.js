@@ -2,18 +2,15 @@ const crypto = require('crypto');
 const { connectToDatabase } = require("./_mongodb.js");
 const { configuredClientId, verifyGoogleCredential } = require('./_googleAuth');
 const { signToken } = require('./_auth');
+const { hashPassword, passwordIsValid, verifyPassword } = require('../services/passwords');
+const { appendCookie, clearRegistrationGrant, readRegistrationGrant } = require('../services/registrationGrant');
 
 const { checkRateLimit } = require('../services/rateLimit');
 const { setCorsHeaders } = require('../services/cors');
 
-function hashPassword(password) {
-    return crypto.createHash('sha256').update(password).digest('hex');
-}
-
-function passwordMatches(tenant, password) {
-    if (!tenant || typeof password !== 'string' || !password) return false;
-    const hashed = hashPassword(password);
-    return tenant.password === hashed || tenant.password === password;
+async function passwordMatches(tenant, password) {
+    if (!tenant) return { matches: false, needsUpgrade: false };
+    return verifyPassword(tenant.password, password);
 }
 
 function publicTenant(tenant) {
@@ -35,13 +32,13 @@ function setTenantSession(res, tenant) {
     if (!token) throw new Error('Tenant session is not configured');
     const attributes = ['tenant_session=' + encodeURIComponent(token), 'HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=43200'];
     if (process.env.NODE_ENV === 'production') attributes.push('Secure');
-    res.setHeader('Set-Cookie', attributes.join('; '));
+    appendCookie(res, attributes.join('; '));
 }
 
 function clearTenantSession(res) {
     const attributes = ['tenant_session=', 'HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=0'];
     if (process.env.NODE_ENV === 'production') attributes.push('Secure');
-    res.setHeader('Set-Cookie', attributes.join('; '));
+    appendCookie(res, attributes.join('; '));
 }
 
 function respondTenant(res, status, tenant) {
@@ -62,7 +59,7 @@ module.exports = async function handler(req, res) {
     if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === "OPTIONS") return res.status(200).end();
 
-    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'auth')) {
+    if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'auth')) {
         return;
     }
 
@@ -110,13 +107,14 @@ module.exports = async function handler(req, res) {
                 const existingEmail = await db.collection('tenants').findOne({ email: profile.email });
                 if (existingEmail) {
                     const suppliedUsername = String(body.username || '').trim();
-                    if (suppliedUsername !== existingEmail.username || !passwordMatches(existingEmail, body.password)) {
+                    const passwordCheck = await passwordMatches(existingEmail, body.password);
+                    if (suppliedUsername !== existingEmail.username || !passwordCheck.matches) {
                         return res.status(409).json({ error: 'This email already has an account. Enter its existing username and password, then choose Google again to link it.' });
                     }
                     const now = new Date().toISOString();
                     const googleAuth = { sub: profile.sub, email: profile.email, email_verified: true, linked_at: now, last_login_at: now };
                     const updates = { 'auth.google': googleAuth };
-                    if (existingEmail.password === body.password && existingEmail.password !== hashPassword(body.password)) updates.password = hashPassword(body.password);
+                    if (passwordCheck.needsUpgrade) updates.password = await hashPassword(body.password, { enforcePolicy: false });
                     await db.collection('tenants').updateOne({ id: existingEmail.id }, { $set: updates });
                     return respondTenant(res, 200, { ...existingEmail, auth: { google: googleAuth } });
                 }
@@ -151,6 +149,16 @@ module.exports = async function handler(req, res) {
                 if (!username || !password) {
                     return res.status(400).json({ error: "Username and Password are required" });
                 }
+                if (!passwordIsValid(password)) {
+                    return res.status(400).json({ error: 'Password must be at least 12 characters' });
+                }
+                if (!email || typeof email !== 'string') {
+                    return res.status(400).json({ error: 'Email is required' });
+                }
+                const registrationGrant = readRegistrationGrant(req, email);
+                if (!registrationGrant) {
+                    return res.status(403).json({ error: 'Verify your email before registering' });
+                }
 
                 // Check unique username
                 const existing = await db.collection('tenants').findOne({ username });
@@ -158,7 +166,7 @@ module.exports = async function handler(req, res) {
                     return res.status(400).json({ error: "Username already exists" });
                 }
 
-                const hashedPassword = hashPassword(password);
+                const hashedPassword = await hashPassword(password);
                 const newApiKey = 'sk_live_' + crypto.randomBytes(18).toString('hex');
                 
                 const newTenant = {
@@ -175,12 +183,19 @@ module.exports = async function handler(req, res) {
                     created_at: new Date().toISOString()
                 };
 
+                let grantClaimed = false;
                 try {
+                    await db.collection('registration_grants').insertOne({ id: registrationGrant.nonce, email, expires_at: new Date(registrationGrant.expiresAt), created_at: new Date().toISOString() });
+                    grantClaimed = true;
                     await db.collection('tenants').insertOne(newTenant);
                 } catch (dbErr) {
-                    console.warn('[AUTH] MongoDB insertOne failed, ignoring for read-only DB:', dbErr.message);
+                    if (grantClaimed) await db.collection('registration_grants').deleteOne({ id: registrationGrant.nonce }).catch(() => { });
+                    if (dbErr && dbErr.code === 11000) return res.status(409).json({ error: 'This email verification or account has already been used' });
+                    console.warn('[AUTH] Registration failed:', dbErr.message);
+                    return res.status(503).json({ error: 'Unable to create account. Please try again.' });
                 }
 
+                clearRegistrationGrant(res);
                 return respondTenant(res, 200, newTenant);
             }
 
@@ -196,17 +211,15 @@ module.exports = async function handler(req, res) {
                     return res.status(401).json({ error: "Invalid Username or Password" });
                 }
 
-                const hashMatch = tenant.password === hashPassword(password);
-                const plainMatch = tenant.password === password;
-
-                if (!plainMatch && !hashMatch) {
+                const passwordCheck = await passwordMatches(tenant, password);
+                if (!passwordCheck.matches) {
                     return res.status(401).json({ error: "Invalid Username or Password" });
                 }
                 
-                // Migrate old plain text password to hashed password automatically
-                if (plainMatch && !hashMatch) {
+                // Migrate old SHA-256/plaintext passwords after a valid login.
+                if (passwordCheck.needsUpgrade) {
                     try {
-                        const newHash = hashPassword(password);
+                        const newHash = await hashPassword(password, { enforcePolicy: false });
                         await db.collection('tenants').updateOne({ id: tenant.id }, { $set: { password: newHash } });
                     } catch (dbErr) {
                         console.warn('[AUTH] MongoDB updateOne failed, ignoring for read-only DB:', dbErr.message);

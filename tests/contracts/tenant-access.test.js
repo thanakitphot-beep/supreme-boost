@@ -1,5 +1,6 @@
 const { canonicalOrigin, firstPartyDemoAllowed, normalizeAllowedOrigins, tenantIsActive } = require('../../services/tenantAccess');
 const customerAuth = require('../../api/customer-auth');
+const memoryApi = require('../../api/v1/memory');
 
 function mockReq(overrides = {}) {
     return {
@@ -81,5 +82,20 @@ describe('Google Sign-In configuration', () => {
         expect(res._statusCode).toBe(503);
         if (previous === undefined) delete process.env.GOOGLE_CLIENT_ID;
         else process.env.GOOGLE_CLIENT_ID = previous;
+    });
+});
+
+describe('Long-term memory tenant isolation', () => {
+    test('allows tenant-scoped memory access only to the matching tenant or an admin', () => {
+        expect(memoryApi.__canAccessTenant({ role: 'tenant', tenantId: 'tenant-a' }, 'tenant-a')).toBe(true);
+        expect(memoryApi.__canAccessTenant({ role: 'tenant', tenantId: 'tenant-a' }, 'tenant-b')).toBe(false);
+        expect(memoryApi.__canAccessTenant({ role: 'admin' }, 'tenant-b')).toBe(true);
+        expect(memoryApi.__canAccessTenant({ role: 'tenant' }, 'tenant-a')).toBe(false);
+    });
+
+    test('bounds memory query and expiry values', () => {
+        expect(memoryApi.__boundedInteger('500', 10, 1, 50)).toBe(50);
+        expect(memoryApi.__boundedInteger('-1', 10, 1, 50)).toBe(1);
+        expect(memoryApi.__boundedInteger('invalid', 10, 1, 50)).toBe(10);
     });
 });

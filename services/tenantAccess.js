@@ -2,6 +2,7 @@
 
 const { connectToDatabase } = require('../api/_mongodb');
 const { isOriginAllowed, setCorsHeaders } = require('./cors');
+const { entitlementsFor } = require('./plans');
 
 function canonicalOrigin(value) {
     try {
@@ -53,7 +54,8 @@ async function authorizePluginRequest({ apiKey, origin }) {
     const key = String(apiKey || '').trim();
     const demoAllowed = firstPartyDemoAllowed(origin);
     if (key === 'INDICATOR_TEST' && process.env.NODE_ENV !== 'production') {
-        return { tenant: { id: 'test', status: 'active', allowed_origins: [] } };
+        const tenant = { id: 'test', status: 'active', package_type: 'starter', allowed_origins: [] };
+        return { tenant: { ...tenant, entitlements: entitlementsFor(tenant) } };
     }
     if (!key) return demoAllowed ? { tenant: { id: 'demo', status: 'active', allowed_origins: [] } } : tenantKeyRequired() ? { error: 'Missing widget API key' } : { tenant: null };
 
@@ -69,7 +71,7 @@ async function authorizePluginRequest({ apiKey, origin }) {
     if (canonical && canonical !== serviceOrigin && !normalizeAllowedOrigins(tenant.allowed_origins).includes(canonical)) {
         return { error: 'This website origin is not registered for the tenant' };
     }
-    return { tenant };
+    return { tenant: { ...tenant, entitlements: entitlementsFor(tenant) } };
 }
 
 module.exports = {
