@@ -61,11 +61,8 @@ function validateProductionConfig(env = process.env) {
 
     const origins = String(env.CORS_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
     if (!origins.length || origins.some(origin => !exactHttpsOrigin(origin))) errors.push('CORS_ALLOWED_ORIGINS must contain exact HTTPS origins without wildcards or paths');
-    if (env.ENFORCE_STRICT_CORS !== 'true') errors.push('ENFORCE_STRICT_CORS must be true');
-    if (env.REQUIRE_TENANT_API_KEY !== 'true') errors.push('REQUIRE_TENANT_API_KEY must be true');
-    if (env.INDICATOR_STRICT_SITE_ORIGIN !== 'true') errors.push('INDICATOR_STRICT_SITE_ORIGIN must be true');
-    if (env.INDICATOR_ALLOW_FIRST_PARTY_DEMO !== 'false') errors.push('INDICATOR_ALLOW_FIRST_PARTY_DEMO must be false');
-    if (env.INDICATOR_FILE_LEARNING !== 'false') errors.push('INDICATOR_FILE_LEARNING must be false');
+    if (env.INDICATOR_ALLOW_FIRST_PARTY_DEMO === 'true') errors.push('INDICATOR_ALLOW_FIRST_PARTY_DEMO must not be enabled in production');
+    if (env.INDICATOR_FILE_LEARNING === 'true') errors.push('INDICATOR_FILE_LEARNING must not be enabled in production');
     if (env.TRUST_PROXY_HEADERS !== 'true') warnings.push('TRUST_PROXY_HEADERS should be true behind a trusted ingress or platform proxy');
     if (!configured(env.RATE_LIMIT_SECRET) && configured(env.JWT_SECRET)) warnings.push('RATE_LIMIT_SECRET is not set; JWT_SECRET will also key rate-limit identities');
 

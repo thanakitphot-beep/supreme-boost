@@ -15,6 +15,7 @@ const { signToken, accessTokenFromRequest, setAdminSessionCookie } = require('..
 const geo = require('../../api/geo');
 const { maskPII } = require('../../services/safety');
 const packageJson = require('../../package.json');
+const { ensureMongoIndexes } = require('../../scripts/initMongoIndexes');
 
 async function requestFromLocalServer(pathname, options) {
     const app = http.createServer(server);
@@ -36,6 +37,7 @@ describe('Production hardening', () => {
     test('routes the platform default start command through release gates', () => {
         expect(packageJson.scripts.start).toBe('npm run release:start');
         expect(packageJson.scripts['release:start']).toContain('npm run db:indexes');
+        expect(typeof ensureMongoIndexes).toBe('function');
     });
 
     test('uses salted scrypt passwords and upgrades legacy records after verification', async () => {

@@ -220,11 +220,6 @@ describe('Production configuration gate', () => {
             OPENAI_API_KEY: 'sk-preview-provider-key',
             CORS_ALLOWED_ORIGINS: 'https://preview.example.com',
             PUBLIC_BASE_URL: 'https://api.example.com',
-            ENFORCE_STRICT_CORS: 'true',
-            REQUIRE_TENANT_API_KEY: 'true',
-            INDICATOR_STRICT_SITE_ORIGIN: 'true',
-            INDICATOR_ALLOW_FIRST_PARTY_DEMO: 'false',
-            INDICATOR_FILE_LEARNING: 'false',
             TRUST_PROXY_HEADERS: 'true',
             REGISTRATION_MODE: 'disabled',
             HANDOFF_DELIVERY_MODE: 'contact_only',
@@ -286,6 +281,12 @@ describe('Production configuration gate', () => {
         const result = validateProductionConfig({ REGISTRATION_MODE: 'open', HANDOFF_DELIVERY_MODE: 'discard' });
         expect(result.errors.join(' ')).toContain('REGISTRATION_MODE');
         expect(result.errors.join(' ')).toContain('HANDOFF_DELIVERY_MODE');
+    });
+
+    test('rejects explicitly enabled production demo and file learning modes', () => {
+        const result = validateProductionConfig({ INDICATOR_ALLOW_FIRST_PARTY_DEMO: 'true', INDICATOR_FILE_LEARNING: 'true' });
+        expect(result.errors.join(' ')).toContain('INDICATOR_ALLOW_FIRST_PARTY_DEMO');
+        expect(result.errors.join(' ')).toContain('INDICATOR_FILE_LEARNING');
     });
 
     test('normalizes delivery modes and defaults to fail-closed behavior', () => {

@@ -33,6 +33,7 @@ const { closeDatabase } = require('./api/_mongodb');
 const { requestCounter, setDraining } = require('./api/v1/health.js');
 const { checkRateLimit } = require('./services/rateLimit.js');
 const { releaseInfo } = require('./services/release');
+const { ensureMongoIndexes } = require('./scripts/initMongoIndexes');
 const chatHandler = require('./api/chat.js');
 const crawlHandler = require('./api/crawl.js');
 const adminHandler = require('./api/admin.js');
@@ -316,7 +317,7 @@ if (require.main === module) {
         });
     });
 
-    server.listen(PORT, HOSTNAME, () => {
+    const listen = () => server.listen(PORT, HOSTNAME, () => {
         console.log(`\n✅ INDICATOR WEB CHAT Server is running!`);
         console.log(`📍 Open: http://localhost:${PORT}`);
         console.log(`📍 API:  http://localhost:${PORT}/api/chat`);
@@ -327,7 +328,12 @@ if (require.main === module) {
         console.log(`🔑 Groq:    ${process.env.GROQ_API_KEY    ? '✅' : '❌ Missing'}`);
         console.log(`🔑 Cohere:  ${process.env.COHERE_API_KEY  ? '✅' : '❌ Missing'}`);
         console.log(`\nPress Ctrl+C to stop\n`);
+    });
 
+    const startup = process.env.NODE_ENV === 'production' ? ensureMongoIndexes() : Promise.resolve();
+    startup.then(listen).catch(error => {
+        console.error(`Startup failed: ${error.message}`);
+        closeDatabase().catch(() => {}).finally(() => { process.exitCode = 1; });
     });
 
     let shuttingDown = false;

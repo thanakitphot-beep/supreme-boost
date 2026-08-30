@@ -12,7 +12,7 @@ function indexOptions(specification) {
     return options;
 }
 
-async function main() {
+async function ensureMongoIndexes() {
     const db = await connectToDatabase();
     if (!db) throw new Error('MongoDB is not configured or reachable');
 
@@ -43,7 +43,11 @@ async function main() {
     console.log('MongoDB indexes are ready');
 }
 
-main().catch(error => {
-    console.error(error.message);
-    process.exitCode = 1;
-}).finally(() => closeDatabase().catch(() => {}));
+if (require.main === module) {
+    ensureMongoIndexes().catch(error => {
+        console.error(error.message);
+        process.exitCode = 1;
+    }).finally(() => closeDatabase().catch(() => {}));
+}
+
+module.exports = { ensureMongoIndexes };
