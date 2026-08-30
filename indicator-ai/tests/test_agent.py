@@ -1,8 +1,13 @@
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
 from app.agent.service import GroundedChatService
+from app.core.config import get_settings
 from app.domain.schemas import AnswerStatus, CatalogItem, ChatRequest, ConversationTurn, KnowledgeDocument
+from app.main import app
 from app.memory.summary_buffer import SummaryBufferMemory
 from app.rag.evidence_store import InMemoryEvidenceStore
-from pathlib import Path
 
 
 def make_service() -> tuple[GroundedChatService, InMemoryEvidenceStore]:
@@ -178,3 +183,15 @@ def test_colloquial_package_spelling_returns_published_plan_summary() -> None:
     assert "Pro Matrix ฿2,490/เดือน" in response.answer
     assert "Enterprise ติดต่อเรา" in response.answer
     assert response.action.type == "warp"
+
+
+def test_stateful_routes_require_the_node_service_token(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("INDICATOR_SERVICE_TOKEN", "test-service-token")
+    monkeypatch.setenv("INDICATOR_CONVERSATION_STORE_PATH", str(tmp_path / "conversations.json"))
+    get_settings.cache_clear()
+    payload = {"site_id": "tenant:one", "conversation_id": "visitor-1", "message": "สวัสดี"}
+    with TestClient(app) as client:
+        assert client.post("/v1/chat", json=payload).status_code == 401
+        assert client.post("/v1/chat", json=payload, headers={"X-Indicator-Service-Token": "wrong"}).status_code == 401
+        assert client.post("/v1/chat", json=payload, headers={"X-Indicator-Service-Token": "test-service-token"}).status_code == 200
+    get_settings.cache_clear()

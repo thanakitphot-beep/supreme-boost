@@ -4,8 +4,19 @@
   "private": true,
   "scripts": {
     "build": "node build.js",
-    "check": "node --check api/chat.js && node --check src/widget/main.js",
-    "test": "jest --testPathPatterns=tests/contracts --runInBand --forceExit --detectOpenHandles",
+    "build:verify": "node scripts/verifyGeneratedBuild.js",
+    "check": "node scripts/checkJavaScript.js",
+    "scan:secrets": "node scripts/scanSecrets.js",
+    "db:indexes": "node scripts/initMongoIndexes.js",
+    "preflight": "node scripts/preflight.js",
+    "preflight:dependencies": "node scripts/preflight.js --dependencies",
+    "preflight:live": "node scripts/preflight.js --live",
+    "start:production": "npm run preflight && node server.js",
+    "release:start": "npm run preflight && npm run db:indexes && npm run preflight:dependencies && node server.js",
+    "ci": "npm run scan:secrets && npm run check && npm run build:verify && npm test && npm run eval:ci && npm audit --omit=dev --audit-level=high",
+    "eval": "node evals/run.js --output evals/results/latest.json",
+    "eval:ci": "node evals/run.js --ci",
+    "test": "jest --testPathPatterns=tests/contracts --runInBand --detectOpenHandles",
     "test:watch": "jest --testPathPatterns=tests/contracts --runInBand --watch",
     "dev": "nodemon server.js",
     "start": "node server.js",
@@ -16,27 +27,21 @@
     "status": "pm2 status"
   },
   "dependencies": {
-    "@google/genai": "^2.8.0",
     "@supabase/supabase-js": "^2.108.2",
     "cheerio": "^1.0.0-rc.12",
-    "docx": "^9.7.1",
-    "dotenv": "^17.4.2",
     "esbuild": "^0.28.1",
     "google-auth-library": "^10.9.1",
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.5.0",
-    "nodemailer": "^9.0.3",
-    "socket.io": "^4.8.3",
-    "vercel": "^54.13.0"
+    "nodemailer": "^9.0.3"
   },
   "devDependencies": {
     "jest": "^30.4.2",
-    "nodemon": "^3.1.14",
-    "supertest": "^7.2.2"
+    "nodemon": "^3.1.14"
   },
   "description": "INDICATOR web-agent widget with a provider-independent, self-hostable agent core.",
   "engines": {
-    "node": ">=20"
+    "node": ">=24 <25"
   },
   "main": "server.js",
   "repository": {
