@@ -2,6 +2,7 @@
 
 const { connectToDatabase } = require('../api/_mongodb');
 const { isOriginAllowed, setCorsHeaders } = require('./cors');
+const { entitlementsFor } = require('./plans');
 
 function canonicalOrigin(value) {
     try {
@@ -28,8 +29,8 @@ function tenantKeyRequired() {
 }
 
 function firstPartyDemoAllowed(origin) {
-    if (process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO === 'false') return false;
-    const serviceOrigin = canonicalOrigin(process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
+    if (process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO !== 'true') return false;
+    const serviceOrigin = canonicalOrigin(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
     return Boolean(serviceOrigin && canonicalOrigin(origin) === serviceOrigin);
 }
 
@@ -53,7 +54,8 @@ async function authorizePluginRequest({ apiKey, origin }) {
     const key = String(apiKey || '').trim();
     const demoAllowed = firstPartyDemoAllowed(origin);
     if (key === 'INDICATOR_TEST' && process.env.NODE_ENV !== 'production') {
-        return { tenant: { id: 'test', status: 'active', allowed_origins: [] } };
+        const tenant = { id: 'test', status: 'active', package_type: 'starter', allowed_origins: [] };
+        return { tenant: { ...tenant, entitlements: entitlementsFor(tenant) } };
     }
     if (!key) return demoAllowed ? { tenant: { id: 'demo', status: 'active', allowed_origins: [] } } : tenantKeyRequired() ? { error: 'Missing widget API key' } : { tenant: null };
 
@@ -65,11 +67,11 @@ async function authorizePluginRequest({ apiKey, origin }) {
 
     const canonical = canonicalOrigin(origin);
     if (tenantKeyRequired() && !canonical) return { error: 'Plugin requests must include a registered browser origin' };
-    const serviceOrigin = canonicalOrigin(process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
+    const serviceOrigin = canonicalOrigin(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
     if (canonical && canonical !== serviceOrigin && !normalizeAllowedOrigins(tenant.allowed_origins).includes(canonical)) {
         return { error: 'This website origin is not registered for the tenant' };
     }
-    return { tenant };
+    return { tenant: { ...tenant, entitlements: entitlementsFor(tenant) } };
 }
 
 module.exports = {

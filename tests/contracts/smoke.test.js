@@ -6,6 +6,8 @@
 
 const path = require('path');
 const fs = require('fs');
+const https = require('node:https');
+const { EventEmitter } = require('node:events');
 
 // ─── Mock req/res helpers ────────────────────────────────────────────────────
 
@@ -86,6 +88,14 @@ describe('Widget asset — boost.js exists and has content', () => {
 
 describe('services/ssrfBlocker — URL validation', () => {
     const { isSafeUrl } = require('../../services/ssrfBlocker');
+    const { createPublicLookup, fetchPublicResource } = require('../../services/publicHttp');
+
+    function runLookup(records, all = false) {
+        return new Promise(resolve => {
+            const lookup = createPublicLookup(async () => records);
+            lookup('example.test', { all }, (...args) => resolve(args));
+        });
+    }
 
     test('blocks localhost', () => {
         expect(isSafeUrl('http://localhost/foo')).toBe(false);
@@ -111,6 +121,40 @@ describe('services/ssrfBlocker — URL validation', () => {
         expect(isSafeUrl('http://172.20.0.1/secret')).toBe(false);
         expect(isSafeUrl('http://localhost./secret')).toBe(false);
         expect(isSafeUrl('http://[::1]/secret')).toBe(false);
+        expect(isSafeUrl('https://192.0.2.1/example')).toBe(false);
+        expect(isSafeUrl('https://[2001:db8::1]/example')).toBe(false);
+        expect(isSafeUrl('https://[fec0::1]/site-local')).toBe(false);
+        expect(isSafeUrl('https://[::7f00:1]/compatible-loopback')).toBe(false);
+        expect(isSafeUrl('https://[64:ff9b::7f00:1]/nat64-loopback')).toBe(false);
+    });
+
+    test('rejects DNS answers containing a non-public address at socket lookup time', async () => {
+        const [error] = await runLookup([{ address: '93.184.216.34', family: 4 }, { address: '127.0.0.1', family: 4 }]);
+        expect(error).toBeInstanceOf(Error);
+        expect(error.message).toMatch(/non-public/iu);
+    });
+
+    test('passes verified public DNS answers to the network socket', async () => {
+        const [error, address, family] = await runLookup([{ address: '93.184.216.34', family: 4 }]);
+        expect(error).toBeNull();
+        expect({ address, family }).toEqual({ address: '93.184.216.34', family: 4 });
+    });
+
+    test('enforces an absolute public request deadline even without socket inactivity', async () => {
+        jest.useFakeTimers();
+        const request = new EventEmitter();
+        request.end = jest.fn();
+        request.destroy = jest.fn(error => request.emit('error', error));
+        const requestSpy = jest.spyOn(https, 'request').mockReturnValue(request);
+        try {
+            const pending = fetchPublicResource('https://example.com/slow', { timeoutMs: 1000 });
+            jest.advanceTimersByTime(1000);
+            await expect(pending).rejects.toThrow('Public request timed out');
+            expect(request.destroy).toHaveBeenCalledTimes(1);
+        } finally {
+            requestSpy.mockRestore();
+            jest.useRealTimers();
+        }
     });
 
     test('allows a public HTTPS URL', () => {

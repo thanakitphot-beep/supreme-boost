@@ -18,11 +18,11 @@ function maskPII(text) {
         .replace(/\b[\w.\-]+@[\w.\-]+\.\w{2,}\b/gi, "[REDACTED_EMAIL]")
         .replace(/\b(?:\d[ -]*?){13,16}\b/g, "[REDACTED_CARD]")
         .replace(/\b\d{13}\b/g, "[REDACTED_ID]")
-        .replace(/\b0[0-9]{8,9}\b/g, "[REDACTED_PHONE]")
-        .replace(/\b(?:นาย|นาง|นางสาว| Mr\.|Mrs\.|Ms\.|Mr |Mrs |Ms |Dr\.|Dr )\s*\w+/gi, "[REDACTED_NAME]")
-        .replace(/\b(?:\+?66|0)\d{8,9}\b/g, "[REDACTED_PHONE]")
+        .replace(/(?<!\d)(?:\+?66|0)[\s.-]?[1-9](?:[\s.-]?\d){7,8}\b/g, "[REDACTED_PHONE]")
+        .replace(/(?:นาย|นางสาว|นาง)\s+[\p{Script=Thai}\p{M}]+(?:\s+[\p{Script=Thai}\p{M}]+){0,2}/gu, "[REDACTED_NAME]")
+        .replace(/\b(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?)\s+[A-Za-z]+(?:[ '-][A-Za-z]+){0,2}\b/g, "[REDACTED_NAME]")
         .replace(/\d{5,9}[-/]\d{2,4}[-/]\d{2,4}\b/g, "[REDACTED_DOB]")
-        .replace(/\b(?:secret|token|api[-_]?key|private[-_]?key)\s*[:=]\s*['\"]?\w{8,}/gi, "[REDACTED_SECRET]")
+        .replace(/\b(?:secret|token|api[-_]?key|private[-_]?key)\s*[:=]\s*['\"]?\S{8,}/gi, "[REDACTED_SECRET]")
         .replace(/\b(?:password|passwd|pwd)\s*[:=]\s*\S+/gi, "[REDACTED_PASSWORD]");
 }
 

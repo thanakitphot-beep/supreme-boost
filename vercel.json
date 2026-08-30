@@ -2,6 +2,15 @@
   "framework": null,
   "outputDirectory": ".",
   "rewrites": [
+    { "source": "/data", "destination": "/api/not-found" },
+    { "source": "/data/(.*)", "destination": "/api/not-found" },
+    { "source": "/docs/(.*)", "destination": "/api/not-found" },
+    { "source": "/indicator-ai/(.*)", "destination": "/api/not-found" },
+    { "source": "/k8s/(.*)", "destination": "/api/not-found" },
+    { "source": "/services/(.*)", "destination": "/api/not-found" },
+    { "source": "/src/(.*)", "destination": "/api/not-found" },
+    { "source": "/tests/(.*)", "destination": "/api/not-found" },
+    { "source": "/.env", "destination": "/api/not-found" },
     { "source": "/admin", "destination": "/admin-dashboard.html" },
     { "source": "/login", "destination": "/admin-login.html" },
     { "source": "/pricing", "destination": "/pricing.html" },
@@ -16,14 +25,6 @@
   "headers": [
     {
       "source": "/supreme-boost/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Content-Type", "value": "application/javascript; charset=utf-8" },
-        { "key": "Cache-Control", "value": "public, max-age=300" }
-      ]
-    },
-    {
-      "source": "/plugins/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Content-Type", "value": "application/javascript; charset=utf-8" },

@@ -1,6 +1,8 @@
 const { checkRateLimit } = require('../services/rateLimit');
-const { isSafeFetchUrl, isSafeUrl } = require('../services/ssrfBlocker');
-const { applyPluginCors, authorizePluginRequest } = require('../services/tenantAccess');
+const { isSafeUrl } = require('../services/ssrfBlocker');
+const { fetchPublicResource } = require('../services/publicHttp');
+const { applyPluginCors, authorizePluginRequest, canonicalOrigin } = require('../services/tenantAccess');
+const { consumeUsage, entitlementsFor } = require('../services/plans');
 
 const MAX_HTML_BYTES = 500_000;
 const MAX_PAGES = 20;
@@ -32,21 +34,34 @@ function extractText(html) {
         .replace(/\s+/g, ' ').trim();
 }
 
+function rootMatchesRequestOrigin(rootUrl, requestOrigin) {
+    try {
+        return new URL(rootUrl).origin === canonicalOrigin(requestOrigin);
+    } catch (_) {
+        return false;
+    }
+}
+
 module.exports = async function crawlHandler(req, res) {
     if (!await applyPluginCors(req, res)) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'api')) return;
+    if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'api')) return;
 
     try {
         const body = parseBody(req.body);
         const access = await authorizePluginRequest({ apiKey: body.apiKey, origin: req.headers.origin });
         if (access.error) return res.status(403).json({ error: access.error });
+        const entitlements = access.tenant && access.tenant.entitlements || entitlementsFor(access.tenant);
+        if (!entitlements.features.crawl) return res.status(403).json({ error: 'This plan does not include website crawling' });
+        if (!await checkRateLimit(req, res, 'api', { principal: `tenant:${access.tenant && access.tenant.id || 'demo'}`, limit: entitlements.chatPerMinute })) return;
         const keywords = (Array.isArray(body.keywords) ? body.keywords : [])
             .filter(keyword => typeof keyword === 'string' && keyword.trim().length > 1)
             .map(keyword => keyword.trim().toLowerCase()).slice(0, 20);
         const rootUrl = typeof body.rootUrl === 'string' && isSafeUrl(body.rootUrl) ? body.rootUrl : null;
-        if (!keywords.length || !rootUrl || !await isSafeFetchUrl(rootUrl)) return res.status(200).json({ results: [] });
+        if (!keywords.length || !rootUrl || !rootMatchesRequestOrigin(rootUrl, req.headers.origin)) return res.status(200).json({ results: [] });
+        const usage = await consumeUsage(access.tenant, 'crawl');
+        if (!usage.allowed) return res.status(usage.status || 429).json({ error: usage.reason });
 
         const root = new URL(rootUrl);
         const seen = new Set();
@@ -99,26 +114,20 @@ module.exports = async function crawlHandler(req, res) {
         }
 
         async function fetchPage(url) {
-            if (seen.has(url) || !await isSafeFetchUrl(url)) return null;
+            if (seen.has(url)) return null;
             seen.add(url);
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
             try {
-                const response = await fetch(url, { signal: controller.signal, redirect: 'manual' });
+                const response = await fetchPublicResource(url, { timeoutMs: TIMEOUT_MS, maxBytes: MAX_HTML_BYTES });
                 if (!response.ok || response.status >= 300 && response.status < 400) return null;
-                const contentType = String(response.headers.get('content-type') || '').toLowerCase();
-                const declaredLength = Number(response.headers.get('content-length') || 0);
-                if (!contentType.includes('text/html') || declaredLength > MAX_HTML_BYTES) return null;
-                const html = await response.text();
-                if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) return null;
+                const contentType = String(response.headers['content-type'] || '').toLowerCase();
+                if (!contentType.includes('text/html')) return null;
+                const html = response.body.toString('utf8');
                 const text = extractText(html);
                 const scored = scorePage(text, html, url);
                 if (scored) results.push(scored);
                 return html;
             } catch (_) {
                 return null;
-            } finally {
-                clearTimeout(timer);
             }
         }
 
@@ -140,3 +149,5 @@ module.exports = async function crawlHandler(req, res) {
         return res.status(200).json({ results: [] });
     }
 };
+
+module.exports.__rootMatchesRequestOrigin = rootMatchesRequestOrigin;

@@ -5,6 +5,7 @@ const { setCorsHeaders } = require('../services/cors');
 
 const JWT_EXPIRY = process.env.JWT_EXPIRY || '24h';
 const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
+const ADMIN_SESSION_COOKIE = 'indicator_admin_session';
 
 function jwtSecret() {
     return String(process.env.JWT_SECRET || '').trim();
@@ -22,6 +23,27 @@ function secretsMatch(left, right) {
     const actual = Buffer.from(String(left || ''));
     const expected = Buffer.from(String(right || ''));
     return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
+
+function accessTokenFromRequest(req) {
+    const authHeader = String(req && req.headers && req.headers.authorization || '');
+    if (authHeader.startsWith('Bearer ')) return authHeader.slice(7).trim();
+    const prefix = `${ADMIN_SESSION_COOKIE}=`;
+    const entry = String(req && req.headers && req.headers.cookie || '').split(';').map(value => value.trim()).find(value => value.startsWith(prefix));
+    if (!entry) return '';
+    try { return decodeURIComponent(entry.slice(prefix.length)); } catch (_) { return ''; }
+}
+
+function setAdminSessionCookie(res, token) {
+    const decoded = decodeToken(token);
+    const maxAge = decoded && decoded.exp ? Math.max(0, decoded.exp - Math.floor(Date.now() / 1000)) : 86400;
+    const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/api; Max-Age=${maxAge}${secure}`);
+}
+
+function clearAdminSessionCookie(res) {
+    const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `${ADMIN_SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/api; Max-Age=0${secure}`);
 }
 
 function signToken(payload) {
@@ -82,7 +104,7 @@ function unauthorizedOrigin(res) {
 module.exports = async function handler(req, res) {
     if (!setCorsHeaders(req, res) && req.headers.origin) return unauthorizedOrigin(res);
     if (req.method === 'OPTIONS') return res.status(200).end();
-    if (!checkRateLimit(req, res, 'auth')) return;
+    if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'auth')) return;
     if (!authConfigured()) return res.status(503).json({ success: false, message: 'Authentication is not configured' });
 
     if (req.method === 'POST') {
@@ -103,7 +125,7 @@ module.exports = async function handler(req, res) {
             });
         }
 
-        if (secretsMatch(password, adminPassword())) {
+        if (typeof password === 'string' && password.length <= 256 && secretsMatch(password, adminPassword())) {
             const payload = { role: 'admin', sub: 'admin' };
             return res.status(200).json({
                 success: true,
@@ -145,3 +167,7 @@ module.exports.verifyAccessJWT = verifyAccessJWT;
 module.exports.verifyJWT = verifyJWT;
 module.exports.verifyToken = verifyToken;
 module.exports.decodeToken = decodeToken;
+module.exports.secretsMatch = secretsMatch;
+module.exports.accessTokenFromRequest = accessTokenFromRequest;
+module.exports.setAdminSessionCookie = setAdminSessionCookie;
+module.exports.clearAdminSessionCookie = clearAdminSessionCookie;

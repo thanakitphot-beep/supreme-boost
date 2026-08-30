@@ -36,4 +36,23 @@ describe('Human handoff API', () => {
         expect(res._statusCode).toBe(200);
         expect(res._body.status).toBe('unavailable');
     });
+
+    test('returns only validated tenant support contacts without masking them', () => {
+        expect(handoffHandler.__safeContact({
+            support_email: ' Support@Example.com ',
+            support_phone: '+66 81 234 5678',
+            support_url: 'https://support.example.com/help'
+        })).toEqual({
+            email: 'support@example.com',
+            phone: '+66 81 234 5678',
+            url: 'https://support.example.com/help'
+        });
+        expect(handoffHandler.__safeContact({ support_url: 'javascript:alert(1)' })).toEqual({});
+    });
+
+    test('binds handoff page URLs to the requesting origin and drops private query data', () => {
+        expect(handoffHandler.__pageUrlForOrigin('https://shop.example/orders?customer=123#detail', 'https://shop.example'))
+            .toBe('https://shop.example/orders');
+        expect(handoffHandler.__pageUrlForOrigin('https://attacker.example/', 'https://shop.example')).toBe('');
+    });
 });

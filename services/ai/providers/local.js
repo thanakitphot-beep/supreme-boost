@@ -16,8 +16,8 @@ class LocalProvider extends BaseProvider {
         const body = {
             model,
             messages: payloadMessages,
-            temperature: options.temperature || 0.7,
-            max_tokens: options.maxTokens || 1024,
+            temperature: options.temperature ?? 0.7,
+            max_tokens: options.maxTokens ?? 1024,
             response_format: { type: "json_object" }
         };
 
@@ -32,9 +32,7 @@ class LocalProvider extends BaseProvider {
         });
 
         if (!res.ok) {
-            const errBody = await res.text().catch(() => '');
-            let errorMsg = `Local AI HTTP ${res.status}: ${errBody.slice(0, 200)}`;
-            const err = new Error(errorMsg);
+            const err = new Error(`Local AI HTTP ${res.status}`);
             err.status = res.status;
             throw err;
         }
