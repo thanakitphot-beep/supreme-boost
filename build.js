@@ -1,13 +1,12 @@
 const esbuild = require('esbuild');
-const fs = require('fs');
 
-async function build() {
+async function build(outfile = 'supreme-boost/boost.js') {
     try {
         await esbuild.build({
             entryPoints: ['src/widget/main.js'],
             bundle: true,
             minify: true,
-            outfile: 'supreme-boost/boost.js',
+            outfile,
             target: ['es2015'],
             format: 'iife'
         });
@@ -18,4 +17,6 @@ async function build() {
     }
 }
 
-build();
+if (require.main === module) build();
+
+module.exports = build;

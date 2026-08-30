@@ -23,7 +23,11 @@ function baseUrl() {
 }
 
 function enabled() {
-    return Boolean(baseUrl()) && String(process.env.INDICATOR_INTELLIGENCE_MODE || 'off').toLowerCase() === 'on';
+    return Boolean(baseUrl()) && Boolean(serviceToken()) && String(process.env.INDICATOR_INTELLIGENCE_MODE || 'off').toLowerCase() === 'on';
+}
+
+function serviceToken() {
+    return String(process.env.INDICATOR_INTELLIGENCE_SERVICE_TOKEN || '').trim();
 }
 
 function cleanText(value, limit) {
@@ -101,7 +105,9 @@ async function requestJson(url, body, timeoutMs) {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const response = await fetch(url, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Indicator-Service-Token': serviceToken() },
+            body: JSON.stringify(body), signal: controller.signal
         });
         return response.ok ? await response.json() : null;
     } catch (_) {
@@ -112,7 +118,12 @@ async function requestJson(url, body, timeoutMs) {
 }
 
 function siteId(payload) {
-    return cleanText(payload.siteProfile && payload.siteProfile.id, 120) || 'unregistered-site';
+    const tenantId = cleanText(payload && payload.tenantId, 120);
+    if (tenantId) return `tenant:${tenantId}`;
+    const profileId = cleanText(payload && payload.siteProfile && payload.siteProfile.id, 120);
+    if (profileId) return `profile:${profileId}`;
+    if (payload && !payload.__intelligenceSiteId) payload.__intelligenceSiteId = `ephemeral:${crypto.randomUUID()}`;
+    return payload && payload.__intelligenceSiteId || `ephemeral:${crypto.randomUUID()}`;
 }
 
 function conversationId(payload) {
@@ -166,4 +177,4 @@ async function answerWithIntelligence(payload) {
     return result && result.answer && result.status ? widgetResponse(result) : null;
 }
 
-module.exports = { enabled, answerWithIntelligence };
+module.exports = { enabled, answerWithIntelligence, __siteId: siteId };

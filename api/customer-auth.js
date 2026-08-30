@@ -1,18 +1,18 @@
 const crypto = require('crypto');
 const { connectToDatabase } = require("./_mongodb.js");
 const { configuredClientId, verifyGoogleCredential } = require('./_googleAuth');
+const { signToken } = require('./_auth');
+const { hashPassword, passwordIsValid, verifyPassword } = require('../services/passwords');
+const { appendCookie, clearRegistrationGrant, readRegistrationGrant } = require('../services/registrationGrant');
+const { normalizeEmail } = require('../services/email');
+const { registrationMode } = require('../services/productionConfig');
 
 const { checkRateLimit } = require('../services/rateLimit');
 const { setCorsHeaders } = require('../services/cors');
 
-function hashPassword(password) {
-    return crypto.createHash('sha256').update(password).digest('hex');
-}
-
-function passwordMatches(tenant, password) {
-    if (!tenant || typeof password !== 'string' || !password) return false;
-    const hashed = hashPassword(password);
-    return tenant.password === hashed || tenant.password === password;
+async function passwordMatches(tenant, password) {
+    if (!tenant) return { matches: false, needsUpgrade: false };
+    return verifyPassword(tenant.password, password);
 }
 
 function publicTenant(tenant) {
@@ -29,6 +29,25 @@ function publicTenant(tenant) {
     };
 }
 
+function setTenantSession(res, tenant) {
+    const token = signToken({ role: 'tenant', tenantId: tenant.id, sub: tenant.id });
+    if (!token) throw new Error('Tenant session is not configured');
+    const attributes = ['tenant_session=' + encodeURIComponent(token), 'HttpOnly', 'SameSite=Strict', 'Path=/', 'Max-Age=43200'];
+    if (process.env.NODE_ENV === 'production') attributes.push('Secure');
+    appendCookie(res, attributes.join('; '));
+}
+
+function clearTenantSession(res) {
+    const attributes = ['tenant_session=', 'HttpOnly', 'SameSite=Strict', 'Path=/', 'Max-Age=0'];
+    if (process.env.NODE_ENV === 'production') attributes.push('Secure');
+    appendCookie(res, attributes.join('; '));
+}
+
+function respondTenant(res, status, tenant) {
+    setTenantSession(res, tenant);
+    return res.status(status).json({ success: true, tenant: publicTenant(tenant) });
+}
+
 async function uniqueGoogleUsername(db, email) {
     const base = String(email || 'google-user').split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'google-user';
     for (let attempt = 0; attempt < 10; attempt++) {
@@ -42,12 +61,18 @@ module.exports = async function handler(req, res) {
     if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === "OPTIONS") return res.status(200).end();
 
-    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'auth')) {
+    if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'auth')) {
         return;
     }
 
     if (req.method === 'GET') {
-        const action = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams.get('action');
+        const action = new URL(req.url, 'http://localhost').searchParams.get('action');
+        if (action === 'public-config') {
+            return res.status(200).json({
+                registrationEnabled: registrationMode() === 'smtp',
+                googleSignInEnabled: Boolean(configuredClientId())
+            });
+        }
         if (action === 'google-config') {
             const clientId = configuredClientId();
             return clientId ? res.status(200).json({ clientId }) : res.status(503).json({ error: 'Google Sign-In is not configured' });
@@ -56,12 +81,23 @@ module.exports = async function handler(req, res) {
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+    let requestBody;
+    try { requestBody = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}; }
+    catch (_) { return res.status(400).json({ error: 'Invalid request body' }); }
+    if (requestBody.action === 'register' && registrationMode() !== 'smtp') {
+        return res.status(503).json({ error: 'Public registration is currently disabled' });
+    }
+    if (requestBody.action === 'logout') {
+        clearTenantSession(res);
+        return res.status(200).json({ success: true });
+    }
+
     const db = await connectToDatabase();
     if (!db) return res.status(503).json({ error: "Database is not configured" });
 
     try {
         if (req.method === "POST") {
-            const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+            const body = requestBody;
             const { action, username, password } = body;
 
             if (action === 'google') {
@@ -74,23 +110,34 @@ module.exports = async function handler(req, res) {
                 const profile = verified.profile;
                 const existingGoogle = await db.collection('tenants').findOne({ 'auth.google.sub': profile.sub });
                 if (existingGoogle) {
+                    if (existingGoogle.status === 'suspended') return res.status(403).json({ error: 'Account suspended. Please contact admin.' });
                     await db.collection('tenants').updateOne({ id: existingGoogle.id }, { $set: { 'auth.google.last_login_at': new Date().toISOString() } });
-                    return res.status(200).json({ success: true, tenant: publicTenant(existingGoogle) });
+                    return respondTenant(res, 200, existingGoogle);
                 }
 
                 // Do not bind a Google identity to a password account solely by email.
-                const existingEmail = await db.collection('tenants').findOne({ email: profile.email });
-                if (existingEmail) {
-                    const suppliedUsername = String(body.username || '').trim();
-                    if (suppliedUsername !== existingEmail.username || !passwordMatches(existingEmail, body.password)) {
+                const suppliedUsername = typeof body.username === 'string' ? body.username.trim().slice(0, 160) : '';
+                const suppliedPassword = typeof body.password === 'string' && body.password.length <= 256 ? body.password : '';
+                const emailAccountExists = await db.collection('tenants').findOne({ email: profile.email }, { projection: { id: 1 } });
+                if (emailAccountExists) {
+                    const existingEmail = suppliedUsername
+                        ? await db.collection('tenants').findOne({ email: profile.email, username: suppliedUsername })
+                        : null;
+                    const passwordCheck = await passwordMatches(existingEmail, suppliedPassword);
+                    if (!existingEmail || !passwordCheck.matches) {
                         return res.status(409).json({ error: 'This email already has an account. Enter its existing username and password, then choose Google again to link it.' });
                     }
+                    if (existingEmail.status === 'suspended') return res.status(403).json({ error: 'Account suspended. Please contact admin.' });
                     const now = new Date().toISOString();
                     const googleAuth = { sub: profile.sub, email: profile.email, email_verified: true, linked_at: now, last_login_at: now };
                     const updates = { 'auth.google': googleAuth };
-                    if (existingEmail.password === body.password && existingEmail.password !== hashPassword(body.password)) updates.password = hashPassword(body.password);
+                    if (passwordCheck.needsUpgrade) updates.password = await hashPassword(suppliedPassword, { enforcePolicy: false });
                     await db.collection('tenants').updateOne({ id: existingEmail.id }, { $set: updates });
-                    return res.status(200).json({ success: true, tenant: publicTenant({ ...existingEmail, auth: { google: googleAuth } }) });
+                    return respondTenant(res, 200, { ...existingEmail, auth: { google: googleAuth } });
+                }
+
+                if (registrationMode() !== 'smtp') {
+                    return res.status(503).json({ error: 'Public registration is currently disabled' });
                 }
 
                 const googleUsername = await uniqueGoogleUsername(db, profile.email);
@@ -114,30 +161,42 @@ module.exports = async function handler(req, res) {
                 } catch (_) {
                     return res.status(409).json({ error: 'Google account is already linked. Please sign in again.' });
                 }
-                return res.status(201).json({ success: true, tenant: publicTenant(newTenant) });
+                return respondTenant(res, 201, newTenant);
             }
 
             // 1. Register Action
             if (action === 'register') {
                 const { email } = body;
-                if (!username || !password) {
+                const normalizedUsername = typeof username === 'string' ? username.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+                const normalizedEmail = normalizeEmail(email);
+                if (!normalizedUsername || !password) {
                     return res.status(400).json({ error: "Username and Password are required" });
+                }
+                if (!passwordIsValid(password)) {
+                    return res.status(400).json({ error: 'Password must contain 12 to 256 characters' });
+                }
+                if (!normalizedEmail) {
+                    return res.status(400).json({ error: 'Valid email is required' });
+                }
+                const registrationGrant = readRegistrationGrant(req, normalizedEmail);
+                if (!registrationGrant) {
+                    return res.status(403).json({ error: 'Verify your email before registering' });
                 }
 
                 // Check unique username
-                const existing = await db.collection('tenants').findOne({ username });
+                const existing = await db.collection('tenants').findOne({ username: normalizedUsername });
                 if (existing) {
                     return res.status(400).json({ error: "Username already exists" });
                 }
 
-                const hashedPassword = hashPassword(password);
+                const hashedPassword = await hashPassword(password);
                 const newApiKey = 'sk_live_' + crypto.randomBytes(18).toString('hex');
                 
                 const newTenant = {
                     id: crypto.randomUUID(),
-                    company_name: username,
-                    username: username,
-                    email: email || '',
+                    company_name: normalizedUsername,
+                    username: normalizedUsername,
+                    email: normalizedEmail,
                     password: hashedPassword,
                     api_key: newApiKey,
                     status: 'pending',
@@ -147,38 +206,43 @@ module.exports = async function handler(req, res) {
                     created_at: new Date().toISOString()
                 };
 
+                let grantClaimed = false;
                 try {
+                    await db.collection('registration_grants').insertOne({ id: registrationGrant.nonce, email: normalizedEmail, expires_at: new Date(registrationGrant.expiresAt), created_at: new Date().toISOString() });
+                    grantClaimed = true;
                     await db.collection('tenants').insertOne(newTenant);
                 } catch (dbErr) {
-                    console.warn('[AUTH] MongoDB insertOne failed, ignoring for read-only DB:', dbErr.message);
+                    if (grantClaimed) await db.collection('registration_grants').deleteOne({ id: registrationGrant.nonce }).catch(() => { });
+                    if (dbErr && dbErr.code === 11000) return res.status(409).json({ error: 'This email verification or account has already been used' });
+                    console.warn('[AUTH] Registration failed:', dbErr.message);
+                    return res.status(503).json({ error: 'Unable to create account. Please try again.' });
                 }
 
-                return res.status(200).json({ success: true, tenant: publicTenant(newTenant) });
+                clearRegistrationGrant(res);
+                return respondTenant(res, 200, newTenant);
             }
 
             // 2. Login Action
             if (action === 'login') {
-                if (!username || !password) {
+                if (typeof username !== 'string' || !username.trim() || username.length > 160 || typeof password !== 'string' || !password || password.length > 256) {
                     return res.status(400).json({ error: "Username and Password are required" });
                 }
 
-                const tenant = await db.collection('tenants').findOne({ username });
+                const tenant = await db.collection('tenants').findOne({ username: username.trim() });
 
                 if (!tenant) {
                     return res.status(401).json({ error: "Invalid Username or Password" });
                 }
 
-                const hashMatch = tenant.password === hashPassword(password);
-                const plainMatch = tenant.password === password;
-
-                if (!plainMatch && !hashMatch) {
+                const passwordCheck = await passwordMatches(tenant, password);
+                if (!passwordCheck.matches) {
                     return res.status(401).json({ error: "Invalid Username or Password" });
                 }
                 
-                // Migrate old plain text password to hashed password automatically
-                if (plainMatch && !hashMatch) {
+                // Migrate old SHA-256/plaintext passwords after a valid login.
+                if (passwordCheck.needsUpgrade) {
                     try {
-                        const newHash = hashPassword(password);
+                        const newHash = await hashPassword(password, { enforcePolicy: false });
                         await db.collection('tenants').updateOne({ id: tenant.id }, { $set: { password: newHash } });
                     } catch (dbErr) {
                         console.warn('[AUTH] MongoDB updateOne failed, ignoring for read-only DB:', dbErr.message);
@@ -189,7 +253,7 @@ module.exports = async function handler(req, res) {
                     return res.status(403).json({ error: "Account suspended. Please contact admin." });
                 }
 
-                return res.status(200).json({ success: true, tenant: publicTenant(tenant) });
+                return respondTenant(res, 200, tenant);
             }
 
             return res.status(400).json({ error: "Invalid action" });
