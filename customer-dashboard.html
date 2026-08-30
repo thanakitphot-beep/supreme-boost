@@ -248,6 +248,15 @@
                     <span id="codeContent">กำลังโหลด...</span>
                 </div>
             </div>
+            <div class="card" style="margin-top:16px">
+                <div class="card-title"><i class="fa-solid fa-shield-halved"></i> เว็บไซต์ที่อนุญาตให้ใช้ Widget</div>
+                <p style="font-size:.82rem;color:var(--t2);margin-bottom:14px">ใส่ origin ของเว็บไซต์ที่นำโค้ดไปติดตั้ง เช่น <code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">https://shop.example.com</code> หนึ่งบรรทัดต่อหนึ่งโดเมน เพื่อป้องกันผู้อื่นนำ API key ไปใช้</p>
+                <div class="fg">
+                    <label class="fl">Allowed origins</label>
+                    <textarea class="fi" id="allowedOrigins" rows="3" placeholder="https://shop.example.com&#10;https://www.shop.example.com" style="resize:vertical;font-family:'JetBrains Mono',monospace;font-size:.78rem"></textarea>
+                </div>
+                <button class="btn btn-vl" onclick="saveAllowedOrigins()"><i class="fa-solid fa-floppy-disk"></i> บันทึกโดเมน</button>
+            </div>
         </div>
 
 
@@ -391,6 +400,8 @@
         document.getElementById('statPkg').textContent = (tenant.package_type || '—').toUpperCase();
         const exp = tenant.expires_at ? new Date(tenant.expires_at).toLocaleDateString('th-TH') : 'ไม่จำกัด';
         document.getElementById('statExpiry').textContent = exp;
+        const origins = document.getElementById('allowedOrigins');
+        if (origins) origins.value = (tenant.allowed_origins || []).join('\n');
     }
 
     updateTenantUI();
@@ -474,6 +485,25 @@
     function copyCode() {
         const code = document.getElementById('codeContent').textContent;
         navigator.clipboard.writeText(code).then(() => toast('คัดลอกโค้ดแล้ว! ✅', 'ok')).catch(() => toast('กรุณาคัดลอกด้วยมือ', 'err'));
+    }
+
+    async function saveAllowedOrigins() {
+        const allowed_origins = document.getElementById('allowedOrigins').value;
+        try {
+            const res = await fetch('/api/tenant?action=save_origins', {
+                method: 'POST',
+                headers: AUTH,
+                body: JSON.stringify({ allowed_origins })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'Unable to save website origins');
+            tenant.allowed_origins = data.allowed_origins;
+            localStorage.setItem('tenant_data', JSON.stringify(tenant));
+            updateTenantUI();
+            toast('บันทึกโดเมนแล้ว Widget ใช้งาน AI ได้ทันที ✅', 'ok');
+        } catch (e) {
+            toast('บันทึกโดเมนไม่สำเร็จ: ' + e.message, 'err');
+        }
     }
 
     // ---- Settings ----

@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const { connectToDatabase } = require('./_mongodb.js');
 const { setCorsHeaders } = require('../services/cors');
 const { checkRateLimit } = require('../services/rateLimit');
-const { tenantIsActive } = require('../services/tenantAccess');
+const { normalizeAllowedOrigins, tenantIsActive } = require('../services/tenantAccess');
 
 // Very basic authentication: For tenants, they pass `Bearer api_key_here`
 // In a real app we'd use JWT, but since they have their api_key in localStorage, we verify that.
@@ -68,6 +68,15 @@ module.exports = async function handler(req, res) {
 
         if (req.method === "POST") {
             const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+
+            if (action === 'save_origins') {
+                const allowedOrigins = normalizeAllowedOrigins(body.allowed_origins);
+                if (!allowedOrigins.length) {
+                    return res.status(400).json({ error: 'Add at least one valid HTTPS website origin' });
+                }
+                await db.collection('tenants').updateOne({ id: tenant.id }, { $set: { allowed_origins: allowedOrigins } });
+                return res.status(200).json({ success: true, allowed_origins: allowedOrigins });
+            }
 
             if (action === 'save_settings') {
                 const payload = {};
