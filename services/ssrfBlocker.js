@@ -1,33 +1,26 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
 
+const nonPublicAddresses = new net.BlockList();
+[
+    ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8],
+    ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.0.2.0', 24],
+    ['192.168.0.0', 16], ['198.18.0.0', 15], ['198.51.100.0', 24], ['203.0.113.0', 24],
+    ['224.0.0.0', 4], ['240.0.0.0', 4]
+].forEach(([address, prefix]) => nonPublicAddresses.addSubnet(address, prefix, 'ipv4'));
+[
+    ['::', 96], ['64:ff9b::', 96], ['64:ff9b:1::', 48], ['100::', 64],
+    ['2001::', 23], ['2001:db8::', 32], ['2002::', 16], ['fc00::', 7], ['fec0::', 10], ['fe80::', 10], ['ff00::', 8]
+].forEach(([address, prefix]) => nonPublicAddresses.addSubnet(address, prefix, 'ipv6'));
+
 function normalizeHostname(hostname) {
     return String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
 }
 
-function isPrivateIPv4(address) {
-    const octets = String(address).split('.').map(Number);
-    if (octets.length !== 4 || octets.some(octet => !Number.isInteger(octet) || octet < 0 || octet > 255)) return true;
-    const [first, second] = octets;
-    return first === 0 || first === 10 || first === 127 || first >= 224 ||
-        (first === 100 && second >= 64 && second <= 127) ||
-        (first === 169 && second === 254) ||
-        (first === 172 && second >= 16 && second <= 31) ||
-        (first === 192 && second === 168) ||
-        (first === 198 && (second === 18 || second === 19));
-}
-
-function isPrivateIPv6(address) {
-    const normalized = String(address).toLowerCase();
-    return normalized === '::' || normalized === '::1' || normalized.startsWith('::ffff:') ||
-        normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe8') ||
-        normalized.startsWith('fe9') || normalized.startsWith('fea') || normalized.startsWith('feb');
-}
-
 function isPublicAddress(address) {
     const family = net.isIP(address);
-    if (family === 4) return !isPrivateIPv4(address);
-    if (family === 6) return !isPrivateIPv6(address);
+    if (family === 4) return !nonPublicAddresses.check(address, 'ipv4');
+    if (family === 6) return !String(address).toLowerCase().startsWith('::ffff:') && !nonPublicAddresses.check(address, 'ipv6');
     return false;
 }
 
@@ -60,4 +53,4 @@ async function isSafeFetchUrl(urlStr) {
     }
 }
 
-module.exports = { isSafeFetchUrl, isSafeUrl };
+module.exports = { isPublicAddress, isSafeFetchUrl, isSafeUrl };

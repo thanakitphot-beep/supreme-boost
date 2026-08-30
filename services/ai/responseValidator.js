@@ -34,12 +34,39 @@ function safeParseJson(text) {
     }
 }
 
+function safeAction(action) {
+    if (!action || typeof action !== 'object') return null;
+    const type = String(action.type || '').toLowerCase();
+    if (type === 'handoff') {
+        return { type, priority: action.priority === 'high' ? 'high' : 'normal' };
+    }
+    if (type === 'speech' && typeof action.text === 'string') {
+        return { type, text: action.text.replace(/\s+/g, ' ').trim().slice(0, 500) };
+    }
+    return null;
+}
+
+function safeInteractive(interactive) {
+    if (!interactive || typeof interactive !== 'object' || interactive.type !== 'carousel' || !Array.isArray(interactive.items)) return null;
+    const items = interactive.items.slice(0, 8).map(item => {
+        if (!item || typeof item !== 'object') return null;
+        const title = String(item.title || item.name || item.label || '').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 120);
+        const subtitle = String(item.subtitle || item.description || '').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 240);
+        return title ? { title, subtitle, description: subtitle } : null;
+    }).filter(Boolean);
+    return items.length ? { type: 'carousel', items } : null;
+}
+
 function validateResponse(rawResponse, requestId) {
     logEvent('info', 'Validating response', { requestId });
     const parsed = safeParseJson(rawResponse);
     
     if (!parsed) {
-        logEvent('warn', 'Failed to parse JSON', { requestId, rawResponse: rawResponse.slice(0, 100) });
+        logEvent('warn', 'Failed to parse JSON', {
+            requestId,
+            responseType: typeof rawResponse,
+            responseLength: typeof rawResponse === 'string' ? rawResponse.length : 0
+        });
         return {
             isValid: false,
             error: 'Invalid JSON format',
@@ -57,17 +84,27 @@ function validateResponse(rawResponse, requestId) {
         };
     }
 
-    // Ensure metadata exists
-    parsed.metadata = parsed.metadata || {};
+    // Provider output cannot control CSS, navigation, plugin loading, or carry
+    // arbitrary metadata into the public API response.
+    const safeResponse = {
+        reply: parsed.reply.slice(0, 4000),
+        action: safeAction(parsed.action),
+        cssCommand: '',
+        interactive: safeInteractive(parsed.interactive),
+        metadata: {},
+        status: 'ok'
+    };
 
     return {
         isValid: true,
         error: null,
-        parsed
+        parsed: safeResponse
     };
 }
 
 module.exports = {
     validateResponse,
-    RESPONSE_SCHEMA
+    RESPONSE_SCHEMA,
+    safeAction,
+    safeInteractive
 };
