@@ -743,7 +743,7 @@ function searchUnified(knowledge, payload, prompt) {
     // Explicit navigation/page requests should resolve page knowledge before
     // fuzzy product matching. This prevents a product keyword from hijacking
     // requests such as “พาไปหน้าสมัครใช้งาน AI Chat Widget”.
-    const explicitPageIntent = /(?:พาไปหน้า|ไปหน้า|หน้าสมัคร|หน้าราคา|pricing|page|section|หัวข้อ|บทความ|นโยบาย)/iu.test(normalize(prompt));
+    const explicitPageIntent = /(?:พาไปหน้า|ไปหน้า|หน้าสมัคร|หน้าราคา|ราคา|แพ็กเกจ|pricing|page|section|หัวข้อ|บทความ|นโยบาย)/iu.test(normalize(prompt));
     if (explicitPageIntent) {
         const page = bestMatch(
             knowledge.pages,
