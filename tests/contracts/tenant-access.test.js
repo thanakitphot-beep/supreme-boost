@@ -1,4 +1,4 @@
-const { canonicalOrigin, firstPartyDemoAllowed, normalizeAllowedOrigins, tenantIsActive } = require('../../services/tenantAccess');
+const { canonicalOrigin, firstPartyDemoAllowed, normalizeAllowedOrigins, tenantAllowsOrigin, tenantIsActive } = require('../../services/tenantAccess');
 const customerAuth = require('../../api/customer-auth');
 
 function mockReq(overrides = {}) {
@@ -27,6 +27,7 @@ function mockRes() {
 describe('SaaS tenant origin access', () => {
     test('normalizes only exact HTTPS origins', () => {
         expect(canonicalOrigin('https://shop.example.com/')).toBe('https://shop.example.com');
+        expect(canonicalOrigin('http://localhost:3000')).toBe('http://localhost:3000');
         expect(canonicalOrigin('https://shop.example.com/path')).toBeNull();
         expect(canonicalOrigin('https://*.example.com')).toBeNull();
         expect(canonicalOrigin('https://shop.example.com?tenant=a')).toBeNull();
@@ -88,6 +89,14 @@ describe('Customer registration persistence', () => {
     test('reports a failed account write instead of claiming registration succeeded', async () => {
         const db = { collection: () => ({ insertOne: async () => { throw new Error('write failed'); } }) };
         await expect(customerAuth.__saveTenant(db, { id: 'tenant-1' })).resolves.toBe(false);
+    });
+
+    test('allows every valid origin until a tenant explicitly restricts its widget', () => {
+        const unrestricted = { allowed_origins: [] };
+        const restricted = { allowed_origins: ['https://shop.example.com'] };
+        expect(tenantAllowsOrigin(unrestricted, 'https://customer-site.example')).toBe(true);
+        expect(tenantAllowsOrigin(restricted, 'https://shop.example.com')).toBe(true);
+        expect(tenantAllowsOrigin(restricted, 'https://other-site.example')).toBe(false);
     });
 
     test('confirms a tenant only after MongoDB accepts the account', async () => {

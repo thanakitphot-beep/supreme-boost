@@ -250,7 +250,7 @@
             </div>
             <div class="card" style="margin-top:16px">
                 <div class="card-title"><i class="fa-solid fa-shield-halved"></i> เว็บไซต์ที่อนุญาตให้ใช้ Widget</div>
-                <p style="font-size:.82rem;color:var(--t2);margin-bottom:14px">ใส่ origin ของเว็บไซต์ที่นำโค้ดไปติดตั้ง เช่น <code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">https://shop.example.com</code> หนึ่งบรรทัดต่อหนึ่งโดเมน เพื่อป้องกันผู้อื่นนำ API key ไปใช้</p>
+                <p style="font-size:.82rem;color:var(--t2);margin-bottom:14px">ใช้ได้กับทุกเว็บไซต์ HTTPS และ <code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">localhost</code> สำหรับทดสอบโดยไม่ต้องกรอกช่องนี้ หากต้องการจำกัดการใช้งาน ให้ใส่ origin เช่น <code style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">https://shop.example.com</code> หนึ่งบรรทัดต่อหนึ่งโดเมน</p>
                 <div class="fg">
                     <label class="fl">Allowed origins</label>
                     <textarea class="fi" id="allowedOrigins" rows="3" placeholder="https://shop.example.com&#10;https://www.shop.example.com" style="resize:vertical;font-family:'JetBrains Mono',monospace;font-size:.78rem"></textarea>
@@ -500,7 +500,7 @@
             tenant.allowed_origins = data.allowed_origins;
             localStorage.setItem('tenant_data', JSON.stringify(tenant));
             updateTenantUI();
-            toast('บันทึกโดเมนแล้ว Widget ใช้งาน AI ได้ทันที ✅', 'ok');
+            toast(data.allowed_origins.length ? 'บันทึกโดเมนแล้ว Widget ใช้งาน AI ได้ทันที ✅' : 'เปิดใช้ Widget กับทุกเว็บไซต์แล้ว ✅', 'ok');
         } catch (e) {
             toast('บันทึกโดเมนไม่สำเร็จ: ' + e.message, 'err');
         }

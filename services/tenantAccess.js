@@ -6,7 +6,7 @@ const { isOriginAllowed, setCorsHeaders } = require('./cors');
 function canonicalOrigin(value) {
     try {
         const url = new URL(String(value || '').trim());
-        const localDevelopment = process.env.NODE_ENV !== 'production' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+        const localDevelopment = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
         if (!url.hostname || url.hostname.includes('*') || url.username || url.password || url.search || url.hash || (url.pathname && url.pathname !== '/')) return null;
         if (url.protocol === 'https:' || (url.protocol === 'http:' && localDevelopment)) return url.origin;
     } catch (_) { }
@@ -39,19 +39,36 @@ function firstPartyDemoAllowed(origin) {
     return Boolean(expectedOrigin && canonicalOrigin(origin) === expectedOrigin);
 }
 
-async function findActiveTenantForOrigin(origin) {
+function tenantAllowsOrigin(tenant, origin) {
     const canonical = canonicalOrigin(origin);
-    if (!canonical) return null;
+    if (!canonical) return false;
+    if (canonical === serviceOrigin()) return true;
+    const allowedOrigins = normalizeAllowedOrigins(tenant && tenant.allowed_origins);
+    return allowedOrigins.length === 0 || allowedOrigins.includes(canonical);
+}
+
+async function findActiveTenantForApiKey(apiKey) {
+    const key = String(apiKey || '').trim();
+    if (!key) return null;
     const db = await connectToDatabase();
     if (!db) return null;
-    const candidates = await db.collection('tenants').find({ allowed_origins: canonical }).toArray();
-    return candidates.find(tenantIsActive) || null;
+    const tenant = await db.collection('tenants').findOne({ api_key: key });
+    return tenantIsActive(tenant) ? tenant : null;
 }
 
 async function applyPluginCors(req, res) {
     if (setCorsHeaders(req, res)) return true;
     const origin = canonicalOrigin(req.headers.origin);
-    if (!origin || !await findActiveTenantForOrigin(origin)) return false;
+    if (!origin) return false;
+
+    // Browsers preflight before sending the API key. The POST is still checked
+    // against the active tenant before any response is exposed to the page.
+    if (req.method === 'OPTIONS') return setCorsHeaders(req, res, [origin]);
+    if (firstPartyDemoAllowed(origin)) return setCorsHeaders(req, res, [origin]);
+
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const tenant = await findActiveTenantForApiKey(body.apiKey || req.headers['x-api-key']);
+    if (!tenant || !tenantAllowsOrigin(tenant, origin)) return false;
     return setCorsHeaders(req, res, [origin]);
 }
 
@@ -71,8 +88,7 @@ async function authorizePluginRequest({ apiKey, origin }) {
 
     const canonical = canonicalOrigin(origin);
     if (tenantKeyRequired() && !canonical) return { error: 'Plugin requests must include a registered browser origin' };
-    const firstPartyOrigin = serviceOrigin();
-    if (canonical && canonical !== firstPartyOrigin && !normalizeAllowedOrigins(tenant.allowed_origins).includes(canonical)) {
+    if (canonical && !tenantAllowsOrigin(tenant, canonical)) {
         return { error: 'This website origin is not registered for the tenant' };
     }
     return { tenant };
@@ -82,8 +98,10 @@ module.exports = {
     applyPluginCors,
     authorizePluginRequest,
     canonicalOrigin,
+    findActiveTenantForApiKey,
     firstPartyDemoAllowed,
     normalizeAllowedOrigins,
     serviceOrigin,
+    tenantAllowsOrigin,
     tenantIsActive
 };

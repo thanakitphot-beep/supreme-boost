@@ -70,9 +70,12 @@ module.exports = async function handler(req, res) {
             const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
             if (action === 'save_origins') {
+                const rawOrigins = Array.isArray(body.allowed_origins)
+                    ? body.allowed_origins.join('\n').trim()
+                    : String(body.allowed_origins || '').trim();
                 const allowedOrigins = normalizeAllowedOrigins(body.allowed_origins);
-                if (!allowedOrigins.length) {
-                    return res.status(400).json({ error: 'Add at least one valid HTTPS website origin' });
+                if (rawOrigins && !allowedOrigins.length) {
+                    return res.status(400).json({ error: 'Add valid HTTPS origins without paths' });
                 }
                 await db.collection('tenants').updateOne({ id: tenant.id }, { $set: { allowed_origins: allowedOrigins } });
                 return res.status(200).json({ success: true, allowed_origins: allowedOrigins });

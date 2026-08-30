@@ -56,12 +56,17 @@ describe('Tenant allowed origins', () => {
         );
     });
 
-    test('rejects empty or malformed origin input instead of disabling all website access', async () => {
+    test('allows a tenant to remove restrictions but rejects malformed origin input', async () => {
+        const unrestricted = mockRes();
+        await tenantApi(mockReq({ body: { allowed_origins: '' } }), unrestricted);
+        expect(unrestricted._statusCode).toBe(200);
+        expect(unrestricted._body).toEqual({ success: true, allowed_origins: [] });
+
         const res = mockRes();
         await tenantApi(mockReq({ body: { allowed_origins: 'https://shop.example.com/path\nnot-a-url' } }), res);
 
         expect(res._statusCode).toBe(400);
-        expect(res._body.error).toBe('Add at least one valid HTTPS website origin');
-        expect(updateOne).not.toHaveBeenCalled();
+        expect(res._body.error).toBe('Add valid HTTPS origins without paths');
+        expect(updateOne).toHaveBeenCalledTimes(1);
     });
 });
