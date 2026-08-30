@@ -1,7 +1,7 @@
+import json
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import RLock
 
@@ -16,7 +16,7 @@ class Turn:
 class Conversation:
     summary: str = ""
     turns: list[Turn] = field(default_factory=list)
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class SummaryBufferMemory:
@@ -49,12 +49,12 @@ class SummaryBufferMemory:
         except (OSError, ValueError, TypeError):
             return
 
-        cutoff = datetime.now(timezone.utc) - self._retention
+        cutoff = datetime.now(UTC) - self._retention
         for record in records if isinstance(records, list) else []:
             try:
                 site_id = str(record["site_id"])[:120]
                 conversation_id = str(record["conversation_id"])[:120]
-                updated_at = datetime.fromisoformat(str(record["updated_at"]).replace("Z", "+00:00"))
+                updated_at = datetime.fromisoformat(str(record["updated_at"]))
                 if not site_id or not conversation_id or updated_at < cutoff:
                     continue
                 raw_turns = record.get("turns", [])
@@ -73,7 +73,7 @@ class SummaryBufferMemory:
         if self._storage_path is None:
             return
         self._storage_path.parent.mkdir(parents=True, exist_ok=True)
-        cutoff = datetime.now(timezone.utc) - self._retention
+        cutoff = datetime.now(UTC) - self._retention
         records = []
         for (site_id, conversation_id), conversation in self._conversations.items():
             if conversation.updated_at < cutoff:
@@ -112,9 +112,9 @@ class SummaryBufferMemory:
             if len(conversation.turns) > self._max_turns:
                 old_turns = conversation.turns[:-self._max_turns]
                 compact = " | ".join(f"{turn.role}: {turn.text}" for turn in old_turns)
-                conversation.summary = (f"{conversation.summary} | {compact}").strip(" | ")[-1000:]
+                conversation.summary = " | ".join(part for part in [conversation.summary, compact] if part)[-1000:]
                 conversation.turns = conversation.turns[-self._max_turns :]
-            conversation.updated_at = datetime.now(timezone.utc)
+            conversation.updated_at = datetime.now(UTC)
             self._persist()
             return conversation.summary
 

@@ -1,21 +1,5 @@
 // RAG & Knowledge Service — ใช้ Cohere Rerank เป็น AI Reranker
-
-async function generateEmbedding(text, apiKey) {
-    if (!apiKey) return null;
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=" + apiKey;
-    const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            model: "models/text-embedding-004",
-            content: { parts: [{ text: text }] }
-        })
-    });
-    
-    if (!res.ok) throw new Error("Gemini embedding failed");
-    const data = await res.json();
-    return data.embedding.values;
-}
+const { generateGeminiEmbedding: generateEmbedding } = require('./geminiEmbedding');
 
 // Basic deterministic scoring function (fallback if Cohere Reranker is unavailable)
 function scoreChunk(query, chunk) {
@@ -37,12 +21,14 @@ function scoreChunk(query, chunk) {
  */
 async function cohereRerank(query, chunks, cohereApiKey) {
     if (!cohereApiKey || chunks.length === 0) return null;
-    
+
+    const controller = new AbortController();
+    const timeoutMs = Math.min(10000, Math.max(2000, Number.parseInt(process.env.COHERE_RERANK_TIMEOUT_MS || '6000', 10) || 6000));
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const model = process.env.COHERE_RERANK_MODEL || 'rerank-v3.5';
-        const topN = parseInt(process.env.COHERE_RERANK_TOP_N || '5', 10);
-        
-        const documents = chunks.map(c => `${c.title || ''}: ${c.content || ''}`);
+        const topN = Math.min(10, Math.max(1, Number.parseInt(process.env.COHERE_RERANK_TOP_N || '5', 10) || 5));
+        const documents = chunks.slice(0, 16).map(c => `${String(c.title || '').slice(0, 160)}: ${String(c.content || '').slice(0, 4000)}`);
         
         const res = await fetch('https://api.cohere.com/v2/rerank', {
             method: 'POST',
@@ -57,12 +43,12 @@ async function cohereRerank(query, chunks, cohereApiKey) {
                 documents,
                 top_n: topN,
                 return_documents: false
-            })
+            }),
+            signal: controller.signal
         });
 
         if (!res.ok) {
-            const errText = await res.text().catch(() => '');
-            console.error('[Cohere Rerank Error]', res.status, errText.slice(0, 200));
+            console.error('[Cohere Rerank Error]', res.status);
             return null;
         }
 
@@ -72,6 +58,8 @@ async function cohereRerank(query, chunks, cohereApiKey) {
     } catch (err) {
         console.error('[Cohere Rerank Exception]', err.message);
         return null; // ถ้า Cohere ล้มเหลว จะ Fallback ไปใช้ scoreChunk แทน
+    } finally {
+        clearTimeout(timer);
     }
 }
 
@@ -145,7 +133,7 @@ async function getRagContext(supabase, tenantId, query, geminiApiKey) {
                 topChunks = chunks.slice(0, 5);
             }
             
-            return topChunks.map(c => `[Source: ${c.title || c.url}]\n${c.content}`).join('\n\n');
+            return topChunks.map(c => `[Source: ${String(c.title || c.url || '').slice(0, 160)}]\n${String(c.content || '').slice(0, 2400)}`).join('\n\n');
         }
     } catch (ragErr) {
         console.error("[RAG Error]", ragErr.message);

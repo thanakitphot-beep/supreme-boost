@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use INDICATOR in research, cite this software release."
+title: "INDICATOR Website Assistant"
+type: software
+authors:
+  - name: "INDICATOR Contributors"
+repository-code: "https://github.com/thanakitphot-beep/supreme-boost"
+version: 1.0.0
+date-released: 2026-08-28
+license: ISC

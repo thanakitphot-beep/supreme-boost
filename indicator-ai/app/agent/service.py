@@ -13,7 +13,6 @@ from app.domain.schemas import (
 from app.guardrails.grounding import enforce_grounding
 from app.memory.summary_buffer import SummaryBufferMemory
 from app.rag.evidence_store import InMemoryEvidenceStore
-from app.understanding.language import package_summary, relevant_excerpt
 from app.tools.catalog import (
     CONTEXT_PRODUCT_PREFIX,
     CatalogTool,
@@ -22,6 +21,7 @@ from app.tools.catalog import (
     is_recommendation,
     normalize,
 )
+from app.understanding.language import package_summary, relevant_excerpt
 
 try:  # The fallback keeps source-only checks usable before dependencies install.
     from langgraph.graph import END, START, StateGraph
