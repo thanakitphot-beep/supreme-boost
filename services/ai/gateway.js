@@ -10,6 +10,8 @@ class IndicatorAIGateway {
         ragContext,
         tools,
         userMessage,
+        pageContent,
+        siteDNA,
         metadata = {},
         runtimeOptions = {}
     }) {
@@ -23,6 +25,8 @@ class IndicatorAIGateway {
             ragContext,
             tools,
             userMessage,
+            pageContent,
+            siteDNA,
             requestId
         });
         

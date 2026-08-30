@@ -1,9 +1,9 @@
 const inMemoryStore = require('./inMemoryStore');
+const mongoStore = require('./mongoStore');
 
 class MemoryManager {
     constructor() {
-        // Prepare for future DB swapping via ENV
-        this.store = inMemoryStore;
+        this.store = process.env.MONGODB_URI ? mongoStore : inMemoryStore;
     }
 
     async getRecentMessages(conversationId, limit = 8) {

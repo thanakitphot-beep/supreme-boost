@@ -388,6 +388,8 @@ async function askBrain(payload, mergedHistory, requestId) {
         ragContext: appendBrainContext(payload),
         tools: toolRegistry.getAvailableTools(),
         userMessage: payload.prompt,
+        pageContent: payload.pageContent,
+        siteDNA: payload.siteDNA,
         metadata: { requestId },
         runtimeOptions: { model: tenantSettings.model, temperature: tenantSettings.temperature }
     });
@@ -415,7 +417,11 @@ async function runOwnedPipeline(payload, mergedHistory, requestId) {
     const intent = intentFor(payload.prompt);
     const deterministic = await runAgentWithResearch(payload);
 
-    if (isGroundedIntent(intent) || resultIsGrounded(deterministic)) {
+    // If deterministic search couldn't find a specific target (searchAll is true),
+    // let it fall through to the AI Brain so RAG (Semantic Search) can try to answer.
+    const isGenericSearch = deterministic && deterministic.action && deterministic.action.searchAll;
+
+    if (!isGenericSearch && (isGroundedIntent(intent) || resultIsGrounded(deterministic))) {
         return deterministic;
     }
 
@@ -654,6 +660,8 @@ async function handler(req, res) {
                 ragContext: appendBrainContext(payload),
                 tools: toolRegistry.getAvailableTools(),
                 userMessage: payload.prompt,
+                pageContent: payload.pageContent,
+                siteDNA: payload.siteDNA,
                 metadata: { requestId }
             }));
         }
