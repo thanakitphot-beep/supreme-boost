@@ -43,6 +43,7 @@ function tenantAllowsOrigin(tenant, origin) {
     const canonical = canonicalOrigin(origin);
     if (!canonical) return false;
     if (canonical === serviceOrigin()) return true;
+    if (process.env.INDICATOR_RESTRICT_WIDGET_ORIGINS !== 'true') return true;
     const allowedOrigins = normalizeAllowedOrigins(tenant && tenant.allowed_origins);
     return allowedOrigins.length === 0 || allowedOrigins.includes(canonical);
 }
@@ -61,14 +62,9 @@ async function applyPluginCors(req, res) {
     const origin = canonicalOrigin(req.headers.origin);
     if (!origin) return false;
 
-    // Browsers preflight before sending the API key. The POST is still checked
-    // against the active tenant before any response is exposed to the page.
-    if (req.method === 'OPTIONS') return setCorsHeaders(req, res, [origin]);
-    if (firstPartyDemoAllowed(origin)) return setCorsHeaders(req, res, [origin]);
-
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const tenant = await findActiveTenantForApiKey(body.apiKey || req.headers['x-api-key']);
-    if (!tenant || !tenantAllowsOrigin(tenant, origin)) return false;
+    // CORS only controls whether the browser may read the response. Reflect
+    // every valid web origin here; each endpoint authenticates the API key
+    // before performing tenant work.
     return setCorsHeaders(req, res, [origin]);
 }
 

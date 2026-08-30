@@ -1,4 +1,4 @@
-const { canonicalOrigin, firstPartyDemoAllowed, normalizeAllowedOrigins, tenantAllowsOrigin, tenantIsActive } = require('../../services/tenantAccess');
+const { applyPluginCors, canonicalOrigin, firstPartyDemoAllowed, normalizeAllowedOrigins, tenantAllowsOrigin, tenantIsActive } = require('../../services/tenantAccess');
 const customerAuth = require('../../api/customer-auth');
 
 function mockReq(overrides = {}) {
@@ -91,12 +91,56 @@ describe('Customer registration persistence', () => {
         await expect(customerAuth.__saveTenant(db, { id: 'tenant-1' })).resolves.toBe(false);
     });
 
-    test('allows every valid origin until a tenant explicitly restricts its widget', () => {
+    test('allows every valid origin regardless of a saved tenant allowlist', () => {
+        const previousRestriction = process.env.INDICATOR_RESTRICT_WIDGET_ORIGINS;
+        delete process.env.INDICATOR_RESTRICT_WIDGET_ORIGINS;
         const unrestricted = { allowed_origins: [] };
         const restricted = { allowed_origins: ['https://shop.example.com'] };
         expect(tenantAllowsOrigin(unrestricted, 'https://customer-site.example')).toBe(true);
         expect(tenantAllowsOrigin(restricted, 'https://shop.example.com')).toBe(true);
-        expect(tenantAllowsOrigin(restricted, 'https://other-site.example')).toBe(false);
+        expect(tenantAllowsOrigin(restricted, 'https://other-site.example')).toBe(true);
+        if (previousRestriction === undefined) delete process.env.INDICATOR_RESTRICT_WIDGET_ORIGINS;
+        else process.env.INDICATOR_RESTRICT_WIDGET_ORIGINS = previousRestriction;
+    });
+
+    test('supports explicit tenant-origin restrictions as an opt-in', () => {
+        const previousRestriction = process.env.INDICATOR_RESTRICT_WIDGET_ORIGINS;
+        process.env.INDICATOR_RESTRICT_WIDGET_ORIGINS = 'true';
+        const tenant = { allowed_origins: ['https://shop.example.com'] };
+        expect(tenantAllowsOrigin(tenant, 'https://shop.example.com')).toBe(true);
+        expect(tenantAllowsOrigin(tenant, 'https://other-site.example')).toBe(false);
+        if (previousRestriction === undefined) delete process.env.INDICATOR_RESTRICT_WIDGET_ORIGINS;
+        else process.env.INDICATOR_RESTRICT_WIDGET_ORIGINS = previousRestriction;
+    });
+
+    test('reflects arbitrary HTTPS origins before API-key authorization', async () => {
+        const previousStrict = process.env.ENFORCE_STRICT_CORS;
+        process.env.ENFORCE_STRICT_CORS = 'true';
+        const req = mockReq({
+            method: 'POST',
+            headers: { origin: 'https://new-customer.example' },
+            body: { apiKey: 'invalid-key' }
+        });
+        const res = mockRes();
+        await expect(applyPluginCors(req, res)).resolves.toBe(true);
+        expect(res._headers['access-control-allow-origin']).toBe('https://new-customer.example');
+        if (previousStrict === undefined) delete process.env.ENFORCE_STRICT_CORS;
+        else process.env.ENFORCE_STRICT_CORS = previousStrict;
+    });
+
+    test('allows preflight from an arbitrary HTTPS origin', async () => {
+        const previousStrict = process.env.ENFORCE_STRICT_CORS;
+        process.env.ENFORCE_STRICT_CORS = 'true';
+        const req = mockReq({
+            method: 'OPTIONS',
+            headers: { origin: 'https://another-customer.example' }
+        });
+        const res = mockRes();
+        await expect(applyPluginCors(req, res)).resolves.toBe(true);
+        expect(res._headers['access-control-allow-origin']).toBe('https://another-customer.example');
+        expect(res._headers['access-control-allow-methods']).toContain('POST');
+        if (previousStrict === undefined) delete process.env.ENFORCE_STRICT_CORS;
+        else process.env.ENFORCE_STRICT_CORS = previousStrict;
     });
 
     test('confirms a tenant only after MongoDB accepts the account', async () => {

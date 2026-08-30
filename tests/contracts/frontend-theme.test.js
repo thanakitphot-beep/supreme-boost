@@ -33,6 +33,19 @@ describe('Shared product visual system', () => {
         expect(source).toContain('siteKey: cfg.siteKey');
     });
 
+    test('widget does not expose or apply a page theme switch', () => {
+        const source = fs.readFileSync(path.resolve(__dirname, '../../src/widget/main.js'), 'utf8');
+        expect(source).not.toContain('data-action="theme"');
+        expect(source).not.toContain('supreme-boost-dark-page');
+        expect(source).not.toContain('getPref("theme")');
+    });
+
+    test('widget defaults to the public API when embedded on another domain', () => {
+        const source = fs.readFileSync(path.resolve(__dirname, '../../src/widget/main.js'), 'utf8');
+        expect(source).toContain('https://indicator-web-chat.onrender.com/api/chat');
+        expect(source).toContain('getAttr(s, "data-backend-url", DEFAULT_BACKEND_URL)');
+    });
+
     test('admin control center inline scripts compile', () => {
         const html = fs.readFileSync(path.resolve(__dirname, '../../admin-dashboard.html'), 'utf8');
         const scripts = [...html.matchAll(/<script>\s*([\s\S]*?)<\/script>/gi)].map(match => match[1]);

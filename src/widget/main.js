@@ -10,6 +10,7 @@
     var BRAIN_PHASE_CLASS = "sb-brain-phase";
     var DEFAULT_TITLE = "INDICATOR WEB CHAT";
     var DEFAULT_PRIMARY = "#667eea";
+    var DEFAULT_BACKEND_URL = "https://indicator-web-chat.onrender.com/api/chat";
     var MAX_PAGE_CHARS = 12000;
     var MAX_HISTORY = 8;
     var PAGE_TEXT_CLASS = "supreme-boost-large-text";
@@ -93,7 +94,7 @@
     function ready(cb) { if (document.readyState !== "loading") { cb(); return; } document.addEventListener("DOMContentLoaded", cb, { once: true }); setTimeout(cb, 2000); }
     function retry(fn, n) { if (n === void 0) n = INIT_RETRY_TIMES; var a = 0, go = function () { a++; try { if (document.body && fn()) return; } catch (e) { console.error("[SB] init", a, e); } if (a < n) setTimeout(go, INIT_RETRY_DELAY); else console.warn("[SB] init failed"); }; go(); }
     function getScript() { return _cs || document.querySelector('script[src*="boost.js"]'); }
-    function getConfig() { var s = getScript(), u = s && s.src ? new URL(s.src, document.baseURI) : null, b = u && u.origin !== "null" ? u.origin + "/api/chat" : "/api/chat"; var wc = window.IndicatorConfig || {}; var lm = (wc.lang || getAttr(s, "data-lang", "auto")).toLowerCase(); var themeKey = wc.theme || getAttr(s, "data-theme", ""); var themeMap = { "cyber-calm": "#6366f1", "modern-light": "#3b82f6", "dark-matrix": "#10b981" }; return { apiKey: wc.apiKey || getAttr(s, "data-api-key", ""), siteKey: wc.siteKey || getAttr(s, "data-site-key", ""), title: wc.title || getAttr(s, "data-title", DEFAULT_TITLE), greeting: wc.greeting || getAttr(s, "data-greeting", ""), shopPrompt: wc.shopPrompt || getAttr(s, "data-shop-prompt", ""), backendUrl: wc.backendUrl || getAttr(s, "data-backend-url", b), primary: normColor(wc.primaryColor || themeMap[themeKey] || getAttr(s, "data-primary", DEFAULT_PRIMARY)), position: String(wc.position || getAttr(s, "data-position", "right")).toLowerCase() === "left" ? "left" : "right", startOpen: String(wc.startOpen || getAttr(s, "data-open", "false")) === "true", langMode: lm === "auto" ? "auto" : normLocale(lm) }; }
+    function getConfig() { var s = getScript(), wc = window.IndicatorConfig || {}; var lm = (wc.lang || getAttr(s, "data-lang", "auto")).toLowerCase(); var themeKey = wc.theme || getAttr(s, "data-theme", ""); var themeMap = { "cyber-calm": "#6366f1", "modern-light": "#3b82f6", "dark-matrix": "#10b981" }; return { apiKey: wc.apiKey || getAttr(s, "data-api-key", ""), siteKey: wc.siteKey || getAttr(s, "data-site-key", ""), title: wc.title || getAttr(s, "data-title", DEFAULT_TITLE), greeting: wc.greeting || getAttr(s, "data-greeting", ""), shopPrompt: wc.shopPrompt || getAttr(s, "data-shop-prompt", ""), backendUrl: wc.backendUrl || getAttr(s, "data-backend-url", DEFAULT_BACKEND_URL), primary: normColor(wc.primaryColor || themeMap[themeKey] || getAttr(s, "data-primary", DEFAULT_PRIMARY)), position: String(wc.position || getAttr(s, "data-position", "right")).toLowerCase() === "left" ? "left" : "right", startOpen: String(wc.startOpen || getAttr(s, "data-open", "false")) === "true", langMode: lm === "auto" ? "auto" : normLocale(lm) }; }
     function normLocale(v) { var c = String(v || "").toLowerCase().split("-")[0]; return SUPPORTED_LOCALES.indexOf(c) !== -1 ? c : "en"; }
 
     // Global Geo-Locale Engine State
@@ -476,7 +477,6 @@
         init: function () {
             this._checkNetwork();
             this._netInterval = setInterval(this._checkNetwork.bind(this), 30000);
-            this._checkA11y();
         },
         _checkNetwork: function () {
             if (!navigator.connection) return;
@@ -505,17 +505,6 @@
                 if (!v.paused) v.pause();
                 v.removeAttribute('autoplay');
             });
-        },
-        _checkA11y: function () {
-            var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-            if (prefersDark) {
-                SessionDB.getPref("theme").then(function (t) {
-                    if (!t) {
-                        document.documentElement.classList.add("supreme-boost-dark-page");
-                        SessionDB.setPref("theme", "dark");
-                    }
-                });
-            }
         }
     };
 
@@ -756,7 +745,7 @@
             var whisperContainer = document.createElement("div"); whisperContainer.className = "sb-whisper-container";
             var whisper = document.createElement("div"); whisper.id = WIDGET_ID + "-whisper"; whisper.className = "sb-whisper";
             var panel = document.createElement("section"); panel.className = "sb-panel";
-            panel.innerHTML = '<div class="sb-header"><div style="display:flex;align-items:center;gap:8px;"><img src="/INDICATOR.png" alt="Logo" style="width:28px;height:28px;object-fit:cover;border-radius:50%;border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"><div><div class="sb-title">' + cfg.title + '</div><div class="sb-subtitle"></div></div></div><div class="sb-actions"><button class="sb-icon-btn" type="button" data-action="theme">\u25D0</button><button class="sb-icon-btn" type="button" data-action="close">\u00D7</button></div></div><div class="sb-messages"></div><div class="sb-quick"></div><form class="sb-compose"><textarea class="sb-input" rows="1"></textarea><button class="sb-voice-btn" type="button" style="background:transparent;border:0;cursor:pointer;font-size:18px;color:#64748b;padding:0 8px;transition:color 0.2s;" title="พูดด้วยเสียง">\uD83C\uDFA4</button><button class="sb-send" type="submit"></button></form>';
+            panel.innerHTML = '<div class="sb-header"><div style="display:flex;align-items:center;gap:8px;"><img src="/INDICATOR.png" alt="Logo" style="width:28px;height:28px;object-fit:cover;border-radius:50%;border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"><div><div class="sb-title">' + cfg.title + '</div><div class="sb-subtitle"></div></div></div><div class="sb-actions"><button class="sb-icon-btn" type="button" data-action="close">\u00D7</button></div></div><div class="sb-messages"></div><div class="sb-quick"></div><form class="sb-compose"><textarea class="sb-input" rows="1"></textarea><button class="sb-voice-btn" type="button" style="background:transparent;border:0;cursor:pointer;font-size:18px;color:#64748b;padding:0 8px;transition:color 0.2s;" title="พูดด้วยเสียง">\uD83C\uDFA4</button><button class="sb-send" type="submit"></button></form>';
             var orb = document.createElement("button"); orb.className = "sb-orb"; orb.type = "button";
 
             shadow.appendChild(whisperContainer);
@@ -775,7 +764,6 @@
             var input = panel.querySelector(".sb-input");
             var sendBtn = panel.querySelector(".sb-send");
             var closeBtn = panel.querySelector('[data-action="close"]');
-            var themeBtn = panel.querySelector('[data-action="theme"]');
             var voiceBtn = panel.querySelector(".sb-voice-btn");
 
             var state = { open: false, busy: false, selectedText: "", history: [], locale: normLocale(detectLocale()), conversationId: createConversationId() };
@@ -851,7 +839,7 @@
             InlineShelf.init();
             GuardianSystem.init();
 
-            var ui = { subtitle: subtitle, input: input, sendBtn: sendBtn, closeBtn: closeBtn, themeBtn: themeBtn, panel: panel };
+            var ui = { subtitle: subtitle, input: input, sendBtn: sendBtn, closeBtn: closeBtn, panel: panel };
             applyLocale(ui, state.locale, cfg);
             addMsg(messages, "assistant", greeting(cfg, state.locale));
             renderQuick(quick, input, sendMsg, state.locale);
@@ -870,11 +858,9 @@
 
             SessionDB.getPref("history").then(function (h) { if (Array.isArray(h)) state.history = h.slice(-MAX_HISTORY); });
             SessionDB.getPref("conversationId").then(function (id) { if (typeof id === "string" && id.length >= 12 && id.length <= 120) state.conversationId = id; else SessionDB.setPref("conversationId", state.conversationId); });
-            SessionDB.getPref("theme").then(function (t) { if (t === "dark") document.documentElement.classList.add("supreme-boost-dark-page"); });
 
             orb.addEventListener("click", function (e) { e.stopPropagation(); if (AmbientUI.isExpanded()) { setOpen(false); } else { setOpen(true); AmbientUI.setState("idle"); InteractiveWhisper.hide(); } });
             closeBtn.addEventListener("click", function (e) { e.stopPropagation(); setOpen(false); });
-            themeBtn.addEventListener("click", function () { document.documentElement.classList.toggle("supreme-boost-dark-page"); SessionDB.setPref("theme", document.documentElement.classList.contains("supreme-boost-dark-page") ? "dark" : "light"); });
             form.addEventListener("submit", function (e) { e.preventDefault(); sendMsg(input.value); });
             input.addEventListener("input", function () { autoGrow(input); });
             input.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); } });
@@ -1048,6 +1034,7 @@
         var to = setTimeout(function () { currentAbort.abort(); }, 12000);
         fetch(_cfg.backendUrl, {
             method: "POST", headers: { "Content-Type": "application/json" },
+            credentials: "omit", referrerPolicy: "no-referrer",
             body: JSON.stringify({ apiKey: _cfg.apiKey, siteKey: _cfg.siteKey, conversationId: _st.conversationId, prompt: overridePrompt || "", proactive: true, domSnapshot: snap, siteDNA: dna, pageContent: collectContent(), selectedText: "", history: [], url: location.href, title: document.title, locale: normLocale(_st.locale), hoverContext: snap._hoverContext || "" }),
             signal: currentAbort.signal
         }).then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; }).then(function (data) {
@@ -1071,6 +1058,7 @@
         try {
             var r = await fetch(cfg.backendUrl, {
                 method: "POST", headers: { "Content-Type": "application/json" },
+                credentials: "omit", referrerPolicy: "no-referrer",
                 body: JSON.stringify({ apiKey: cfg.apiKey, siteKey: cfg.siteKey, conversationId: state.conversationId, prompt: maskPII(prompt), pageContent: maskPII(collectContent()), siteDNA: dna, selectedText: maskPII(state.selectedText), history: maskHist(state.history), url: location.href, title: document.title, locale: normLocale(locale), domSnapshot: snap }),
                 signal: ctrl.signal
             });
@@ -1088,7 +1076,7 @@
         } finally { clearTimeout(to); }
     }
 
-    function applyLocale(ui, loc, cfg) { var s = t(loc); ui.subtitle.textContent = s.subtitle; ui.input.placeholder = s.placeholder; ui.input.setAttribute("aria-label", s.inputLabel); ui.sendBtn.textContent = s.send; ui.closeBtn.setAttribute("aria-label", s.closeChat); ui.themeBtn.setAttribute("aria-label", s.toggleTheme); var ro = document.getElementById(WIDGET_ID); if (ro && ro.shadowRoot) { var o = ro.shadowRoot.querySelector(".sb-orb"); if (o) o.setAttribute("aria-label", s.openChat); } }
+    function applyLocale(ui, loc, cfg) { var s = t(loc); ui.subtitle.textContent = s.subtitle; ui.input.placeholder = s.placeholder; ui.input.setAttribute("aria-label", s.inputLabel); ui.sendBtn.textContent = s.send; ui.closeBtn.setAttribute("aria-label", s.closeChat); var ro = document.getElementById(WIDGET_ID); if (ro && ro.shadowRoot) { var o = ro.shadowRoot.querySelector(".sb-orb"); if (o) o.setAttribute("aria-label", s.openChat); } }
     function renderQuick(c, inp, onPick, loc, rep) { if (rep) c.innerHTML = ""; var items = t(loc, "quick"); items.forEach(function (l) { var b = document.createElement("button"); b.type = "button"; b.className = "sb-chip"; b.textContent = l; b.addEventListener("click", function () { inp.value = l; onPick(l); }); c.appendChild(b); }); }
     function addMsg(c, role, text, load) { var m = document.createElement("div"); m.className = "sb-msg sb-" + role + (load ? " sb-loading" : ""); if (role === "assistant" && !load) { m.innerHTML = ""; var w = text.split(/(\s+)/); w.forEach(function (x, i) { if (!x) return; var s = document.createElement("span"); s.textContent = x; if (!/^\s+$/.test(x)) { s.style.opacity = "0"; s.style.display = "inline-block"; s.style.transform = "translateY(10px) scale(0.9)"; s.style.animation = "sbFloatWord 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards"; s.style.animationDelay = (i * 0.03) + "s"; } m.appendChild(s); }); } else { m.textContent = text; } c.appendChild(m); c.scrollTop = c.scrollHeight; return m; }
     function updateMsg(m, t, isFinal) { m.classList.remove("sb-loading"); if (m.classList.contains("sb-assistant") && isFinal) { m.innerHTML = ""; var w = t.split(/(\s+)/); w.forEach(function (x, i) { if (!x) return; var s = document.createElement("span"); s.textContent = x; if (!/^\s+$/.test(x)) { s.style.opacity = "0"; s.style.display = "inline-block"; s.style.transform = "translateY(10px) scale(0.9)"; s.style.animation = "sbFloatWord 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards"; s.style.animationDelay = (i * 0.03) + "s"; } m.appendChild(s); }); } else { m.textContent = t; } var p = m.parentElement; if (p) p.scrollTop = p.scrollHeight; }
@@ -1098,11 +1086,9 @@
 
     function localCmd(text, loc) {
         var v = String(text || "").toLowerCase(), h = document.documentElement, s = t(loc);
-        if (/(reset|รีเซ็ต|คืนค่า|กลับปกติ|恢复|重置|リセット)/i.test(v)) { h.classList.remove(PAGE_TEXT_CLASS, PAGE_SMALL_TEXT_CLASS, "supreme-boost-dark-page"); return { type: "reset", reply: s.reset }; }
+        if (/(reset|รีเซ็ต|คืนค่า|กลับปกติ|恢复|重置|リセット)/i.test(v)) { h.classList.remove(PAGE_TEXT_CLASS, PAGE_SMALL_TEXT_CLASS); return { type: "reset", reply: s.reset }; }
         if (/(ขยาย|ตัวใหญ่|เพิ่มขนาด|อ่านง่าย|bigger|large|zoom in|放大|読みやす)/i.test(v)) { h.classList.add(PAGE_TEXT_CLASS); h.classList.remove(PAGE_SMALL_TEXT_CLASS); return { type: "large-text", reply: s.largeText }; }
         if (/(ลดขนาด|ตัวเล็ก|เล็กลง|smaller|zoom out|缩小|文字を小)/i.test(v)) { h.classList.add(PAGE_SMALL_TEXT_CLASS); h.classList.remove(PAGE_TEXT_CLASS); return { type: "small-text", reply: s.smallText }; }
-        if (/(ธีมเข้ม|โหมดมืด|dark mode|dark|深色|ダーク)/i.test(v)) { h.classList.add("supreme-boost-dark-page"); return { type: "dark", reply: s.dark }; }
-        if (/(ธีมสว่าง|โหมดสว่าง|light mode|浅色|ライト)/i.test(v)) { h.classList.remove("supreme-boost-dark-page"); return { type: "light", reply: s.light }; }
         return null;
     }
     function mergeCmd(cmd, ai) { var r = String(ai || "").trim(); if (!cmd) return r; if (!r) return cmd.reply; return /(ปรับ|ขยาย|ลด|เปิด|เรียบร้อย|done|updated)/i.test(r) ? r : cmd.reply + "\n\n" + r; }
@@ -1791,7 +1777,6 @@
             "#" + WIDGET_ID + ".sb-expanded .sb-glow-base{opacity:0;transform:scale(3);}",
             "#" + WIDGET_ID + ".sb-nudge .sb-glow-base{opacity:1;animation:sbPulseRingHost 1.5s ease-in-out 3;}",
             "#" + WIDGET_ID + " .sb-aura{position:fixed;pointer-events:none;z-index:2147483645;border-radius:12px;box-shadow:0 0 30px var(--ai-glow, rgba(102,126,234,0.5)),inset 0 0 30px color-mix(in srgb,var(--ai-primary, #667eea) 25%,transparent),0 0 10px var(--ai-glow, rgba(102,126,234,0.5)),0 0 20px color-mix(in srgb,var(--ai-primary, #667eea) 25%,transparent),0 0 40px color-mix(in srgb,var(--ai-primary, #667eea) 10%,transparent);border:1px solid rgba(255,255,255,0.15);opacity:0;display:none;transition:opacity 0.6s cubic-bezier(0.22,1,0.36,1);}",
-            "html.supreme-boost-dark-page body{background:#0f172a!important;color:#e5e7eb!important;}",
             "html.supreme-boost-large-text body>:not(#" + WIDGET_ID + "){font-size:118%!important;line-height:1.75!important;}",
             "html.supreme-boost-small-text body>:not(#" + WIDGET_ID + "){font-size:94%!important;}",
             "@keyframes sbPulseRingHost{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.15);opacity:0.3}}",
