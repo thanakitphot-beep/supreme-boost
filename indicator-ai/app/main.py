@@ -1,8 +1,9 @@
+import secrets
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 
 from app.agent.service import GroundedChatService
 from app.core.config import get_settings
@@ -31,13 +32,24 @@ app = FastAPI(
 )
 
 
+def require_service_token(request: Request) -> None:
+    """Allow only the Node backend to call stateful intelligence routes."""
+
+    configured = (get_settings().service_token or "").encode("utf-8")
+    supplied = request.headers.get("X-Indicator-Service-Token", "").encode("utf-8")
+    if not configured:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service authentication is not configured")
+    if not secrets.compare_digest(configured, supplied):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid service token")
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     settings = get_settings()
     return {"status": "healthy", "rag_backend": settings.rag_backend, "mode": "evidence-first"}
 
 
-@app.post("/v1/knowledge/documents", response_model=IngestResponse, status_code=status.HTTP_202_ACCEPTED)
+@app.post("/v1/knowledge/documents", response_model=IngestResponse, status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(require_service_token)])
 async def ingest_documents(payload: IngestRequest, request: Request) -> IngestResponse:
     # The development store is deterministic. A production worker will validate,
     # chunk, embed, and upsert verified documents into Qdrant asynchronously.
@@ -45,12 +57,12 @@ async def ingest_documents(payload: IngestRequest, request: Request) -> IngestRe
     return IngestResponse(accepted=len(payload.documents))
 
 
-@app.post("/v1/chat", response_model=ChatResponse)
+@app.post("/v1/chat", response_model=ChatResponse, dependencies=[Depends(require_service_token)])
 async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
     return request.app.state.agent.respond(payload)
 
 
-@app.delete("/v1/conversations/{site_id}/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/v1/conversations/{site_id}/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_service_token)])
 async def forget_conversation(site_id: str, conversation_id: str, request: Request) -> Response:
     """Privacy control for deleting one browser-scoped conversation."""
 

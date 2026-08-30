@@ -66,6 +66,20 @@ function thaiPhraseScore(query, text) {
     return 0;
 }
 
+function cjkPhraseScore(query, text) {
+    const cjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu;
+    const compactQuery = (normalize(query).match(cjk) || []).join('');
+    const compactText = (normalize(text).match(cjk) || []).join('');
+    if (compactQuery.length < 2 || compactText.length < 2) return 0;
+    const maxLength = Math.min(10, compactQuery.length);
+    for (let length = maxLength; length >= 2; length--) {
+        for (let index = 0; index <= compactQuery.length - length; index++) {
+            if (compactText.includes(compactQuery.slice(index, index + length))) return 8 + length;
+        }
+    }
+    return 0;
+}
+
 function score(query, text, aliases = []) {
     const q = normalize(query);
     const candidates = [text, ...aliases].map(normalize).filter(Boolean);
@@ -83,7 +97,7 @@ function score(query, text, aliases = []) {
     if (phraseScore) return phraseScore;
 
     const wordScore = words(q).reduce((total, word) => total + (word.length >= 3 && all.includes(word) ? 10 : 0), 0);
-    return wordScore + thaiPhraseScore(q, all);
+    return wordScore + thaiPhraseScore(q, all) + cjkPhraseScore(q, all);
 }
 
 function safeText(value, max = 480) {
@@ -112,6 +126,41 @@ function safeSameOriginUrl(value, currentUrl) {
     } catch (_) {
         return currentUrl || '/';
     }
+}
+
+function tenantKnowledgePage(chunk, index, currentUrl) {
+    if (!chunk || typeof chunk !== 'object') return null;
+    const content = safeText(chunk.content, 1600);
+    if (!content) return null;
+
+    const title = safeText(chunk.title || 'Tenant knowledge', 220);
+    const source = safeText(chunk.source || chunk.url, 500);
+    let sourceUrl = '';
+    let actionUrl = '';
+    if (/^(?:https?:\/\/|\/)/i.test(source)) {
+        try {
+            const current = new URL(String(currentUrl || '/'), 'https://indicator.local');
+            const destination = new URL(source, current);
+            if (/^https?:$/i.test(destination.protocol)) {
+                sourceUrl = destination.origin === current.origin
+                    ? `${destination.pathname}${destination.search}${destination.hash}`
+                    : destination.href;
+                if (destination.origin === current.origin) actionUrl = sourceUrl;
+            }
+        } catch (_) { }
+    }
+
+    return {
+        id: safeText(chunk.id || `tenant-knowledge-${index + 1}`, 160),
+        title,
+        url: sourceUrl,
+        actionUrl,
+        sourceUrl,
+        sourceType: 'tenant_knowledge',
+        content,
+        keywords: [title, source].filter(Boolean),
+        confidence: Number.isFinite(chunk.score) ? Number(chunk.score) : 0
+    };
 }
 
 function normalizeRuntimeEntity(entity, index, currentUrl) {
@@ -287,6 +336,13 @@ function runtimeKnowledge(payload) {
     knowledge.pages = [...knowledge.pages, ...learned.pages];
     knowledge.catalog = [...knowledge.catalog, ...learned.catalog];
     knowledge.glossary = [...knowledge.glossary, ...learned.glossary];
+
+    const tenantPages = (Array.isArray(payload && payload.tenantKnowledge) ? payload.tenantKnowledge : [])
+        .map((chunk, index) => tenantKnowledgePage(chunk, index, payload && payload.url))
+        .filter(Boolean);
+    // Tenant-owned knowledge is considered before shared/static content, while
+    // the current page remains first below for live navigation accuracy.
+    knowledge.pages = [...tenantPages, ...knowledge.pages];
 
     const siteDNA = payload && payload.siteDNA && typeof payload.siteDNA === 'object' ? payload.siteDNA : {};
     const currentUrl = String(payload && payload.url || '/');
@@ -536,10 +592,12 @@ function bestProductMatch(items, prompt) {
 
 // Server-side short-term memory to preserve context better than client payload alone
 const memoryCache = new Map();
+const MAX_MEMORY_CONVERSATIONS = 1000;
 
 function recentHistory(payload) {
     const convId = payload && payload.conversationId ? String(payload.conversationId) : null;
-    let serverHistory = convId ? (memoryCache.get(convId) || []).slice() : [];
+    const serverMemoryEnabled = process.env.NODE_ENV !== 'production';
+    let serverHistory = serverMemoryEnabled && convId ? (memoryCache.get(convId) || []).slice() : [];
     const clientHistory = Array.isArray(payload && payload.history) ? payload.history : [];
 
     const merged = [...clientHistory, ...serverHistory].map(item => ({
@@ -559,20 +617,24 @@ function recentHistory(payload) {
         if (!last || last.role !== 'user' || last.text !== promptText) deduped.push({ role: 'user', text: promptText });
     }
 
-    if (convId) {
+    if (serverMemoryEnabled && convId) {
+        memoryCache.delete(convId);
         memoryCache.set(convId, deduped.slice(-MAX_CONTEXT_MESSAGES * 2));
+        while (memoryCache.size > MAX_MEMORY_CONVERSATIONS) memoryCache.delete(memoryCache.keys().next().value);
     }
     return deduped.slice(-MAX_CONTEXT_MESSAGES);
 }
 
 function updateServerMemory(conversationId, assistantReply) {
-    if (!conversationId) return;
+    if (!conversationId || process.env.NODE_ENV === 'production') return;
     let history = memoryCache.get(conversationId) || [];
     history.push({ role: 'assistant', text: safeText(assistantReply, 1000) });
     if (history.length > MAX_CONTEXT_MESSAGES * 2) {
         history = history.slice(-MAX_CONTEXT_MESSAGES * 2);
     }
+    memoryCache.delete(conversationId);
     memoryCache.set(conversationId, history);
+    while (memoryCache.size > MAX_MEMORY_CONVERSATIONS) memoryCache.delete(memoryCache.keys().next().value);
 }
 
 function productFromHistory(knowledge, payload) {
@@ -833,15 +895,18 @@ function findContent(knowledge, payload, prompt, matchedPage = null) {
     }
     const destination = `${page.url || '/'}${page.anchor ? `#${String(page.anchor).replace(/^#/, '')}` : ''}`;
     const pageTitle = ((page.headings && page.headings[0]) || page.title || '').replace(/^h[1-6]:/i, '');
+    const actionUrl = Object.prototype.hasOwnProperty.call(page, 'actionUrl') ? page.actionUrl : destination;
+    const source = { type: page.sourceType || (page.learned ? 'learned_public_page' : 'page'), id: page.id, title: safeText(page.title, 220) };
+    if (page.sourceUrl || destination) source.url = page.sourceUrl || destination;
     return base(`พบ "${pageTitle || page.title}" ครับ ผมพาไปยังจุดที่เกี่ยวข้องให้แล้ว`, {
-        action: actionFor({
+        action: actionUrl ? actionFor({
             title: pageTitle || page.title,
-            url: destination,
+            url: actionUrl,
             currentUrl: payload.url,
             keywords: (page.headings || []).map(h => String(h).replace(/^h[1-6]:/i, '')),
             permissions: payload.siteProfile && payload.siteProfile.permissions
-        }),
-        sources: [{ type: 'page', id: page.id, url: destination }]
+        }) : null,
+        sources: [source]
     });
 }
 
@@ -893,15 +958,18 @@ function answerFromWebsiteKnowledge(knowledge, payload, prompt) {
     const excerpt = excerptFor(page, prompt);
     if (!excerpt) return null;
     const destination = `${page.url || '/'}${page.anchor ? `#${String(page.anchor).replace(/^#/, '')}` : ''}`;
+    const actionUrl = Object.prototype.hasOwnProperty.call(page, 'actionUrl') ? page.actionUrl : destination;
+    const source = { type: page.sourceType || (page.learned ? 'learned_public_page' : 'page'), id: page.id, title: safeText(page.title, 220) };
+    if (page.sourceUrl || destination) source.url = page.sourceUrl || destination;
     return base(`จากหน้า “${page.title}”: ${excerpt}`, {
-        action: actionFor({
+        action: actionUrl ? actionFor({
             title: page.headings && page.headings[0] || page.title,
-            url: destination,
+            url: actionUrl,
             currentUrl: payload.url,
             keywords: page.headings || [],
             permissions: payload.siteProfile && payload.siteProfile.permissions
-        }),
-        sources: [{ type: page.learned ? 'learned_public_page' : 'page', id: page.id, url: destination }]
+        }) : null,
+        sources: [source]
     });
 }
 
@@ -917,6 +985,10 @@ function runIndicatorAgent(payload = {}) {
     const contextualProduct = productFromHistory(knowledge, payload);
     let intent = intentFor(prompt);
     const productMatch = bestProductMatch(knowledge.catalog, prompt);
+    const tenantKnowledgeAnswer = answerFromWebsiteKnowledge(knowledge, payload, prompt);
+    const hasTenantKnowledgeAnswer = tenantKnowledgeAnswer && tenantKnowledgeAnswer.sources &&
+        tenantKnowledgeAnswer.sources[0] && tenantKnowledgeAnswer.sources[0].type === 'tenant_knowledge';
+    const asksForContactFact = /(?:เบอร์โทร|หมายเลข|อีเมล|phone\s*(?:number)?|email)/iu.test(normalize(prompt));
     // A brand-only request such as "อยากได้ nike" is still a product request
     // when the brand occurs in the approved catalog.  Specific policy/article
     // wording remains a content request and is not overridden.
@@ -928,7 +1000,15 @@ function runIndicatorAgent(payload = {}) {
         intent = 'search_unified';
     }
     let result;
-    if (contextualProduct && asksAboutPreviousProduct(prompt)) {
+    if (
+        hasTenantKnowledgeAnswer &&
+        !productMatch &&
+        (['answer', 'search_unified', 'find_content', 'define_term'].includes(intent) || (intent === 'handoff' && asksForContactFact))
+    ) {
+        // A tenant's approved policy/FAQ is a stronger answer than a generic
+        // website-wide search. Its action remains constrained by source origin.
+        result = tenantKnowledgeAnswer;
+    } else if (contextualProduct && asksAboutPreviousProduct(prompt)) {
         result = explainProduct(contextualProduct, payload);
     } else switch (intent) {
         case 'recommend_products': result = recommendProducts(knowledge); break;

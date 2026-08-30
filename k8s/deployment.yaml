@@ -37,9 +37,15 @@ spec:
           limits:
             cpu: 1000m
             memory: 1Gi
+        startupProbe:
+          httpGet:
+            path: /api/v1/livez
+            port: 3000
+          periodSeconds: 5
+          failureThreshold: 30
         livenessProbe:
           httpGet:
-            path: /api/v1/health
+            path: /api/v1/livez
             port: 3000
           initialDelaySeconds: 15
           periodSeconds: 15
@@ -47,35 +53,10 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /api/v1/health
+            path: /api/v1/readyz
             port: 3000
           initialDelaySeconds: 5
           periodSeconds: 10
           timeoutSeconds: 3
           successThreshold: 1
           failureThreshold: 3
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: omega-jarvis-hpa
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: omega-jarvis
-  minReplicas: 3
-  maxReplicas: 20
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  - type: Resource
-    resource:
-      name: memory
-      target:
-        type: Utilization
-        averageUtilization: 80

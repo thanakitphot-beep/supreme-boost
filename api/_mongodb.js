@@ -44,4 +44,23 @@ async function connectToDatabase() {
     }
 }
 
-module.exports = { connectToDatabase };
+async function databaseIsReady() {
+    const db = await connectToDatabase();
+    if (!db) return false;
+    try {
+        await db.admin().command({ ping: 1 }, { maxTimeMS: positiveInteger(process.env.MONGODB_PING_TIMEOUT_MS, 2000) });
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+async function closeDatabase() {
+    const client = cachedClient || cachedConnection && await cachedConnection.catch(() => null);
+    cachedClient = null;
+    cachedConnection = null;
+    cachedDb = null;
+    if (client) await client.close();
+}
+
+module.exports = { closeDatabase, connectToDatabase, databaseIsReady };
