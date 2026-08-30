@@ -57,14 +57,14 @@ describe('SaaS tenant origin access', () => {
         else process.env.RENDER_EXTERNAL_URL = previousUrl;
     });
 
-    test('enables the first-party demo by default but permits an explicit opt-out', () => {
+    test('keeps the first-party demo available even when a legacy opt-out remains configured', () => {
         const previous = process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO;
         const previousUrl = process.env.RENDER_EXTERNAL_URL;
         delete process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO;
         process.env.RENDER_EXTERNAL_URL = 'https://indicator-web-chat.onrender.com';
         expect(firstPartyDemoAllowed('https://indicator-web-chat.onrender.com')).toBe(true);
         process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO = 'false';
-        expect(firstPartyDemoAllowed('https://indicator-web-chat.onrender.com')).toBe(false);
+        expect(firstPartyDemoAllowed('https://indicator-web-chat.onrender.com')).toBe(true);
         if (previous === undefined) delete process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO;
         else process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO = previous;
         if (previousUrl === undefined) delete process.env.RENDER_EXTERNAL_URL;
@@ -81,5 +81,17 @@ describe('Google Sign-In configuration', () => {
         expect(res._statusCode).toBe(503);
         if (previous === undefined) delete process.env.GOOGLE_CLIENT_ID;
         else process.env.GOOGLE_CLIENT_ID = previous;
+    });
+});
+
+describe('Customer registration persistence', () => {
+    test('reports a failed account write instead of claiming registration succeeded', async () => {
+        const db = { collection: () => ({ insertOne: async () => { throw new Error('write failed'); } }) };
+        await expect(customerAuth.__saveTenant(db, { id: 'tenant-1' })).resolves.toBe(false);
+    });
+
+    test('confirms a tenant only after MongoDB accepts the account', async () => {
+        const db = { collection: () => ({ insertOne: async () => ({ acknowledged: true }) }) };
+        await expect(customerAuth.__saveTenant(db, { id: 'tenant-1' })).resolves.toBe(true);
     });
 });

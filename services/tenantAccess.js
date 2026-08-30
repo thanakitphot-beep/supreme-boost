@@ -27,10 +27,16 @@ function tenantKeyRequired() {
     return process.env.REQUIRE_TENANT_API_KEY === 'true' || process.env.NODE_ENV === 'production';
 }
 
+function serviceOrigin() {
+    const configured = canonicalOrigin(process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL || process.env.PUBLIC_BASE_URL);
+    if (configured) return configured;
+    const name = String(process.env.RENDER_SERVICE_NAME || '').trim().toLowerCase();
+    return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(name) ? `https://${name}.onrender.com` : null;
+}
+
 function firstPartyDemoAllowed(origin) {
-    if (process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO === 'false') return false;
-    const serviceOrigin = canonicalOrigin(process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
-    return Boolean(serviceOrigin && canonicalOrigin(origin) === serviceOrigin);
+    const expectedOrigin = serviceOrigin();
+    return Boolean(expectedOrigin && canonicalOrigin(origin) === expectedOrigin);
 }
 
 async function findActiveTenantForOrigin(origin) {
@@ -65,8 +71,8 @@ async function authorizePluginRequest({ apiKey, origin }) {
 
     const canonical = canonicalOrigin(origin);
     if (tenantKeyRequired() && !canonical) return { error: 'Plugin requests must include a registered browser origin' };
-    const serviceOrigin = canonicalOrigin(process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
-    if (canonical && canonical !== serviceOrigin && !normalizeAllowedOrigins(tenant.allowed_origins).includes(canonical)) {
+    const firstPartyOrigin = serviceOrigin();
+    if (canonical && canonical !== firstPartyOrigin && !normalizeAllowedOrigins(tenant.allowed_origins).includes(canonical)) {
         return { error: 'This website origin is not registered for the tenant' };
     }
     return { tenant };
@@ -78,5 +84,6 @@ module.exports = {
     canonicalOrigin,
     firstPartyDemoAllowed,
     normalizeAllowedOrigins,
+    serviceOrigin,
     tenantIsActive
 };

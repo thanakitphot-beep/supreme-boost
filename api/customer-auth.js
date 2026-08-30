@@ -15,6 +15,15 @@ function passwordMatches(tenant, password) {
     return tenant.password === hashed || tenant.password === password;
 }
 
+async function saveTenant(db, tenant) {
+    try {
+        await db.collection('tenants').insertOne(tenant);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
 function publicTenant(tenant) {
     return {
         id: tenant.id,
@@ -147,10 +156,8 @@ module.exports = async function handler(req, res) {
                     created_at: new Date().toISOString()
                 };
 
-                try {
-                    await db.collection('tenants').insertOne(newTenant);
-                } catch (dbErr) {
-                    console.warn('[AUTH] MongoDB insertOne failed, ignoring for read-only DB:', dbErr.message);
+                if (!await saveTenant(db, newTenant)) {
+                    return res.status(503).json({ error: 'Could not save account. Please try again.' });
                 }
 
                 return res.status(200).json({ success: true, tenant: publicTenant(newTenant) });
@@ -201,3 +208,5 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+
+module.exports.__saveTenant = saveTenant;
