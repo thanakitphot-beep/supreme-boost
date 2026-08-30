@@ -92,11 +92,11 @@ module.exports = {
         return await db.collection('knowledge_chunks').find({ tenant_id: tenantId }).sort({ created_at: -1 }).toArray();
     },
 
-    deleteKnowledge: async (id) => {
+    deleteKnowledge: async (tenantId, id) => {
         const db = await connectToDatabase();
         if (!db) return false;
-        await db.collection('knowledge_chunks').deleteOne({ id });
-        return true;
+        const result = await db.collection('knowledge_chunks').deleteOne({ id, tenant_id: tenantId });
+        return result.deletedCount === 1;
     },
 
     deleteKnowledgeByUrl: async (tenantId, url) => {
@@ -185,7 +185,7 @@ module.exports = {
         if (!db) return false;
         await db.collection('otps').updateOne(
             { email },
-            { $set: { otp, expiresAt, created_at: new Date().toISOString() } },
+            { $set: { otp, attempts: 0, expiresAt: new Date(expiresAt), created_at: new Date().toISOString() } },
             { upsert: true }
         );
         return true;
@@ -195,6 +195,20 @@ module.exports = {
         const db = await connectToDatabase();
         if (!db) return null;
         return await db.collection('otps').findOne({ email });
+    },
+
+    consumeOtp: async (email, otp) => {
+        const db = await connectToDatabase();
+        if (!db) return { available: false, record: null };
+        const result = await db.collection('otps').findOneAndUpdate(
+            { email, expiresAt: { $gte: new Date() }, $or: [{ attempts: { $exists: false } }, { attempts: { $lt: 5 } }] },
+            { $inc: { attempts: 1 } },
+            { returnDocument: 'after' }
+        );
+        const record = result && Object.prototype.hasOwnProperty.call(result, 'value') ? result.value : result;
+        if (!record || record.otp !== otp) return { available: true, record: null };
+        const deleted = await db.collection('otps').deleteOne({ _id: record._id, otp, attempts: record.attempts });
+        return { available: true, record: deleted.deletedCount === 1 ? record : null };
     },
 
     deleteOtp: async (email) => {

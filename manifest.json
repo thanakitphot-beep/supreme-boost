@@ -1,11 +1,13 @@
 {
-  "name": "INDICATOR 2.0 Admin",
-  "short_name": "INDICATOR Admin",
-  "start_url": "/admin-login.html",
+  "name": "INDICATOR Website Platform",
+  "short_name": "INDICATOR",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#06b6d4",
-  "description": "INDICATOR WEB CHAT Backend Management",
+  "description": "Website assistant and customer management platform",
   "icons": [
     {
       "src": "/ICON.jpg",
