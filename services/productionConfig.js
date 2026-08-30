@@ -14,6 +14,18 @@ function exactHttpsOrigin(value) {
     }
 }
 
+function hasCharacterDiversity(value, minimumUnique) {
+    return new Set(String(value || '')).size >= minimumUnique;
+}
+
+function registrationMode(env = process.env) {
+    return String(env.REGISTRATION_MODE || 'disabled').trim().toLowerCase();
+}
+
+function handoffDeliveryMode(env = process.env) {
+    return String(env.HANDOFF_DELIVERY_MODE || 'contact_only').trim().toLowerCase();
+}
+
 function validateProductionConfig(env = process.env) {
     const errors = [];
     const warnings = [];
@@ -24,10 +36,28 @@ function validateProductionConfig(env = process.env) {
     requireValue('MONGODB_URI');
     requireValue('JWT_SECRET', 32);
     requireValue('ADMIN_PASSWORD', 12);
+    const jwtSecret = String(env.JWT_SECRET || '').trim();
+    const adminPassword = String(env.ADMIN_PASSWORD || '').trim();
+    if (configured(jwtSecret) && !hasCharacterDiversity(jwtSecret, 8)) errors.push('JWT_SECRET must be randomly generated');
+    if (configured(adminPassword) && !hasCharacterDiversity(adminPassword, 8)) errors.push('ADMIN_PASSWORD is too predictable');
+    if (configured(jwtSecret) && jwtSecret === adminPassword) errors.push('JWT_SECRET and ADMIN_PASSWORD must be different');
     requireValue('CORS_ALLOWED_ORIGINS');
-    requireValue('SMTP_HOST');
-    requireValue('SMTP_USER');
-    requireValue('SMTP_PASS');
+
+    if (![env.OPENAI_API_KEY, env.GEMINI_API_KEY, env.GROQ_API_KEY, env.API_KEY, env.LOCAL_AI_BASE_URL].some(configured)) {
+        errors.push('At least one AI provider must be configured');
+    }
+
+    const registration = registrationMode(env);
+    const handoff = handoffDeliveryMode(env);
+    if (!['disabled', 'smtp'].includes(registration)) errors.push('REGISTRATION_MODE must be disabled or smtp');
+    if (!['contact_only', 'smtp'].includes(handoff)) errors.push('HANDOFF_DELIVERY_MODE must be contact_only or smtp');
+    if (registration === 'smtp' || handoff === 'smtp') {
+        requireValue('SMTP_HOST');
+        requireValue('SMTP_USER');
+        requireValue('SMTP_PASS');
+    }
+    if (registration === 'disabled') warnings.push('Public registration is disabled');
+    if (handoff === 'contact_only') warnings.push('Handoff email delivery is disabled; requests remain in the support queue');
 
     const origins = String(env.CORS_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
     if (!origins.length || origins.some(origin => !exactHttpsOrigin(origin))) errors.push('CORS_ALLOWED_ORIGINS must contain exact HTTPS origins without wildcards or paths');
@@ -43,7 +73,8 @@ function validateProductionConfig(env = process.env) {
     if (!exactHttpsOrigin(publicUrl)) errors.push('PUBLIC_BASE_URL or RENDER_EXTERNAL_URL must be an exact HTTPS origin');
 
     const paymentMode = String(env.PAYMENT_MODE || '').toLowerCase();
-    if (!['stripe', 'slipok', 'both'].includes(paymentMode)) errors.push('PAYMENT_MODE must be stripe, slipok, or both for automatic billing');
+    if (!['manual', 'stripe', 'slipok', 'both'].includes(paymentMode)) errors.push('PAYMENT_MODE must be manual, stripe, slipok, or both');
+    if (paymentMode === 'manual') warnings.push('Payments require manual approval');
     if (['stripe', 'both'].includes(paymentMode)) {
         requireValue('STRIPE_SECRET_KEY', 12);
         requireValue('STRIPE_WEBHOOK_SECRET', 12);
@@ -58,7 +89,7 @@ function validateProductionConfig(env = process.env) {
         requireValue('SLIPOK_RECEIVER_ACCOUNT', 4);
     }
     if (env.NODE_ENV !== 'production') warnings.push('NODE_ENV is not production');
-    return { ok: errors.length === 0, errors, warnings };
+    return { ok: errors.length === 0, errors, warnings, modes: { registration, handoff, payment: paymentMode } };
 }
 
-module.exports = { exactHttpsOrigin, validateProductionConfig };
+module.exports = { exactHttpsOrigin, handoffDeliveryMode, registrationMode, validateProductionConfig };

@@ -3,6 +3,8 @@ const nodemailer = require('nodemailer');
 const { checkRateLimit } = require('../services/rateLimit');
 const { setCorsHeaders } = require('../services/cors');
 const { appendCookie, issueRegistrationGrant } = require('../services/registrationGrant');
+const { normalizeEmail } = require('../services/email');
+const { registrationMode } = require('../services/productionConfig');
 
 const { consumeOtp, saveOtp } = require('./_db.js');
 
@@ -70,18 +72,20 @@ const transporter = nodemailer.createTransport({
 module.exports = async function handler(req, res) {
     if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === "OPTIONS") return res.status(200).end();
+    if (registrationMode() !== 'smtp') return res.status(503).json({ error: 'Public registration is currently disabled' });
 
     if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'auth')) return;
 
     try {
         if (req.method === "POST") {
-            const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+            const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) || {};
             const { action, email, otp } = body;
+            const normalizedEmail = normalizeEmail(email);
 
-            if (!email) {
-                return res.status(400).json({ error: "Email is required" });
+            if (!normalizedEmail) {
+                return res.status(400).json({ error: "Valid email is required" });
             }
-            if (!await checkRateLimit(req, res, 'auth', { principal: `otp-email:${String(email).trim().toLowerCase()}`, limit: 5 })) return;
+            if (!await checkRateLimit(req, res, 'auth', { principal: `otp-email:${normalizedEmail}`, limit: 5 })) return;
 
             // 1. Request OTP
             if (action === 'request') {
@@ -91,14 +95,14 @@ module.exports = async function handler(req, res) {
                 // ลอง save ใน MongoDB ก่อน ถ้าล้มเหลว fallback ไปใช้ signed cookie
                 let savedToMongo = false;
                 try {
-                    savedToMongo = await saveOtp(email, generatedOtp, expiresAt);
+                    savedToMongo = await saveOtp(normalizedEmail, generatedOtp, expiresAt);
                 } catch (dbErr) {
                     console.warn('[OTP] MongoDB saveOtp failed, falling back to cookie:', dbErr.message);
                 }
 
                 if (!savedToMongo) {
                     if (process.env.NODE_ENV === 'production') return res.status(503).json({ error: 'OTP service is temporarily unavailable' });
-                    if (!setOtpChallenge(res, email, generatedOtp)) {
+                    if (!setOtpChallenge(res, normalizedEmail, generatedOtp)) {
                         return res.status(503).json({ error: "OTP service is temporarily unavailable. Please try again later." });
                     }
                 }
@@ -108,7 +112,7 @@ module.exports = async function handler(req, res) {
                     try {
                         await transporter.sendMail({
                             from: process.env.SMTP_FROM || `"INDICATOR WEB CHAT" <${process.env.SMTP_USER}>`,
-                            to: email,
+                            to: normalizedEmail,
                             subject: "รหัสยืนยันตัวตน (OTP) สำหรับการสมัครสมาชิก INDICATOR",
                             text: `รหัส OTP ของคุณคือ: ${generatedOtp}\n\nรหัสนี้จะหมดอายุภายใน 5 นาที\nหากคุณไม่ได้ทำการสมัครสมาชิก กรุณาเพิกเฉยต่ออีเมลฉบับนี้`,
                             html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; text-align: center;">
@@ -138,14 +142,14 @@ module.exports = async function handler(req, res) {
 
             // 2. Verify OTP
             if (action === 'verify') {
-                if (!otp) {
+                if (typeof otp !== 'string' || !/^\d{6}$/u.test(otp)) {
                     return res.status(400).json({ error: "OTP is required for verification" });
                 }
 
                 let mongoAvailable = false;
                 let mongoVerified = false;
                 try {
-                    const consumed = await consumeOtp(email, otp);
+                    const consumed = await consumeOtp(normalizedEmail, otp);
                     mongoAvailable = consumed.available;
                     mongoVerified = Boolean(consumed.record);
                 } catch (dbErr) {
@@ -157,13 +161,13 @@ module.exports = async function handler(req, res) {
                 }
                 if (!mongoAvailable) {
                     if (process.env.NODE_ENV === 'production') return res.status(503).json({ error: 'OTP service is temporarily unavailable' });
-                    if (!verifyOtpChallenge(req, email, otp)) {
+                    if (!verifyOtpChallenge(req, normalizedEmail, otp)) {
                         return res.status(400).json({ error: "Invalid or expired OTP. Please request a new one." });
                     }
                     clearOtpChallenge(res);
                 }
 
-                if (!issueRegistrationGrant(res, email)) {
+                if (!issueRegistrationGrant(res, normalizedEmail)) {
                     return res.status(503).json({ error: 'Registration verification is not configured' });
                 }
 

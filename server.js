@@ -1,14 +1,7 @@
 const http = require('http');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const keepAlive = require('./services/keepAlive');
-const { setCorsHeaders } = require('./services/cors');
-const { closeDatabase } = require('./api/_mongodb');
-
-// ─── Metrics and Rate Limiter ───
-const { requestCounter } = require('./api/v1/health.js');
-const { checkRateLimit } = require('./services/rateLimit.js');
-// ──────────────────────────────────────
 
 function loadEnv() {
     const envFile = path.join(__dirname, '.env');
@@ -26,18 +19,48 @@ function loadEnv() {
                 } else if (val.startsWith("'") && val.endsWith("'")) {
                     val = val.slice(1, -1);
                 }
-                if (key && val) process.env[key] = val;
+                if (key && val && process.env[key] === undefined) process.env[key] = val;
             }
         });
     } catch (err) {
-        console.warn('⚠️  .env file not found — API Keys will not be available.');
+        console.log('Local .env file not found; using the process environment.');
     }
 }
-loadEnv();
+if (require.main === module && process.env.NODE_ENV !== 'test') loadEnv();
 
+const { setCorsHeaders } = require('./services/cors');
+const { closeDatabase } = require('./api/_mongodb');
+const { requestCounter, setDraining } = require('./api/v1/health.js');
+const { checkRateLimit } = require('./services/rateLimit.js');
+const { releaseInfo } = require('./services/release');
 const chatHandler = require('./api/chat.js');
 const crawlHandler = require('./api/crawl.js');
 const adminHandler = require('./api/admin.js');
+const healthHandler = require('./api/v1/health.js');
+
+const API_HANDLERS = {
+    '/api/chat': chatHandler,
+    '/api/v1/chat': chatHandler,
+    '/api/crawl': crawlHandler,
+    '/api/handoff': require('./api/handoff.js'),
+    '/api/admin': adminHandler,
+    '/api/checkout': require('./api/checkout.js'),
+    '/api/stripe-webhook': require('./api/stripe-webhook.js'),
+    '/api/geo': require('./api/geo.js'),
+    '/api/tenant': require('./api/tenant.js'),
+    '/api/auth': require('./api/auth.js'),
+    '/api/customer-auth': require('./api/customer-auth.js'),
+    '/api/otp': require('./api/otp.js'),
+    '/api/knowledge': require('./api/knowledge.js'),
+    '/api/knowledge/text': require('./api/knowledge.js'),
+    '/api/knowledge/crawl': require('./api/knowledge.js'),
+    '/api/knowledge/search': require('./api/knowledge.js'),
+    '/api/v1/health': healthHandler,
+    '/api/v1/livez': require('./api/v1/livez.js'),
+    '/api/v1/readyz': require('./api/v1/readyz.js'),
+    '/metrics': healthHandler,
+    '/api/v1/memory': require('./api/v1/memory.js')
+};
 
 const MIME = {
     '.html': 'text/html; charset=utf-8',
@@ -58,7 +81,11 @@ const MIME = {
 
 const PUBLIC_STATIC_PREFIXES = ['/supreme-boost/', '/styles/'];
 const PRIVATE_STATIC_PREFIXES = ['/api/', '/data/', '/docs/', '/indicator-ai/', '/k8s/', '/services/', '/src/', '/tests/'];
-const PUBLIC_ROOT_FILES = new Set(['/robots.txt', '/sitemap.xml', '/ICON.jpg']);
+const PUBLIC_ROOT_FILES = new Set([
+    '/robots.txt', '/sitemap.xml', '/manifest.json', '/ICON.jpg', '/INDICATOR.png',
+    '/index.html', '/pricing.html', '/admin-dashboard.html', '/admin-login.html',
+    '/customer-dashboard.html', '/customer-login.html'
+]);
 const PUBLIC_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf']);
 
 function isPublicStaticPath(pathname) {
@@ -66,11 +93,10 @@ function isPublicStaticPath(pathname) {
     if (pathname.startsWith('/.')) return false;
     if (PRIVATE_STATIC_PREFIXES.some(prefix => pathname.startsWith(prefix))) return false;
     if (PUBLIC_ROOT_FILES.has(pathname)) return true;
-    if (/^\/[a-z0-9_-]+\.html$/i.test(pathname)) return true;
     if (PUBLIC_STATIC_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
         return ['.js', '.css', ...PUBLIC_IMAGE_EXTENSIONS].includes(path.extname(pathname).toLowerCase());
     }
-    return PUBLIC_IMAGE_EXTENSIONS.has(path.extname(pathname).toLowerCase());
+    return false;
 }
 
 function serveStatic(req, res, pathname) {
@@ -145,7 +171,17 @@ function wrapRes(res) {
     return wrapper;
 }
 
-// ─── Shared handler used by both Vercel Lambda and local server ──
+function setSecurityHeaders(res, apiResponse = false) {
+    res.setHeader('Content-Security-Policy', "object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), microphone=()');
+    if (process.env.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    if (apiResponse) res.setHeader('Cache-Control', 'no-store');
+}
+
+// Shared handler for the Node.js server and compatible function runtimes.
 async function handleRequest(req, res) {
     // ✅ FIX 8: ใช้ WHATWG URL API แทน url.parse() ที่ deprecated
     let parsedUrl;
@@ -157,19 +193,42 @@ async function handleRequest(req, res) {
     const pathname = parsedUrl.pathname;
     req.query = Object.fromEntries(parsedUrl.searchParams.entries());
     const tenantCorsRoute = ['/api/chat', '/api/v1/chat', '/api/crawl', '/api/handoff'].includes(pathname);
+    const corsProtectedRoute = pathname.startsWith('/api/') || pathname === '/metrics';
+    setSecurityHeaders(res, corsProtectedRoute);
 
-    // Request Tracing & Metrics
-    req.id = req.headers['x-request-id'] || Math.random().toString(36).substring(2, 15);
+    // Request tracing uses a bounded caller ID or a cryptographically random ID.
+    const callerRequestId = String(req.headers['x-request-id'] || '');
+    req.id = /^[A-Za-z0-9._:-]{1,128}$/u.test(callerRequestId) ? callerRequestId : crypto.randomUUID();
     res.setHeader('X-Request-ID', req.id);
+    res.setHeader('Access-Control-Expose-Headers', 'X-Request-ID');
     if (requestCounter) requestCounter.total++;
+    const startedAt = process.hrtime.bigint();
+    if (typeof res.once === 'function') {
+        res.once('finish', () => {
+            const status = Number(res.statusCode || 200);
+            if (requestCounter) requestCounter[status < 500 ? 'success' : 'error']++;
+            if (process.env.NODE_ENV !== 'test') {
+                const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+                console.log(JSON.stringify({
+                    event: 'http_request',
+                    request_id: req.id,
+                    method: req.method,
+                    path: pathname,
+                    status,
+                    duration_ms: Number(durationMs.toFixed(1)),
+                    release: releaseInfo().commit
+                }));
+            }
+        });
+    }
 
-    if (!setCorsHeaders(req, res) && req.headers.origin && !tenantCorsRoute) {
+    if (!setCorsHeaders(req, res) && req.headers.origin && corsProtectedRoute && !tenantCorsRoute) {
         res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: 'Origin is not allowed' }));
         return;
     }
 
-    if (req.method === 'OPTIONS' && !tenantCorsRoute) {
+    if (req.method === 'OPTIONS' && corsProtectedRoute && !tenantCorsRoute) {
         res.writeHead(204);
         res.end();
         return;
@@ -188,35 +247,10 @@ async function handleRequest(req, res) {
     const rateLimitedRoute = pathname.startsWith('/api/') || pathname === '/metrics';
     if (rateLimitedRoute && !probeRoute) {
         if (!await checkRateLimit(req, wrapRes(res), routeType)) {
-            if (requestCounter) requestCounter.error++;
             return;
         }
         req._rateLimitChecked = true;
     }
-
-    const API_HANDLERS = {
-        '/api/chat': chatHandler,
-        '/api/v1/chat': chatHandler, // New v1 endpoint
-        '/api/crawl': crawlHandler,
-        '/api/handoff': require('./api/handoff.js'),
-        '/api/admin': adminHandler,
-        '/api/checkout': require('./api/checkout.js'),
-        '/api/stripe-webhook': require('./api/stripe-webhook.js'),
-        '/api/geo': require('./api/geo.js'),
-        '/api/tenant': require('./api/tenant.js'),
-        '/api/auth': require('./api/auth.js'),
-        '/api/customer-auth': require('./api/customer-auth.js'),
-        '/api/otp': require('./api/otp.js'),
-        '/api/knowledge': require('./api/knowledge.js'),
-        '/api/knowledge/text': require('./api/knowledge.js'),
-        '/api/knowledge/crawl': require('./api/knowledge.js'),
-        '/api/knowledge/search': require('./api/knowledge.js'),
-        '/api/v1/health': require('./api/v1/health.js'),
-        '/api/v1/livez': require('./api/v1/livez.js'),
-        '/api/v1/readyz': require('./api/v1/readyz.js'),
-        '/metrics': require('./api/v1/health.js'),
-        '/api/v1/memory': require('./api/v1/memory.js')
-    };
 
     const handler = API_HANDLERS[pathname];
     if (handler) {
@@ -234,33 +268,18 @@ async function handleRequest(req, res) {
         return serveStatic(req, res, '/login');
     }
 
-    const extmap = { 
-        '.html': 'text/html', 
-        '.js': 'application/javascript', 
-        '.css': 'text/css',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.png': 'image/png',
-        '.svg': 'image/svg+xml',
-        '.json': 'application/json'
-    };
     const ext = path.extname(pathname).toLowerCase();
-    if (ext && extmap[ext] && isPublicStaticPath(pathname)) {
-        const filePath = path.join(__dirname, pathname);
-        if (fs.existsSync(filePath)) {
-            res.writeHead(200, { 'Content-Type': extmap[ext] });
-            return res.end(fs.readFileSync(filePath));
-        }
-    }
+    if (ext && MIME[ext] && isPublicStaticPath(pathname)) return serveStatic(req, res, pathname);
 
     // Default 404
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
 }
 
-// ─── On Vercel, export the handler ──
+// Export the request handler for tests and compatible function runtimes.
 module.exports = handleRequest;
 module.exports.__isPublicStaticPath = isPublicStaticPath;
+module.exports.__setSecurityHeaders = setSecurityHeaders;
 
 // ─── Local dev: create HTTP server ──
 if (require.main === module) {
@@ -268,16 +287,16 @@ if (require.main === module) {
     const HOSTNAME = '0.0.0.0';
 
     const server = http.createServer((req, res) => {
-        let body = '';
+        const chunks = [];
         let bodySize = 0;
         let bodyTooLarge = false;
         req.on('data', chunk => {
             bodySize += chunk.length;
-            if (bodySize > 1_000_000) {
+            if (bodySize > 1_600_000) {
                 bodyTooLarge = true;
                 return;
             }
-            body += chunk;
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
         });
         req.on('end', () => {
             if (bodyTooLarge) {
@@ -285,8 +304,8 @@ if (require.main === module) {
                 res.end(JSON.stringify({ error: 'Request body too large' }));
                 return;
             }
-            req.rawBody = body;
-            try { req.body = JSON.parse(body); }
+            req.rawBody = Buffer.concat(chunks);
+            try { req.body = JSON.parse(req.rawBody.toString('utf8')); }
             catch { req.body = {}; }
             Promise.resolve(handleRequest(req, res)).catch(() => {
                 if (!res.headersSent) {
@@ -309,13 +328,15 @@ if (require.main === module) {
         console.log(`🔑 Cohere:  ${process.env.COHERE_API_KEY  ? '✅' : '❌ Missing'}`);
         console.log(`\nPress Ctrl+C to stop\n`);
 
-        // เปิด Keep-Alive เพื่อป้องกัน Render Free Plan Sleep
-        keepAlive.start();
     });
 
+    let shuttingDown = false;
     const shutdown = () => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        setDraining(true);
         server.close(() => closeDatabase().catch(() => {}).finally(() => process.exit(0)));
-        setTimeout(() => process.exit(1), 10_000).unref();
+        setTimeout(() => process.exit(1), 30_000).unref();
     };
     process.once('SIGTERM', shutdown);
     process.once('SIGINT', shutdown);

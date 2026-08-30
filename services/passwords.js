@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const SCRYPT_PREFIX = 'scrypt';
 const SCRYPT_KEY_LENGTH = 64;
 const MIN_PASSWORD_LENGTH = 12;
+const MAX_PASSWORD_LENGTH = 256;
 
 function timingSafeEqual(left, right) {
     const leftBuffer = Buffer.from(String(left || ''), 'utf8');
@@ -22,7 +23,7 @@ function scrypt(password, salt) {
 }
 
 function passwordIsValid(password) {
-    return typeof password === 'string' && password.length >= MIN_PASSWORD_LENGTH;
+    return typeof password === 'string' && password.length >= MIN_PASSWORD_LENGTH && password.length <= MAX_PASSWORD_LENGTH;
 }
 
 async function hashPassword(password, { enforcePolicy = true } = {}) {
@@ -62,6 +63,7 @@ function generateInitialPassword() {
 
 module.exports = {
     MIN_PASSWORD_LENGTH,
+    MAX_PASSWORD_LENGTH,
     generateInitialPassword,
     hashPassword,
     passwordIsValid,

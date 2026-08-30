@@ -2,10 +2,12 @@ const crypto = require('crypto');
 const { Readable } = require('stream');
 const { incrementBoundedCounter } = require('../../services/mongoCounter');
 const rateLimit = require('../../services/rateLimit');
-const { activateBillingRequest, verifyStripeSignature } = require('../../services/billing');
+const { activateBillingRequest, CHECKOUT_LOCK_STATUSES, verifyStripeSignature } = require('../../services/billing');
+const { __rejectBillingRequest: rejectBillingRequest, __knowledgeDeleteFilter: knowledgeDeleteFilter } = require('../../api/admin');
 const checkout = require('../../api/checkout');
 const stripeWebhook = require('../../api/stripe-webhook');
-const { validateProductionConfig } = require('../../services/productionConfig');
+const { handoffDeliveryMode, registrationMode, validateProductionConfig } = require('../../services/productionConfig');
+const { parseImageDataUrl } = require('../../services/imageData');
 
 function getPath(document, path) {
     return path.split('.').reduce((value, key) => value && value[key], document);
@@ -18,6 +20,10 @@ function incrementPath(document, path, amount) {
         if (index === keys.length - 1) cursor[key] = Number(cursor[key] || 0) + amount;
         else cursor = cursor[key] ||= {};
     });
+}
+
+function matchesQuery(item, query) {
+    return Object.entries(query).every(([key, value]) => value && value.$in ? value.$in.includes(item[key]) : item[key] === value);
 }
 
 class CounterCollection {
@@ -41,18 +47,19 @@ class CounterCollection {
 
 function billingDb() {
     const data = {
-        billing_requests: [{ id: 'request-1', tenant_id: 'tenant-1', package_type: 'Pro Matrix', provider: 'slipok', status: 'verified' }],
+        billing_requests: [{ id: 'request-1', tenant_id: 'tenant-1', package_type: 'Pro Matrix', provider: 'slipok', status: 'verified', slip_base64: 'data:image/png;base64,proof', checkout_key: 'stripe-open:tenant-1' }],
         tenants: [{ id: 'tenant-1', status: 'pending', package_type: 'none' }]
     };
     return {
         data,
         collection(name) {
             return {
-                async findOne(query) { return data[name].find(item => Object.entries(query).every(([key, value]) => item[key] === value)) || null; },
+                async findOne(query) { return data[name].find(item => matchesQuery(item, query)) || null; },
                 async updateOne(query, update) {
-                    const item = data[name].find(candidate => Object.entries(query).every(([key, value]) => candidate[key] === value));
+                    const item = data[name].find(candidate => matchesQuery(candidate, query));
                     if (!item) return { matchedCount: 0, modifiedCount: 0 };
                     Object.assign(item, update.$set || {});
+                    Object.keys(update.$unset || {}).forEach(key => delete item[key]);
                     return { matchedCount: 1, modifiedCount: 1 };
                 }
             };
@@ -87,6 +94,15 @@ describe('Horizontal scaling counters', () => {
 });
 
 describe('Billing integrity', () => {
+    test('accepts only image data URLs whose bytes match their declared type', () => {
+        const png = Buffer.from('89504e470d0a1a0a00000000', 'hex');
+        const parsed = parseImageDataUrl(`data:image/png;base64,${png.toString('base64')}`);
+        expect(parsed).toMatchObject({ mimeType: 'image/png', bytes: png.length });
+        expect(parseImageDataUrl('https://evil.example/slip.png')).toBeNull();
+        expect(parseImageDataUrl('data:image/png;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+')).toBeNull();
+        expect(parseImageDataUrl(`data:image/jpeg;base64,${png.toString('base64')}`)).toBeNull();
+    });
+
     test('verifies Stripe signatures over the unchanged raw body and rejects tampering', () => {
         const secret = 'whsec_test_secret';
         const now = Date.now();
@@ -106,11 +122,30 @@ describe('Billing integrity', () => {
         expect(tenant.package_type).toBe('pro');
         expect(tenant.expires_at).toBeTruthy();
         expect(db.data.billing_requests[0].status).toBe('paid');
+        expect(db.data.billing_requests[0].slip_base64).toBeUndefined();
+        expect(db.data.billing_requests[0].checkout_key).toBeUndefined();
+    });
+
+    test('removes uploaded slip evidence when an admin rejects a billing request', async () => {
+        const db = billingDb();
+        db.data.billing_requests[0].status = 'pending';
+        const result = await rejectBillingRequest(db, 'request-1');
+        expect(result.modifiedCount).toBe(1);
+        expect(db.data.billing_requests[0]).toMatchObject({ status: 'rejected' });
+        expect(db.data.billing_requests[0].slip_base64).toBeUndefined();
     });
 
     test('uses one open Stripe checkout lock per tenant across all plans and time windows', () => {
         expect(checkout.__stripeCheckoutKey('tenant-1')).toBe('stripe-open:tenant-1');
         expect(checkout.__stripeCheckoutKey('tenant-1')).not.toContain('starter');
+        expect(checkout.__stripeIdempotencyKey('request-1')).toBe('indicator-checkout-request-1');
+        expect(checkout.__stripeIdempotencyKey('request-1')).not.toBe(checkout.__stripeIdempotencyKey('request-2'));
+        expect(checkout.__stripeErrorDefinitelyHasNoSession(400, 'invalid_request_error', 'parameter_missing')).toBe(true);
+        expect(checkout.__stripeErrorDefinitelyHasNoSession(400, 'idempotency_error', 'idempotency_key_in_use')).toBe(false);
+        expect(checkout.__stripeErrorDefinitelyHasNoSession(409, 'invalid_request_error', '')).toBe(false);
+        expect(checkout.__stripeErrorDefinitelyHasNoSession(429, 'rate_limit_error', '')).toBe(false);
+        expect(checkout.__stripeErrorDefinitelyHasNoSession(500, 'api_error', '')).toBe(false);
+        expect(CHECKOUT_LOCK_STATUSES).toEqual(expect.arrayContaining(['creating_checkout', 'recovering_checkout', 'checkout_started']));
     });
 
     test('transactional activation refuses to overwrite another active Stripe subscription', async () => {
@@ -165,13 +200,55 @@ describe('Billing integrity', () => {
     });
 });
 
+describe('Admin knowledge management', () => {
+    test('deletes every chunk for a grouped tenant source without accepting query objects', () => {
+        expect(knowledgeDeleteFilter({ tenant_id: 'tenant-1', url: 'https://shop.example/help' }, 'chunk-1')).toEqual({
+            tenant_id: 'tenant-1',
+            url: 'https://shop.example/help'
+        });
+        expect(knowledgeDeleteFilter({ tenant_id: 'tenant-1', url: { $ne: '' } }, 'chunk-1')).toEqual({ id: 'chunk-1' });
+    });
+});
+
 describe('Production configuration gate', () => {
+    test('accepts a hardened free-preview configuration without SMTP or payment secrets', () => {
+        const result = validateProductionConfig({
+            NODE_ENV: 'production',
+            MONGODB_URI: 'mongodb+srv://db.example/test',
+            JWT_SECRET: 'preview-JWT_4f8pX2qL9mN6vK3sR7tW1zC5',
+            ADMIN_PASSWORD: 'Admin-Preview-4827',
+            OPENAI_API_KEY: 'sk-preview-provider-key',
+            CORS_ALLOWED_ORIGINS: 'https://preview.example.com',
+            PUBLIC_BASE_URL: 'https://api.example.com',
+            ENFORCE_STRICT_CORS: 'true',
+            REQUIRE_TENANT_API_KEY: 'true',
+            INDICATOR_STRICT_SITE_ORIGIN: 'true',
+            INDICATOR_ALLOW_FIRST_PARTY_DEMO: 'false',
+            INDICATOR_FILE_LEARNING: 'false',
+            TRUST_PROXY_HEADERS: 'true',
+            REGISTRATION_MODE: 'disabled',
+            HANDOFF_DELIVERY_MODE: 'contact_only',
+            PAYMENT_MODE: 'manual'
+        });
+        expect(result).toMatchObject({
+            ok: true,
+            errors: [],
+            modes: { registration: 'disabled', handoff: 'contact_only', payment: 'manual' }
+        });
+        expect(result.warnings).toEqual(expect.arrayContaining([
+            'Public registration is disabled',
+            'Handoff email delivery is disabled; requests remain in the support queue',
+            'Payments require manual approval'
+        ]));
+    });
+
     test('accepts a complete dual-provider production configuration', () => {
         const result = validateProductionConfig({
             NODE_ENV: 'production',
             MONGODB_URI: 'mongodb+srv://db.example/test',
-            JWT_SECRET: 'j'.repeat(40),
-            ADMIN_PASSWORD: 'a'.repeat(16),
+            JWT_SECRET: 'dual-JWT_8pR2mK5vX9qL3sN7tW4zC6fH',
+            ADMIN_PASSWORD: 'Admin-Dual-5938',
+            GEMINI_API_KEY: 'gemini-provider-key',
             CORS_ALLOWED_ORIGINS: 'https://app.example.com,https://admin.example.com',
             PUBLIC_BASE_URL: 'https://api.example.com',
             ENFORCE_STRICT_CORS: 'true',
@@ -203,5 +280,31 @@ describe('Production configuration gate', () => {
         expect(result.ok).toBe(false);
         expect(result.errors.join(' ')).toContain('CORS_ALLOWED_ORIGINS');
         expect(result.errors.join(' ')).toContain('PAYMENT_MODE');
+    });
+
+    test('rejects unknown registration and handoff delivery modes', () => {
+        const result = validateProductionConfig({ REGISTRATION_MODE: 'open', HANDOFF_DELIVERY_MODE: 'discard' });
+        expect(result.errors.join(' ')).toContain('REGISTRATION_MODE');
+        expect(result.errors.join(' ')).toContain('HANDOFF_DELIVERY_MODE');
+    });
+
+    test('normalizes delivery modes and defaults to fail-closed behavior', () => {
+        expect(registrationMode({ REGISTRATION_MODE: ' SMTP ' })).toBe('smtp');
+        expect(handoffDeliveryMode({ HANDOFF_DELIVERY_MODE: ' SMTP ' })).toBe('smtp');
+        expect(registrationMode({})).toBe('disabled');
+        expect(handoffDeliveryMode({})).toBe('contact_only');
+    });
+
+    test('compares runtime signing secrets after trimming whitespace', () => {
+        const secret = 'Preview-Secret_4f8pX2qL9mN6vK3sR7tW1';
+        const result = validateProductionConfig({ JWT_SECRET: ` ${secret}`, ADMIN_PASSWORD: `${secret} ` });
+        expect(result.errors.join(' ')).toContain('must be different');
+    });
+
+    test('rejects predictable signing secrets and a missing AI provider', () => {
+        const result = validateProductionConfig({ JWT_SECRET: 'x'.repeat(40), ADMIN_PASSWORD: 'a'.repeat(16) });
+        expect(result.errors.join(' ')).toContain('randomly generated');
+        expect(result.errors.join(' ')).toContain('too predictable');
+        expect(result.errors.join(' ')).toContain('AI provider');
     });
 });

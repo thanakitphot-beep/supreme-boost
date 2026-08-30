@@ -8,21 +8,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script>
-        if (!localStorage.getItem('admin_token')) {
-            window.location.href = '/admin-login.html';
-        }
         async function fetchAPI(action, method='GET', body=null) {
-            const token = localStorage.getItem('admin_token');
-            const authHeader = token.startsWith('Bearer ') ? token : 'Bearer ' + token;
-            const opts = { method, headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' } };
+            const opts = { method, headers: { 'Content-Type': 'application/json' } };
             if (body) opts.body = JSON.stringify(body);
             const res = await fetch(`/api/admin?action=${action}`, opts);
+            if (res.status === 401) {
+                window.location.replace('/admin-login.html');
+                throw new Error('Admin session expired');
+            }
             if (res.status === 404) {
                 document.body.innerHTML = `<div style="padding:50px;text-align:center;color:white;font-family:'Prompt',sans-serif;background:#0f172a;min-height:100vh">
                     <i class="fa-solid fa-triangle-exclamation" style="font-size:4rem;color:#f43f5e;margin-bottom:20px"></i>
-                    <h1 style="font-size:2rem;margin-bottom:10px">ระบบไม่รองรับ Static Hosting (เช่น Netlify ปกติ)</h1>
-                    <p style="font-size:1.1rem;color:#cbd5e1">คุณจำเป็นต้อง Deploy โปรเจกต์นี้บน <b>Vercel</b> หรือเซิร์ฟเวอร์ที่รองรับ Node.js API<br>เนื่องจากระบบต้องใช้ Server-side Functions ในการจัดการ AI และฐานข้อมูล</p>
-                    <a href="https://vercel.com/new" target="_blank" style="display:inline-block;margin-top:20px;padding:12px 24px;background:white;color:black;text-decoration:none;border-radius:8px;font-weight:bold">🚀 Deploy to Vercel</a>
+                    <h1 style="font-size:2rem;margin-bottom:10px">ระบบนี้ไม่รองรับ Static Hosting</h1>
+                    <p style="font-size:1.1rem;color:#cbd5e1">โปรดเปิดจาก Render หรือเซิร์ฟเวอร์ที่รัน Node.js API และเชื่อมต่อฐานข้อมูลได้</p>
+                    <a href="https://render.com" rel="noopener noreferrer" target="_blank" style="display:inline-block;margin-top:20px;padding:12px 24px;background:white;color:black;text-decoration:none;border-radius:8px;font-weight:bold">เปิด Render</a>
                 </div>`;
                 throw new Error("404 API Not Found - Static Hosting Detected");
             }
@@ -748,10 +747,10 @@
             <div id="mt-aictl" style="display:none">
                 <div style="background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(6,182,212,.04));border:1px solid rgba(124,58,237,.15);border-radius:12px;padding:16px;margin-bottom:16px">
                     <p style="font-size:.68rem;font-weight:700;color:var(--v3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px"><i class="fa-solid fa-robot" style="margin-right:5px"></i> ปรับจูน AI เฉพาะลูกค้ารายนี้</p>
-                    <div class="fg"><label class="fl">AI Model</label><select id="m-ai-model" class="fi fi-sel"><option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash (เร็ว, ประหยัด)</option><option value="gemini-2.5-pro">💎 Gemini 2.5 Pro (ฉลาดที่สุด)</option><option value="gemini-2.0-flash">🔮 Gemini 2.0 Flash</option></select></div>
+                    <div class="fg"><label class="fl">AI Model</label><select id="m-ai-model" class="fi fi-sel"><option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash (เร็ว, ประหยัด)</option><option value="gemini-2.5-pro">💎 Gemini 2.5 Pro (ฉลาดที่สุด)</option></select></div>
                     <div class="fg">
                         <label class="fl">Temperature (ความสร้างสรรค์) — <span id="m-temp-val">0.7</span></label>
-                        <input type="range" id="m-ai-temp" min="0" max="2" step="0.1" value="0.7" class="fi" style="padding:4px 0;cursor:pointer" oninput="document.getElementById('m-temp-val').textContent=this.value">
+                        <input type="range" id="m-ai-temp" min="0" max="1" step="0.1" value="0.7" class="fi" style="padding:4px 0;cursor:pointer" oninput="document.getElementById('m-temp-val').textContent=this.value">
                         <div style="display:flex;justify-content:space-between;font-size:.62rem;color:var(--t3);margin-top:2px"><span>🎯 แม่นยำ (0.0)</span><span>🎨 สร้างสรรค์ (2.0)</span></div>
                     </div>
                     <div class="fg" style="margin-bottom:0"><label class="fl">System Prompt (บุคลิก AI)</label><textarea id="m-ai-prompt" class="fi" rows="5" style="resize:vertical;font-size:.8rem;line-height:1.6" placeholder="เช่น: คุณคือ AI ผู้ช่วยฝ่ายขายของร้าน XYZ มีบุคลิกเป็นมิตร พูดภาษาไทย และตอบอย่างกระชับ..."></textarea></div>
@@ -760,17 +759,7 @@
             </div>
             <!-- EMBED -->
             <div id="mt-embed" style="display:none">
-                <!-- Customer Dashboard Link -->
-                <div style="background:linear-gradient(135deg,rgba(6,182,212,.08),rgba(139,92,246,.06));border:1px solid rgba(6,182,212,.2);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
-                    <div>
-                        <div style="font-size:.82rem;font-weight:700;color:var(--t1);margin-bottom:3px;"><i class="fa-solid fa-gauge-high" style="color:var(--c2);margin-right:6px"></i>แดชบอร์ดลูกค้า</div>
-                        <div style="font-size:.7rem;color:var(--t3)">เปิดหน้า Dashboard ของลูกค้ารายนี้ (สามารถดูและแก้ไขการตั้งค่าของลูกค้าคนนี้เท่านั้น)</div>
-                    </div>
-                    <button onclick="openCustomerDashboard()" class="btn btn-sm" style="background:linear-gradient(135deg,#0891b2,#7c3aed);color:#fff;white-space:nowrap;flex-shrink:0;box-shadow:0 4px 12px rgba(8,145,178,.3)">
-                        <i class="fa-solid fa-arrow-up-right-from-square"></i> เปิด Dashboard
-                    </button>
-                </div>
-                <div class="fg"><label class="fl"><i class="fa-solid fa-link" style="margin-right:5px;color:var(--v3)"></i>Backend API URL (ปล่อยว่างเพื่อใช้โดเมนปัจจุบัน)</label><input type="text" id="m-backend-url" class="fi" placeholder="https://your-api.vercel.app" oninput="updateEmbedCode()"></div>
+                <div class="fg"><label class="fl"><i class="fa-solid fa-link" style="margin-right:5px;color:var(--v3)"></i>Backend API URL (ปล่อยว่างเพื่อใช้โดเมนปัจจุบัน)</label><input type="text" id="m-backend-url" class="fi" placeholder="https://your-service.onrender.com" oninput="updateEmbedCode()"></div>
                 <!-- Format Selector -->
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
                     <button onclick="setEmbedFmt('smart',this)" class="btn btn-sm btn-vl" style="font-size:.7rem;padding:5px 12px" id="efmt-smart">⚡ Smart Async (แนะนำ)</button>
@@ -811,7 +800,8 @@ function toast(msg,t='info'){
     const w=document.getElementById('twrap'),el=document.createElement('div');
     const ics={success:'fa-circle-check',error:'fa-circle-exclamation',info:'fa-circle-info'};
     el.className=`toast t-${t==='success'?'ok':t==='error'?'err':'info'}`;
-    el.innerHTML=`<i class="fa-solid ${ics[t]}"></i><span>${msg}</span>`;
+    const icon=document.createElement('i'),text=document.createElement('span');
+    icon.className=`fa-solid ${ics[t]||ics.info}`;text.textContent=String(msg||'');el.append(icon,text);
     w.appendChild(el);
     setTimeout(()=>{el.style.opacity='0';el.style.transform='translateX(40px)';el.style.transition='.28s';setTimeout(()=>el.remove(),300)},3500);
 }
@@ -853,15 +843,21 @@ function doRefresh(){
     setTimeout(()=>{ic.style.transform='';ic.style.transition=''},520);
     sw(id);
 }
-function logout(){localStorage.removeItem('admin_token');window.location.href='/admin-login.html'}
+function logout(){fetch('/api/admin?action=logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).finally(()=>{window.location.href='/admin-login.html'})}
 function printDashboard(){window.print()}
 function safeHtml(value){const d=document.createElement('div');d.textContent=String(value||'');return d.innerHTML}
+function safeInlineArg(value){return encodeURIComponent(String(value||'')).replace(/'/g,'%27')}
+function safeImageDataUrl(value){const text=String(value||'');return text.length<=1400000&&/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/u.test(text)?text:''}
+function openSafeImage(value){const image=safeImageDataUrl(value);if(image)window.open(image,'_blank','noopener,noreferrer')}
+function javascriptLiteral(value){return JSON.stringify(String(value||'')).replace(/</g,'\\u003c').replace(/>/g,'\\u003e')}
+function exactHttpOrigin(value){try{const url=new URL(String(value||''),window.location.origin);return ['http:','https:'].includes(url.protocol)&&!url.username&&!url.password?url.origin:null}catch(_){return null}}
+function csvCell(value){let text=String(value??'');if(/^[=+\-@\t\r]/u.test(text))text="'"+text;return `"${text.replace(/"/g,'""')}"`}
 
 async function loadOperations(){
     const badge=document.getElementById('ops-runtime-status'),details=document.getElementById('ops-runtime-details');
     badge.textContent='กำลังตรวจสอบ';
     try{
-        const res=await fetch('/api/v1/health',{headers:{Authorization:'Bearer '+localStorage.getItem('admin_token')}});
+        const res=await fetch('/api/v1/health');
         const data=await res.json();
         const checks=data.checks||{},runtime=data.runtime||{};
         badge.textContent=data.status==='healthy'?'พร้อมใช้งาน':'ต้องตรวจสอบ';
@@ -885,7 +881,7 @@ async function loadHandoffs(){
         const badge=document.getElementById('bdg-handoffs');
         badge.textContent=queued;badge.style.display=queued?'flex':'none';
         if(!tickets.length){list.innerHTML='<div class="empty card" style="padding:50px"><i class="fa-solid fa-headset"></i><h4>ไม่มีคำขอรอรับเรื่อง</h4><p>คำขอจากผู้เข้าชมจะแสดงที่นี่</p></div>';return}
-        list.innerHTML=tickets.map(ticket=>`<article class="handoff-item"><div class="handoff-head"><div><span class="badge badge-${ticket.status==='resolved'||ticket.status==='closed'?'active':ticket.priority==='high'?'pending':'pkg'}">${safeHtml(ticket.status||'queued')}</span><strong>${safeHtml(ticket.id)}</strong></div><time>${safeHtml(fmtDate(ticket.created_at))}</time></div><p>${safeHtml(ticket.reason||'Visitor requested support')}</p><small>${safeHtml(ticket.summary||ticket.page&&ticket.page.url||'ไม่มีสรุปเพิ่มเติม')}</small><div class="handoff-actions">${ticket.status==='queued'?`<button class="btn btn-gh-vl btn-sm" onclick="updateHandoff('${ticket.id}','in_progress')">รับเรื่อง</button>`:''}${!['resolved','closed'].includes(ticket.status)?`<button class="btn btn-gn btn-sm" onclick="updateHandoff('${ticket.id}','resolved')">ปิดเรื่อง</button>`:''}<button class="btn btn-gh btn-sm" onclick="cpy('${String(ticket.id).replace(/'/g,"\\'")}')">คัดลอกเลขอ้างอิง</button></div></article>`).join('');
+        list.innerHTML=tickets.map(ticket=>{const id=safeInlineArg(ticket.id);return `<article class="handoff-item"><div class="handoff-head"><div><span class="badge badge-${ticket.status==='resolved'||ticket.status==='closed'?'active':ticket.priority==='high'?'pending':'pkg'}">${safeHtml(ticket.status||'queued')}</span><strong>${safeHtml(ticket.id)}</strong></div><time>${safeHtml(fmtDate(ticket.created_at))}</time></div><p>${safeHtml(ticket.reason||'Visitor requested support')}</p><small>${safeHtml(ticket.summary||ticket.page&&ticket.page.url||'ไม่มีสรุปเพิ่มเติม')}</small><div class="handoff-actions">${ticket.status==='queued'?`<button class="btn btn-gh-vl btn-sm" onclick="updateHandoff(decodeURIComponent('${id}'),'in_progress')">รับเรื่อง</button>`:''}${!['resolved','closed'].includes(ticket.status)?`<button class="btn btn-gn btn-sm" onclick="updateHandoff(decodeURIComponent('${id}'),'resolved')">ปิดเรื่อง</button>`:''}<button class="btn btn-gh btn-sm" onclick="cpy(decodeURIComponent('${id}'))">คัดลอกเลขอ้างอิง</button></div></article>`}).join('');
     }catch(e){list.innerHTML='<div class="empty card" style="padding:50px"><i class="fa-solid fa-triangle-exclamation"></i><p>ไม่สามารถโหลดคิวเจ้าหน้าที่ได้</p></div>'}
 }
 
@@ -908,10 +904,10 @@ async function loadOv(){
         const rec=(td.tenants||[]).slice(0,5),el=document.getElementById('rec-list');
         if(!rec.length){el.innerHTML='<div class="empty"><i class="fa-solid fa-inbox"></i><p>ยังไม่มีลูกค้า</p></div>';return}
         el.innerHTML=rec.map((t,i)=>`
-            <div class="rec-item" onclick="sw('tenants');setTimeout(()=>openMng('${t.id}'),400)">
-                <div class="tav ${avCls(i)}">${t.company_name.charAt(0)}</div>
-                <div style="flex:1;min-width:0"><p style="font-size:.83rem;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.company_name}</p><p style="font-size:.65rem;color:var(--t3);font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.api_key}</p></div>
-                <span class="badge badge-${t.status==='active'?'active':'suspended'}"><span class="bd"></span>${t.status}</span>
+            <div class="rec-item" onclick="sw('tenants');setTimeout(()=>openMng(decodeURIComponent('${safeInlineArg(t.id)}')),400)">
+                <div class="tav ${avCls(i)}">${safeHtml(String(t.company_name||'').charAt(0))}</div>
+                <div style="flex:1;min-width:0"><p style="font-size:.83rem;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${safeHtml(t.company_name)}</p><p style="font-size:.65rem;color:var(--t3);font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${safeHtml(t.api_key)}</p></div>
+                <span class="badge badge-${t.status==='active'?'active':'suspended'}"><span class="bd"></span>${safeHtml(t.status)}</span>
             </div>`).join('');
     }catch(e){toast('ไม่สามารถโหลดข้อมูล Overview ได้','error')}
 }
@@ -927,17 +923,17 @@ function renderT(list){
     if(!list.length){tb.innerHTML=`<tr><td colspan="6"><div class="empty"><i class="fa-solid fa-inbox"></i><h4>ไม่พบลูกค้า</h4><p>ยังไม่มีลูกค้าในระบบ หรือไม่ตรงกับคำค้นหา</p></div></td></tr>`;return}
     tb.innerHTML=list.map((t,i)=>`
         <tr>
-            <td><div style="display:flex;align-items:center;gap:9px"><div class="tav ${avCls(i)}">${t.company_name.charAt(0)}</div><div><div style="font-weight:600;color:var(--t1)">${t.company_name}</div><div style="font-size:.63rem;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:2px">${t.api_key}</div></div></div></td>
+            <td><div style="display:flex;align-items:center;gap:9px"><div class="tav ${avCls(i)}">${safeHtml(String(t.company_name||'').charAt(0))}</div><div><div style="font-weight:600;color:var(--t1)">${safeHtml(t.company_name)}</div><div style="font-size:.63rem;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:2px">${safeHtml(t.api_key)}</div></div></div></td>
             <td>
-                <div style="font-size:.8rem;color:var(--t2)"><i class="fa-solid fa-user" style="color:var(--v3);margin-right:4px"></i> ${t.username||'<span style="color:var(--t3)">—</span>'}</div>
-                <div style="font-size:.8rem;color:var(--c2);margin-top:4px"><i class="fa-solid fa-key" style="margin-right:4px"></i> ${t.password ? (t.password.length === 64 ? '<span style="color:var(--t3);font-size:0.7rem">(รหัสเก่าถูกเข้ารหัส)</span>' : t.password) : '<span style="color:var(--t3)">ไม่มีรหัสผ่าน</span>'}</div>
+                <div style="font-size:.8rem;color:var(--t2)"><i class="fa-solid fa-user" style="color:var(--v3);margin-right:4px"></i> ${t.username?safeHtml(t.username):'<span style="color:var(--t3)">—</span>'}</div>
+                <div style="font-size:.8rem;color:var(--c2);margin-top:4px"><i class="fa-solid fa-key" style="margin-right:4px"></i> <span style="color:var(--t3)">รหัสผ่านถูกปกปิด</span></div>
             </td>
-            <td><span class="badge badge-pkg">${t.package_type||'basic'}</span></td>
-            <td><span class="${exCls(t.expires_at)}" style="font-size:.8rem">${exLbl(t.expires_at)}</span></td>
-            <td><span class="badge badge-${t.status==='active'?'active':'suspended'}"><span class="bd"></span>${t.status}</span></td>
+            <td><span class="badge badge-pkg">${safeHtml(t.package_type||'starter')}</span></td>
+            <td><span class="${exCls(t.expires_at)}" style="font-size:.8rem">${safeHtml(exLbl(t.expires_at))}</span></td>
+            <td><span class="badge badge-${t.status==='active'?'active':'suspended'}"><span class="bd"></span>${safeHtml(t.status)}</span></td>
             <td style="text-align:right"><div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
-                <button onclick="openMng('${t.id}')" class="btn btn-sm btn-gh-vl"><i class="fa-solid fa-pen-to-square" style="font-size:.68rem"></i> จัดการ</button>
-                <button onclick="delT('${t.id}','${t.company_name.replace(/'/g,"\\'")}' )" class="btn btn-ic btn-gh-rs" title="ลบ"><i class="fa-solid fa-trash" style="font-size:.68rem"></i></button>
+                <button onclick="openMng(decodeURIComponent('${safeInlineArg(t.id)}'))" class="btn btn-sm btn-gh-vl"><i class="fa-solid fa-pen-to-square" style="font-size:.68rem"></i> จัดการ</button>
+                <button onclick="delT(decodeURIComponent('${safeInlineArg(t.id)}'))" class="btn btn-ic btn-gh-rs" title="ลบ"><i class="fa-solid fa-trash" style="font-size:.68rem"></i></button>
             </div></td>
         </tr>`).join('');
 }
@@ -946,7 +942,8 @@ function filterT(){
     const f=allT.filter(t=>t.company_name.toLowerCase().includes(q)||t.api_key.toLowerCase().includes(q)||(t.username||'').toLowerCase().includes(q));
     renderT(f);document.getElementById('tcount').textContent=q?`ผลลัพธ์ ${f.length} / ${allT.length} รายการ`:`ทั้งหมด ${allT.length} รายการ`;
 }
-async function delT(id,name){
+async function delT(id){
+    const tenant=allT.find(item=>item.id===id),name=tenant&&tenant.company_name||id;
     if(!confirm(`⚠️ ต้องการลบลูกค้า "${name}" ?\n\nAPI Key จะใช้งานไม่ได้ทันที!`))return;
     try{await fetchAPI('delete_tenant','POST',{id});toast('ลบลูกค้าเรียบร้อยแล้ว!','success');loadT()}
     catch(e){toast('เกิดข้อผิดพลาดในการลบ','error')}
@@ -959,15 +956,7 @@ function exportTenantsCSV() {
     }
     const headers = ['ID', 'Company Name', 'Username', 'Package', 'Status', 'API Key', 'Expires At'];
     const rows = allT.map(t => {
-        return [
-            t.id,
-            `"${(t.company_name || '').replace(/"/g, '""')}"`,
-            `"${(t.username || '').replace(/"/g, '""')}"`,
-            t.package_type || 'basic',
-            t.status || 'active',
-            t.api_key,
-            t.expires_at ? new Date(t.expires_at).toLocaleString('th-TH') : 'Lifetime'
-        ].join(',');
+        return [t.id,t.company_name,t.username,t.package_type||'basic',t.status||'active',t.api_key,t.expires_at?new Date(t.expires_at).toLocaleString('th-TH'):'Lifetime'].map(csvCell).join(',');
     });
     const csvContent = "\uFEFF" + headers.join(',') + '\n' + rows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1032,30 +1021,32 @@ function updateEmbedCode() {
     if(!curTid)return;
     const t=allT.find(x=>x.id===curTid);if(!t)return;
     const customUrl=document.getElementById('m-backend-url').value.trim();
-    const or=customUrl || window.location.origin;
-    const apiKey = t.api_key;
-    const title = t.company_name + ' AI';
+    const or=customUrl?exactHttpOrigin(customUrl):window.location.origin;
+    if(!or){document.getElementById('m-emb').textContent='Backend URL must be an HTTP or HTTPS origin';return}
+    const apiKey = String(t.api_key||'');
+    const title = String(t.company_name||t.username||'My Shop') + ' AI';
     const boostSrc = or + '/supreme-boost/boost.js';
     const chatUrl = or + '/api/chat';
+    const apiKeyLiteral=javascriptLiteral(apiKey),chatUrlLiteral=javascriptLiteral(chatUrl),titleLiteral=javascriptLiteral(title),boostSrcLiteral=javascriptLiteral(boostSrc);
 
     const codes = {
         smart: `<!-- INDICATOR Smart AI Widget -->
 <script>
   window.IndicatorConfig={
-    apiKey:"${apiKey}",
-    backendUrl:"${chatUrl}",
-    title:"${title}",
+    apiKey:${apiKeyLiteral},
+    backendUrl:${chatUrlLiteral},
+    title:${titleLiteral},
     primaryColor:"#7c3aed",
     lang:"auto"
   };
-  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));
+  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src=${boostSrcLiteral};fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));
 <\/script>`,
-        single: `<script>window.IndicatorConfig={apiKey:"${apiKey}",backendUrl:"${chatUrl}",title:"${title}",lang:"auto"};(function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));<\/script>`,
+        single: `<script>window.IndicatorConfig={apiKey:${apiKeyLiteral},backendUrl:${chatUrlLiteral},title:${titleLiteral},lang:"auto"};(function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src=${boostSrcLiteral};fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));<\/script>`,
         simple: `<!-- INDICATOR AI Widget -->
-<script src="${boostSrc}"
-  data-api-key="${apiKey}"
-  data-backend-url="${chatUrl}"
-  data-title="${title}"
+<script src="${safeHtml(boostSrc)}"
+  data-api-key="${safeHtml(apiKey)}"
+  data-backend-url="${safeHtml(chatUrl)}"
+  data-title="${safeHtml(title)}"
   data-primary="#7c3aed"
   data-lang="auto"
   defer>
@@ -1063,13 +1054,13 @@ function updateEmbedCode() {
         gtm: `<!-- Custom HTML Tag สำหรับ Google Tag Manager -->
 <script>
   window.IndicatorConfig={
-    apiKey:"${apiKey}",
-    backendUrl:"${chatUrl}",
-    title:"${title}",
+    apiKey:${apiKeyLiteral},
+    backendUrl:${chatUrlLiteral},
+    title:${titleLiteral},
     lang:"auto"
   };
   var s=document.createElement('script');
-  s.src="${boostSrc}";
+  s.src=${boostSrcLiteral};
   s.async=true;
   document.head.appendChild(s);
 <\/script>`,
@@ -1079,12 +1070,12 @@ function add_indicator_ai_widget() {
   ?>
   <script>
   window.IndicatorConfig={
-    apiKey:"${apiKey}",
-    backendUrl:"${chatUrl}",
-    title:"${title}",
+    apiKey:${apiKeyLiteral},
+    backendUrl:${chatUrlLiteral},
+    title:${titleLiteral},
     lang:"auto"
   };
-  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));
+  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src=${boostSrcLiteral};fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));
   <\/script>
   <?php
 }
@@ -1093,22 +1084,6 @@ add_action('wp_footer', 'add_indicator_ai_widget');`
     document.getElementById('m-emb').textContent = codes[_embedFmt] || codes.smart;
 }
 function closeMng(){document.getElementById('modal-manage').classList.remove('show');curTid=null}
-function openCustomerDashboard(){
-    if(!curTid)return;
-    const t=allT.find(x=>x.id===curTid);if(!t)return;
-    // Build a preview token (base64 encoded tenant_data object) for admin to view customer dashboard
-    const tenantData={
-        id:t.id,
-        api_key:t.api_key,
-        company_name:t.company_name,
-        username:t.username,
-        package_type:t.package_type,
-        expires_at:t.expires_at,
-        _admin_preview:true
-    };
-    const token=btoa(unescape(encodeURIComponent(JSON.stringify(tenantData))));
-    window.open('/customer-dashboard.html?preview='+encodeURIComponent(token),'_blank');
-}
 function swMtab(tab,el){
     ['gen','cred','aictl','embed'].forEach(t=>{document.getElementById('mt-'+t).style.display=t===tab?'':'none'});
     document.querySelectorAll('.mtab').forEach(b=>b.classList.remove('active'));
@@ -1163,22 +1138,23 @@ async function submitAdd(){
 async function loadB(){
     const d=await fetchAPI('billing'),g=document.getElementById('bgrid'),rq=d.requests||[];
     if(!rq.length){g.innerHTML=`<div class="card empty" style="padding:60px;grid-column:1/-1"><i class="fa-solid fa-inbox"></i><h4>ไม่มีคำขอเติมเงิน</h4><p>ยังไม่มีลูกค้าแจ้งโอนเงินเข้ามา</p></div>`;return}
-    g.innerHTML=rq.map(r=>`
-        <div class="bc ${r.status==='pending'?'pend':''}">
+    g.innerHTML=rq.map(r=>{const id=safeInlineArg(r.id),pending=['pending','verified_pending_approval'].includes(r.status),status=pending?'pending':['paid','approved'].includes(r.status)?'approved':'rejected';return `
+        <div class="bc ${pending?'pend':''}">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
                 <div><h4 style="font-size:.92rem;font-weight:700;color:var(--t1)">${safeHtml(r.tenant_name)}</h4><p style="font-size:.73rem;color:var(--t2);margin-top:2px"><i class="fa-solid fa-box" style="margin-right:4px;color:var(--v3)"></i>${safeHtml(r.package_type)}${r.amount?` · <span style="font-family:'JetBrains Mono',monospace;color:var(--t1)">${Number(r.amount).toLocaleString()} ฿</span>`:''}</p></div>
-                <span class="badge badge-${r.status}"><span class="bd"></span>${r.status==='pending'?'รออนุมัติ':r.status==='approved'?'อนุมัติแล้ว':'ปฏิเสธ'}</span>
+                <span class="badge badge-${status}"><span class="bd"></span>${status==='pending'?'รออนุมัติ':status==='approved'?'อนุมัติแล้ว':'ปฏิเสธ'}</span>
             </div>
             ${r.contact_email?`<p style="font-size:.72rem;color:var(--t3);margin-bottom:9px"><i class="fa-solid fa-envelope" style="margin-right:5px"></i>${safeHtml(r.contact_email)}</p>`:''}
-            ${r.slip_base64?`<img src="${r.slip_base64}" style="width:100%;height:130px;object-fit:cover;border-radius:9px;margin-bottom:10px;cursor:pointer;border:1px solid var(--b1)" onclick="window.open('${r.slip_base64}')">` :''}
-            <p style="font-size:.65rem;color:var(--t3);margin-bottom:10px"><i class="fa-regular fa-clock" style="margin-right:4px"></i>${fmtDate(r.created_at)}</p>
-            ${r.status==='pending'?`<div style="display:flex;gap:7px;margin-bottom:7px"><button onclick="appB('${r.id}')" class="btn btn-gn btn-sm" style="flex:1;justify-content:center"><i class="fa-solid fa-check" style="font-size:.68rem"></i> อนุมัติ & สร้าง Key</button><button onclick="rejB('${r.id}')" class="btn btn-rs btn-sm" style="flex:1;justify-content:center"><i class="fa-solid fa-xmark" style="font-size:.68rem"></i> ปฏิเสธ</button></div>`:''}
-            <button onclick="delB('${r.id}')" class="btn btn-gh-rs btn-xs" style="width:100%;justify-content:center"><i class="fa-solid fa-trash" style="font-size:.62rem"></i> ลบรายการนี้</button>
-        </div>`).join('');
+            ${r.has_slip?`<button onclick="viewBillingSlip(decodeURIComponent('${id}'))" class="btn btn-gh btn-xs" style="width:100%;justify-content:center;margin-bottom:10px"><i class="fa-regular fa-image"></i> ดูสลิป</button>` :''}
+            <p style="font-size:.65rem;color:var(--t3);margin-bottom:10px"><i class="fa-regular fa-clock" style="margin-right:4px"></i>${safeHtml(fmtDate(r.created_at))}</p>
+            ${status==='pending'?`<div style="display:flex;gap:7px;margin-bottom:7px"><button onclick="appB(decodeURIComponent('${id}'))" class="btn btn-gn btn-sm" style="flex:1;justify-content:center"><i class="fa-solid fa-check" style="font-size:.68rem"></i> อนุมัติ & สร้าง Key</button><button onclick="rejB(decodeURIComponent('${id}'))" class="btn btn-rs btn-sm" style="flex:1;justify-content:center"><i class="fa-solid fa-xmark" style="font-size:.68rem"></i> ปฏิเสธ</button></div>`:''}
+            ${status!=='approved'?`<button onclick="delB(decodeURIComponent('${id}'))" class="btn btn-gh-rs btn-xs" style="width:100%;justify-content:center"><i class="fa-solid fa-trash" style="font-size:.62rem"></i> ลบรายการนี้</button>`:''}
+        </div>`}).join('');
 }
 async function appB(id){if(!confirm('ยืนยันอนุมัติและเปิดแพ็กเกจให้บัญชีนี้?'))return;try{await fetchAPI('approve_billing','POST',{id});toast('อนุมัติและเปิดแพ็กเกจสำเร็จ','success');loadB()}catch(e){toast('เกิดข้อผิดพลาด','error')}}
 async function rejB(id){if(!confirm('ยืนยันปฏิเสธสลิปนี้?'))return;try{await fetchAPI('reject_billing','POST',{id});toast('ปฏิเสธคำขอเรียบร้อย','info');loadB()}catch(e){toast('เกิดข้อผิดพลาด','error')}}
 async function delB(id){if(!confirm('⚠️ ต้องการลบรายการนี้?'))return;try{await fetchAPI('delete_billing','POST',{id});toast('ลบรายการเรียบร้อยแล้ว!','success');loadB()}catch(e){toast('เกิดข้อผิดพลาด','error')}}
+async function viewBillingSlip(id){try{const d=await fetchAPI('get_billing_slip','POST',{id}),slip=safeImageDataUrl(d.slip);if(!slip)throw new Error('Invalid slip');openSafeImage(slip)}catch(e){toast('ไม่สามารถเปิดสลิปได้','error')}}
 
 // ====PAYMENT====
 async function loadPM(){
@@ -1188,20 +1164,20 @@ async function loadPM(){
     if(elQ)elQ.textContent=ms.filter(m=>m.qr_base64).length;
     if(elO)elO.textContent=ms.filter(m=>!m.is_active).length;
     if(!ms.length){bl.innerHTML=`<div class="pc empty" style="padding:50px"><i class="fa-solid fa-credit-card"></i><h4>ยังไม่มีช่องทางรับเงิน</h4><p>เพิ่มบัญชีด้านซ้ายเพื่อเริ่มรับเงิน</p></div>`;return}
-    bl.innerHTML=ms.map(m=>`
+    bl.innerHTML=ms.map(m=>{const qr=safeImageDataUrl(m.qr_base64),id=safeInlineArg(m.id);return `
         <div class="pc" style="${!m.is_active?'opacity:.45':''}">
             <div style="display:flex;align-items:center;gap:9px;margin-bottom:11px">
                 <div style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,rgba(79,70,229,.2),rgba(6,182,212,.1));border:1px solid rgba(6,182,212,.15);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-building-columns" style="color:var(--c2);font-size:.82rem"></i></div>
-                <div style="flex:1;min-width:0"><h4 style="font-size:.85rem;font-weight:700;color:var(--t1)">${m.bank_name}</h4><span class="badge badge-${m.is_active?'active':'suspended'}" style="font-size:.56rem"><span class="bd"></span>${m.is_active?'เปิดใช้งาน':'ปิดอยู่'}</span></div>
+                <div style="flex:1;min-width:0"><h4 style="font-size:.85rem;font-weight:700;color:var(--t1)">${safeHtml(m.bank_name)}</h4><span class="badge badge-${m.is_active?'active':'suspended'}" style="font-size:.56rem"><span class="bd"></span>${m.is_active?'เปิดใช้งาน':'ปิดอยู่'}</span></div>
             </div>
-            <p style="font-size:.95rem;font-weight:700;color:var(--c2);font-family:'JetBrains Mono',monospace;margin-bottom:2px;letter-spacing:.05em">${m.account_number}</p>
-            <p style="font-size:.75rem;color:var(--t2);margin-bottom:11px">${m.account_name}</p>
-            ${m.qr_base64?`<img src="${m.qr_base64}" style="width:80px;height:80px;border-radius:9px;margin:0 auto 11px;display:block;border:1px solid var(--b1);cursor:zoom-in;transition:transform .18s" onmouseover="this.style.transform='scale(1.12)'" onmouseout="this.style.transform=''">`:''}
-            <div style="display:flex;gap:7px"><button onclick="togPM('${m.id}',${!m.is_active})" class="btn btn-gh btn-xs" style="flex:1;justify-content:center"><i class="fa-solid ${m.is_active?'fa-eye-slash':'fa-eye'}" style="font-size:.62rem"></i> ${m.is_active?'ปิด':'เปิด'}</button><button onclick="delPM('${m.id}','${m.bank_name.replace(/'/g,"\\'")}' )" class="btn btn-ic btn-gh-rs" style="width:28px;height:28px;border-radius:6px"><i class="fa-solid fa-trash" style="font-size:.62rem"></i></button></div>
-        </div>`).join('');
+            <p style="font-size:.95rem;font-weight:700;color:var(--c2);font-family:'JetBrains Mono',monospace;margin-bottom:2px;letter-spacing:.05em">${safeHtml(m.account_number)}</p>
+            <p style="font-size:.75rem;color:var(--t2);margin-bottom:11px">${safeHtml(m.account_name)}</p>
+            ${qr?`<img src="${qr}" style="width:80px;height:80px;border-radius:9px;margin:0 auto 11px;display:block;border:1px solid var(--b1);cursor:zoom-in;transition:transform .18s" onclick="openSafeImage(this.src)">`:''}
+            <div style="display:flex;gap:7px"><button onclick="togPM(decodeURIComponent('${id}'),${!m.is_active})" class="btn btn-gh btn-xs" style="flex:1;justify-content:center"><i class="fa-solid ${m.is_active?'fa-eye-slash':'fa-eye'}" style="font-size:.62rem"></i> ${m.is_active?'ปิด':'เปิด'}</button><button onclick="delPM(decodeURIComponent('${id}'))" class="btn btn-ic btn-gh-rs" style="width:28px;height:28px;border-radius:6px"><i class="fa-solid fa-trash" style="font-size:.62rem"></i></button></div>
+        </div>`}).join('');
 }
 async function togPM(id,is_active){await fetchAPI('toggle_payment_method','POST',{id,is_active});toast(is_active?'เปิดช่องทางรับเงินแล้ว':'ปิดช่องทางรับเงินแล้ว','info');loadPM()}
-async function delPM(id,name){if(!confirm(`⚠️ ต้องการลบช่องทาง "${name}" ?`))return;try{await fetchAPI('delete_payment_method','POST',{id});toast('ลบช่องทางรับเงินเรียบร้อย!','success');loadPM()}catch(e){toast('เกิดข้อผิดพลาด','error')}}
+async function delPM(id){if(!confirm('⚠️ ต้องการลบช่องทางรับเงินนี้?'))return;try{await fetchAPI('delete_payment_method','POST',{id});toast('ลบช่องทางรับเงินเรียบร้อย!','success');loadPM()}catch(e){toast('เกิดข้อผิดพลาด','error')}}
 document.getElementById('bank-form').onsubmit=async e=>{
     e.preventDefault();
     const p={bank_name:document.getElementById('bkName').value,account_number:document.getElementById('bkNum').value,account_name:document.getElementById('bkAcc').value};
@@ -1252,20 +1228,20 @@ async function loadKB(){
         const items=d.data||[];
         if(!items.length){box.innerHTML='<div class="empty" style="padding:30px"><i class="fa-solid fa-inbox"></i><p>\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e43\u0e19\u0e04\u0e25\u0e31\u0e07\u0e04\u0e27\u0e32\u0e21\u0e23\u0e39\u0e49</p></div>';return}
         // Group by URL/title
-        const grouped={};
-        items.forEach(c=>{const k=c.url||'unknown';if(!grouped[k])grouped[k]={title:c.title||c.url,url:c.url,count:0,id:c.id};grouped[k].count++;});
-        const entries=Object.values(grouped);
-        box.innerHTML=entries.map(g=>`
+        const grouped=new Map();
+        items.forEach(c=>{const k=c.url?'url:'+c.url:'id:'+c.id;if(!grouped.has(k))grouped.set(k,{title:c.title||c.source||c.url||'Manual Entry',url:c.url,count:0,id:c.id});grouped.get(k).count++;});
+        const entries=Array.from(grouped.values());
+        box.innerHTML=entries.map(g=>{const id=safeInlineArg(g.id);return `
             <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;background:rgba(255,255,255,.02);border:1px solid var(--b1);margin-bottom:8px">
                 <div style="width:34px;height:34px;border-radius:8px;background:rgba(124,58,237,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0">
                     <i class="fa-solid ${g.url&&g.url.startsWith('text:')?'fa-file-lines':'fa-link'}" style="color:var(--v3);font-size:.75rem"></i>
                 </div>
                 <div style="flex:1;min-width:0">
-                    <div style="font-size:.82rem;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.title||g.url}</div>
+                    <div style="font-size:.82rem;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${safeHtml(g.title||g.url)}</div>
                     <div style="font-size:.65rem;color:var(--t3);margin-top:2px">${g.count} chunks</div>
                 </div>
-                <button onclick="deleteKB('${g.id}','${(g.title||'').replace(/'/g,"\\'")}' )" class="btn btn-ic btn-gh-rs" style="width:28px;height:28px;border-radius:6px" title="\u0e25\u0e1a"><i class="fa-solid fa-trash" style="font-size:.62rem"></i></button>
-            </div>`).join('');
+                <button onclick="deleteKB(decodeURIComponent('${id}'))" class="btn btn-ic btn-gh-rs" style="width:28px;height:28px;border-radius:6px" title="\u0e25\u0e1a"><i class="fa-solid fa-trash" style="font-size:.62rem"></i></button>
+            </div>`}).join('');
     }catch(e){box.innerHTML='<div class="empty" style="padding:30px"><i class="fa-solid fa-triangle-exclamation"></i><p>\u0e42\u0e2b\u0e25\u0e14\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49</p></div>'}
 }
 async function submitKB(){
@@ -1279,12 +1255,12 @@ async function submitKB(){
             const url=document.getElementById('kb-url').value.trim();
             const deepCrawl=document.getElementById('kb-deep-crawl').checked;
             if(!url){toast('\u0e01\u0e23\u0e38\u0e13\u0e32\u0e01\u0e23\u0e2d\u0e01 URL','error');btn.innerHTML='<i class="fa-solid fa-upload"></i> \u0e40\u0e1e\u0e34\u0e48\u0e21\u0e40\u0e02\u0e49\u0e32\u0e04\u0e25\u0e31\u0e07\u0e04\u0e27\u0e32\u0e21\u0e23\u0e39\u0e49';btn.disabled=false;return}
-            r=await fetch('/api/knowledge/crawl',{method:'POST',headers:{'Content-Type':'application/json','Authorization':AUTH_TOKEN},body:JSON.stringify({tenantId:tid,url,deepCrawl})});
+            r=await fetch('/api/knowledge/crawl',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tenantId:tid,url,deepCrawl})});
         } else {
             const text=document.getElementById('kb-text').value.trim();
             const title=document.getElementById('kb-title').value.trim();
             if(!text){toast('\u0e01\u0e23\u0e38\u0e13\u0e32\u0e01\u0e23\u0e2d\u0e01\u0e40\u0e19\u0e37\u0e49\u0e2d\u0e2b\u0e32','error');btn.innerHTML='<i class="fa-solid fa-upload"></i> \u0e40\u0e1e\u0e34\u0e48\u0e21\u0e40\u0e02\u0e49\u0e32\u0e04\u0e25\u0e31\u0e07\u0e04\u0e27\u0e32\u0e21\u0e23\u0e39\u0e49';btn.disabled=false;return}
-            r=await fetch('/api/knowledge/text',{method:'POST',headers:{'Content-Type':'application/json','Authorization':AUTH_TOKEN},body:JSON.stringify({tenantId:tid,text,title})});
+            r=await fetch('/api/knowledge/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tenantId:tid,text,title})});
         }
         const json=await r.json();
         if(json.success){toast(json.message || `\u0e40\u0e1e\u0e34\u0e48\u0e21\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08! \u0e1b\u0e23\u0e30\u0e21\u0e27\u0e25\u0e1c\u0e25 ${json.chunksCount} chunks \u2728`,'success');document.getElementById('kb-url').value='';document.getElementById('kb-text').value='';document.getElementById('kb-title').value='';loadKB();}
@@ -1292,8 +1268,8 @@ async function submitKB(){
     }catch(e){toast('\u0e40\u0e01\u0e34\u0e14\u0e02\u0e49\u0e2d\u0e1c\u0e34\u0e14\u0e1e\u0e25\u0e32\u0e14: '+e.message,'error')}
     btn.innerHTML='<i class="fa-solid fa-upload"></i> \u0e40\u0e1e\u0e34\u0e48\u0e21\u0e40\u0e02\u0e49\u0e32\u0e04\u0e25\u0e31\u0e07\u0e04\u0e27\u0e32\u0e21\u0e23\u0e39\u0e49';btn.disabled=false;
 }
-async function deleteKB(id,name){
-    if(!confirm(`\u26a0\ufe0f \u0e25\u0e1a\u0e04\u0e27\u0e32\u0e21\u0e23\u0e39\u0e49 "${name}"?`))return;
+async function deleteKB(id){
+    if(!confirm('\u26a0\ufe0f \u0e25\u0e1a\u0e04\u0e27\u0e32\u0e21\u0e23\u0e39\u0e49\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e19\u0e35\u0e49?'))return;
     try{await fetchAPI('delete_knowledge','POST',{id});toast('\u0e25\u0e1a\u0e04\u0e27\u0e32\u0e21\u0e23\u0e39\u0e49\u0e40\u0e23\u0e35\u0e22\u0e1a\u0e23\u0e49\u0e2d\u0e22\u0e41\u0e25\u0e49\u0e27!','success');loadKB()}
     catch(e){toast('\u0e25\u0e1a\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49','error')}
 }
@@ -1320,12 +1296,12 @@ async function loadChatLogs(){
             <div style="padding:12px 16px;border-bottom:1px solid var(--b1);display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start">
                 <div style="width:8px;height:8px;border-radius:50%;background:${l.type==='error'?'var(--r1)':l.type==='warn'?'var(--a1)':'var(--g1)'};margin-top:5px;box-shadow:0 0 6px ${l.type==='error'?'rgba(244,63,94,.5)':l.type==='warn'?'rgba(245,158,11,.5)':'rgba(16,185,129,.5)'}"></div>
                 <div>
-                    <div style="font-size:.82rem;color:var(--t1);line-height:1.5">${l.message||''}</div>
-                    ${l.metadata&&l.metadata.tenantId?`<div style="font-size:.65rem;color:var(--t3);margin-top:3px;font-family:'JetBrains Mono',monospace">tenant: ${l.metadata.tenantId}</div>`:''}
+                    <div style="font-size:.82rem;color:var(--t1);line-height:1.5">${safeHtml(l.message||'')}</div>
+                    ${l.metadata&&l.metadata.tenantId?`<div style="font-size:.65rem;color:var(--t3);margin-top:3px;font-family:'JetBrains Mono',monospace">tenant: ${safeHtml(l.metadata.tenantId)}</div>`:''}
                 </div>
                 <div style="font-size:.65rem;color:var(--t3);white-space:nowrap">${fmtDate(l.timestamp||l.created_at)}</div>
             </div>`).join('')+'</div>';
-    }catch(e){box.innerHTML='<div class="empty card" style="padding:60px"><i class="fa-solid fa-triangle-exclamation"></i><h4>\u0e42\u0e2b\u0e25\u0e14\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49</h4><p>'+e.message+'</p></div>'}
+    }catch(e){box.innerHTML='<div class="empty card" style="padding:60px"><i class="fa-solid fa-triangle-exclamation"></i><h4>\u0e42\u0e2b\u0e25\u0e14\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49</h4><p>'+safeHtml(e.message)+'</p></div>'}
 }
 </script>
 </body>

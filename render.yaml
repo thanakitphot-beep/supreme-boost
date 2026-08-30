@@ -4,18 +4,22 @@ services:
     runtime: node
     region: singapore
     plan: free
-    buildCommand: "npm ci && npm run build && npm run db:indexes"
-    startCommand: "node server.js"
-    healthCheckPath: /api/v1/livez
-    autoDeploy: true
+    buildCommand: "npm ci --omit=dev && npm run build"
+    startCommand: "npm run release:start"
+    healthCheckPath: /api/v1/readyz
+    autoDeployTrigger: checksPass
 
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: "24"
       - key: ENFORCE_STRICT_CORS
         value: "true"
       - key: CORS_ALLOWED_ORIGINS
-        sync: false
+        value: https://indicator-web-chat.onrender.com
+      - key: PUBLIC_BASE_URL
+        value: https://indicator-web-chat.onrender.com
       - key: ENABLE_LEGACY_HMAC_AUTH
         value: "false"
       - key: INDICATOR_FILE_LEARNING
@@ -40,6 +44,10 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: GEMINI_EMBEDDING_MODEL
+        value: gemini-embedding-001
+      - key: KNOWLEDGE_SYNTHESIS_ENABLED
+        value: "false"
       - key: COHERE_API_KEY
         sync: false
       - key: GROQ_API_KEY
@@ -50,11 +58,13 @@ services:
         value: openai
       - key: AI_FALLBACK_PROVIDER
         value: groq
-      - key: AI_FAST_MODEL
+      - key: OPENAI_MODEL
         value: gpt-5.6-terra
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
       - key: AI_NORMAL_MODEL
-        value: gpt-5.6-terra
-      - key: AI_REASONING_MODEL
         value: gpt-5.6-terra
       - key: AI_FALLBACK_MODEL
         value: llama-3.3-70b-versatile
@@ -72,11 +82,6 @@ services:
         value: rerank-v3.5
       - key: COHERE_RERANK_TOP_N
         value: 5
-
-      # Keep-Alive: ใส่ URL ของ Render Service ที่นี่เพื่อ Ping ตัวเอง
-      # เช่น: https://indicator-web-chat.onrender.com
-      - key: RENDER_EXTERNAL_URL
-        sync: false
 
       # Database
       - key: SUPABASE_URL
@@ -99,6 +104,10 @@ services:
         sync: false
 
       # SMTP
+      - key: REGISTRATION_MODE
+        value: disabled
+      - key: HANDOFF_DELIVERY_MODE
+        value: contact_only
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

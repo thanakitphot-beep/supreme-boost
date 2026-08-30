@@ -1,35 +1,48 @@
 const db = require("./_db.js");
 const auth = require("./_auth.js");
 const cheerio = require('cheerio');
-const { isSafeUrl } = require('../services/ssrfBlocker');
+const { fetchPublicResource } = require('../services/publicHttp');
 const { checkRateLimit } = require('../services/rateLimit');
 const { setCorsHeaders } = require('../services/cors');
 const { consumeUsage, loadEntitledTenant } = require('../services/plans');
+const { connectToDatabase } = require('./_mongodb');
+const { canonicalOrigin, normalizeAllowedOrigins } = require('../services/tenantAccess');
+const { generateGeminiEmbedding } = require('../services/geminiEmbedding');
+
+const MAX_DEEP_PAGES = 3;
+const MAX_CHUNKS_PER_PAGE = 6;
+const MAX_TEXT_CHARS = 12_000;
+const MAX_TEXT_CHUNKS = 20;
+
+function validRecordId(value) {
+    return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,160}$/u.test(value);
+}
 
 async function entitledKnowledgeTenant(isGlobalAdmin, tenantId) {
-    if (isGlobalAdmin) return { admin: true };
+    if (isGlobalAdmin) {
+        const mongo = await connectToDatabase();
+        return mongo && mongo.collection('tenants').findOne({ id: tenantId });
+    }
     const tenant = await loadEntitledTenant(tenantId);
     if (!tenant || !tenant.entitlements.features.knowledge) return null;
     return tenant;
+}
+
+function tenantAllowsCrawl(tenant, url) {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return false;
+        const origin = canonicalOrigin(parsed.origin);
+        return Boolean(origin && tenant && normalizeAllowedOrigins(tenant.allowed_origins).includes(origin));
+    } catch (_) {
+        return false;
+    }
 }
 
 // ============================================================
 // SUPREME INTELLIGENCE CRAWLER — Enterprise RAG Engine v3.0
 // Deep Multi-Page Crawler + Smart Chunking + Semantic Embedding
 // ============================================================
-
-async function generateEmbedding(text, apiKey) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`;
-    const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: "models/text-embedding-004", content: { parts: [{ text }] } })
-    });
-    if (!res.ok) throw new Error(`Embedding failed: ${res.status}`);
-    const data = await res.json();
-    if (!data.embedding || !data.embedding.values) throw new Error('Embedding format error');
-    return data.embedding.values;
-}
 
 // Smart Semantic Chunking — split by paragraph/sentence boundaries
 function smartChunk(text, maxSize = 600, overlap = 80) {
@@ -84,17 +97,19 @@ function smartChunk(text, maxSize = 600, overlap = 80) {
 // Extract unique CSS selector
 function getUniqueSelector(el, $) {
     if (!el || !el.name) return '';
-    if (el.attribs && el.attribs.id) return `#${el.attribs.id}`;
+    const safeIdentifier = value => String(value || '').trim().split(/\s+/)[0].replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
+    if (el.attribs && el.attribs.id) return `#${safeIdentifier(el.attribs.id)}`;
     let path = [];
     let current = el;
     while (current && current.name && current.name !== 'body' && current.name !== 'html') {
         let sel = current.name;
         if (current.attribs && current.attribs.id) {
-            sel += `#${current.attribs.id}`;
+            sel += `#${safeIdentifier(current.attribs.id)}`;
             path.unshift(sel);
             break;
         } else if (current.attribs && current.attribs.class) {
-            sel += `.${current.attribs.class.trim().replace(/\s+/g, '.').split(' ')[0]}`;
+            const className = safeIdentifier(current.attribs.class);
+            if (className) sel += `.${className}`;
         }
         path.unshift(sel);
         current = current.parent;
@@ -106,14 +121,14 @@ function getUniqueSelector(el, $) {
 function extractContent($, url) {
     $('script, style, nav, header, footer, noscript, svg, iframe, [class*="cookie"], [class*="popup"], [class*="modal"]').remove();
 
-    const title = $('title').text().trim() || $('h1').first().text().trim() || url;
-    const description = $('meta[name="description"]').attr('content') || '';
+    const title = ($('title').text().trim() || $('h1').first().text().trim() || url).slice(0, 240);
+    const description = String($('meta[name="description"]').attr('content') || '').replace(/\s+/g, ' ').trim().slice(0, 500);
     
     const chunksWithSelectors = [];
 
     // Extract block elements
     $('h1, h2, h3, p, li, [class*="price"], [class*="faq"]').each((_, el) => {
-        const text = $(el).text().replace(/\s+/g, ' ').trim();
+        const text = $(el).text().replace(/\s+/g, ' ').trim().slice(0, 1200);
         if (text.length > 20) {
             chunksWithSelectors.push({
                 text: text,
@@ -149,13 +164,13 @@ function extractContent($, url) {
 // GROQ Synthesizer (Llama 3 70B)
 async function synthesizeGroq(text) {
     const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) return text;
+    if (!groqKey || process.env.KNOWLEDGE_SYNTHESIS_ENABLED !== 'true') return text;
     try {
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: "llama3-70b-8192",
+                model: process.env.GROQ_MODEL || process.env.AI_FALLBACK_MODEL || "llama-3.3-70b-versatile",
                 messages: [{
                     role: "system",
                     content: "Analyze the text and generate 1-2 probable questions a user might ask regarding this information. Format: Original text followed by [Q: <question>]"
@@ -164,8 +179,10 @@ async function synthesizeGroq(text) {
                 }],
                 temperature: 0.1,
                 max_tokens: 300
-            })
+            }),
+            signal: AbortSignal.timeout(8000)
         });
+        if (!res.ok) return text;
         const json = await res.json();
         return json.choices && json.choices[0] ? json.choices[0].message.content : text;
     } catch (e) {
@@ -181,16 +198,14 @@ async function discoverUrls(baseUrl, html, $, maxPages = 15) {
 
     // Try sitemap.xml first
     try {
-        const sitemapRes = await fetch(origin + '/sitemap.xml', {
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            signal: AbortSignal.timeout(4000)
-        });
+        const sitemapUrl = origin + '/sitemap.xml';
+        const sitemapRes = await fetchPublicResource(sitemapUrl, { timeoutMs: 4000, maxBytes: 500_000 });
         if (sitemapRes.ok) {
-            const sitemapText = await sitemapRes.text();
+            const sitemapText = sitemapRes.body.toString('utf8');
             const matches = sitemapText.match(/<loc>([^<]+)<\/loc>/g) || [];
             for (const m of matches) {
                 const u = m.replace(/<\/?loc>/g, '').trim();
-                if (u.startsWith(origin) && u !== baseUrl) {
+                if (new URL(u).origin === origin && u !== baseUrl) {
                     discovered.add(u);
                     if (discovered.size >= maxPages) break;
                 }
@@ -207,7 +222,7 @@ async function discoverUrls(baseUrl, html, $, maxPages = 15) {
                 if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
                 const abs = new URL(href, baseUrl).href;
                 // Only same-origin links that are not the same as base
-                if (abs.startsWith(origin) && abs !== baseUrl && !abs.includes('#')) {
+                if (new URL(abs).origin === origin && abs !== baseUrl && !abs.includes('#')) {
                     // Prefer important pages
                     const important = /(about|product|service|faq|contact|price|feature|blog|ราคา|สินค้า|บริการ|ติดต่อ)/i.test(abs);
                     if (important || discovered.size < 5) discovered.add(abs);
@@ -221,27 +236,13 @@ async function discoverUrls(baseUrl, html, $, maxPages = 15) {
 
 // Fetch and extract one page
 async function fetchPage(url) {
-    if (!isSafeUrl(url)) {
-        console.warn(`[SSRF Block] Refused to crawl unsafe URL: ${url}`);
-        return null;
-    }
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 8000);
     try {
-        const res = await fetch(url, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36' },
-            signal: ctrl.signal
-        });
-        clearTimeout(timeout);
+        const res = await fetchPublicResource(url, { timeoutMs: 8000, maxBytes: 500_000 });
         if (!res.ok) return null;
-        const contentType = res.headers.get('content-type') || '';
+        const contentType = String(res.headers['content-type'] || '');
         if (!contentType.includes('html')) return null;
-        const contentLength = Number(res.headers.get('content-length') || 0);
-        if (contentLength > 500_000) return null;
-        const html = await res.text();
-        return html.length <= 500_000 ? html : null;
-    } catch (e) {
-        clearTimeout(timeout);
+        return res.body.toString('utf8');
+    } catch (_) {
         return null;
     }
 }
@@ -252,9 +253,7 @@ module.exports = async function handler(req, res) {
 
     if (!req._rateLimitChecked && !await checkRateLimit(req, res, 'api')) return;
 
-    const authHeader = req.headers['authorization'];
-    let token = '';
-    if (authHeader && authHeader.startsWith('Bearer ')) token = authHeader.substring(7);
+    const token = auth.accessTokenFromRequest(req);
     
     // Check global valid token first
     if (!auth.verifyToken(token)) return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -266,7 +265,7 @@ module.exports = async function handler(req, res) {
     try {
         if (req.method === 'GET') {
             const tenantId = req.query ? req.query.tenantId : (req.url.split('tenantId=')[1] || '').split('&')[0];
-            if (!tenantId) return res.status(400).json({ success: false, message: 'Missing tenantId' });
+            if (!validRecordId(tenantId)) return res.status(400).json({ success: false, message: 'Valid tenantId required' });
             
             // Tenant Check
             if (!isGlobalAdmin && decoded?.tenantId !== tenantId) {
@@ -281,7 +280,7 @@ module.exports = async function handler(req, res) {
         if (req.method === 'DELETE') {
             const body = req.body || {};
             const { id, tenantId } = body;
-            if (!id || !tenantId) return res.status(400).json({ success: false, message: 'Missing id or tenantId' });
+            if (!validRecordId(id) || !validRecordId(tenantId)) return res.status(400).json({ success: false, message: 'Valid id and tenantId required' });
             if (!isGlobalAdmin && decoded?.tenantId !== tenantId) {
                 return res.status(403).json({ success: false, message: 'Forbidden: Tenant mismatch' });
             }
@@ -298,7 +297,9 @@ module.exports = async function handler(req, res) {
             if (req.url && req.url.includes('/crawl')) {
                 const body = req.body || {};
                 const { tenantId, url, deepCrawl = true } = body;
-                if (!tenantId || !url) return res.status(400).json({ success: false, message: 'Missing tenantId or url' });
+                if (!validRecordId(tenantId) || typeof url !== 'string' || url.length > 2000 || typeof deepCrawl !== 'boolean') {
+                    return res.status(400).json({ success: false, message: 'Valid tenantId, url, and deepCrawl are required' });
+                }
 
                 // Tenant Check
                 if (!isGlobalAdmin && decoded?.tenantId !== tenantId) {
@@ -307,34 +308,35 @@ module.exports = async function handler(req, res) {
 
                 const entitledTenant = await entitledKnowledgeTenant(isGlobalAdmin, tenantId);
                 if (!entitledTenant) return res.status(403).json({ success: false, message: 'Knowledge crawling is not available for this tenant plan' });
+                if (!tenantAllowsCrawl(entitledTenant, url)) return res.status(403).json({ success: false, message: 'URL origin is not registered for this tenant' });
                 const geminiKey = process.env.GEMINI_API_KEY;
                 if (!geminiKey) return res.status(500).json({ success: false, message: 'Missing GEMINI_API_KEY' });
-
-                // Step 1: Fetch main page
-                const mainHtml = await fetchPage(url);
-                if (!mainHtml) return res.status(400).json({ success: false, message: 'Cannot fetch the URL. Check if it is accessible.' });
                 if (!isGlobalAdmin) {
                     const usage = await consumeUsage(entitledTenant, 'crawl');
                     if (!usage.allowed) return res.status(usage.status || 429).json({ success: false, message: usage.reason });
                 }
 
+                // Step 1: Fetch main page
+                const mainHtml = await fetchPage(url);
+                if (!mainHtml) return res.status(400).json({ success: false, message: 'Cannot fetch the URL. Check if it is accessible.' });
+
                 const $ = cheerio.load(mainHtml);
                 const { title, structuredChunks } = extractContent($, url);
 
                 // Step 2: Discover sub-pages
-                const subUrls = deepCrawl ? await discoverUrls(url, mainHtml, $, 12) : [];
+                const subUrls = deepCrawl ? await discoverUrls(url, mainHtml, $, MAX_DEEP_PAGES) : [];
 
                 // Step 3: Delete old knowledge for this domain
-                await db.deleteKnowledgeByUrl(tenantId, url);
+                await Promise.all([url, ...subUrls].map(pageUrl => db.deleteKnowledgeByUrl(tenantId, pageUrl)));
 
                 // Step 4: Process main page (Tri-Core)
                 let totalSaved = 0;
-                for (let i = 0; i < structuredChunks.length; i++) {
+                for (let i = 0; i < Math.min(structuredChunks.length, MAX_CHUNKS_PER_PAGE); i++) {
                     try {
                         // AI 1 & 2: Synthesis (Groq Llama 3)
                         const synthesizedText = await synthesizeGroq(structuredChunks[i]);
                         // AI 3: Vectorization (Gemini Embedding)
-                        const embedding = await generateEmbedding(synthesizedText, geminiKey);
+                        const embedding = await generateGeminiEmbedding(synthesizedText, geminiKey);
                         await db.addKnowledge({ tenantId, url, title, content: synthesizedText, embedding, chunkIndex: i });
                         totalSaved++;
                     } catch (e) { console.error('Embed error main:', e.message); }
@@ -352,12 +354,12 @@ module.exports = async function handler(req, res) {
                             const { title: subTitle, structuredChunks: subChunks } = extractContent($s, subUrl);
                             if (!subChunks || subChunks.length === 0) return;
 
-                            for (let j = 0; j < subChunks.length; j++) {
+                            for (let j = 0; j < Math.min(subChunks.length, MAX_CHUNKS_PER_PAGE); j++) {
                                 try {
                                     // Synthesis
                                     const synthesizedText = await synthesizeGroq(subChunks[j]);
                                     // Embedding
-                                    const embedding = await generateEmbedding(synthesizedText, geminiKey);
+                                    const embedding = await generateGeminiEmbedding(synthesizedText, geminiKey);
                                     await db.addKnowledge({ tenantId, url: subUrl, title: subTitle, content: synthesizedText, embedding, chunkIndex: j });
                                     totalSaved++;
                                 } catch (e) { console.error('Embed error sub:', e.message); }
@@ -381,7 +383,7 @@ module.exports = async function handler(req, res) {
             if (req.url && req.url.includes('/text')) {
                 const body = req.body || {};
                 const { tenantId, text, title } = body;
-                if (!tenantId || !text) return res.status(400).json({ success: false, message: 'Missing tenantId or text' });
+                if (!validRecordId(tenantId) || typeof text !== 'string') return res.status(400).json({ success: false, message: 'Valid tenantId and text required' });
 
                 // Tenant Check
                 if (!isGlobalAdmin && decoded?.tenantId !== tenantId) {
@@ -394,19 +396,20 @@ module.exports = async function handler(req, res) {
                 const geminiKey = process.env.GEMINI_API_KEY;
                 if (!geminiKey) return res.status(500).json({ success: false, message: 'Missing GEMINI_API_KEY' });
 
-                const cleaned = String(text).replace(/\s+/g, ' ').trim().slice(0, 50_000);
+                const cleaned = text.replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT_CHARS);
                 if (!cleaned) return res.status(400).json({ success: false, message: 'Knowledge text cannot be empty' });
                 if (!isGlobalAdmin) {
                     const usage = await consumeUsage(entitledTenant, 'knowledge');
                     if (!usage.allowed) return res.status(usage.status || 429).json({ success: false, message: usage.reason });
                 }
-                const chunks = smartChunk(cleaned, 600, 80).slice(0, 100);
+                const chunks = smartChunk(cleaned, 600, 80).slice(0, MAX_TEXT_CHUNKS);
                 const fakeUrl = 'text:' + Date.now();
+                const safeTitle = String(title || 'Custom Text Knowledge').replace(/\s+/g, ' ').trim().slice(0, 240) || 'Custom Text Knowledge';
                 let savedCount = 0;
                 for (let i = 0; i < chunks.length; i++) {
                     try {
-                        const embedding = await generateEmbedding(chunks[i], geminiKey);
-                        await db.addKnowledge({ tenantId, url: fakeUrl, title: title || 'Custom Text Knowledge', content: chunks[i], embedding, chunkIndex: i });
+                        const embedding = await generateGeminiEmbedding(chunks[i], geminiKey);
+                        await db.addKnowledge({ tenantId, url: fakeUrl, title: safeTitle, content: chunks[i], embedding, chunkIndex: i });
                         savedCount++;
                     } catch (e) { console.error('Embed error text:', e.message); }
                 }
@@ -419,6 +422,8 @@ module.exports = async function handler(req, res) {
         return res.status(405).json({ success: false, message: 'Method not allowed' });
     } catch (err) {
         console.error('Knowledge handler error:', err);
-        return res.status(500).json({ success: false, message: err.message });
+        return res.status(500).json({ success: false, message: 'Internal server error' });
     }
 };
+
+module.exports.__tenantAllowsCrawl = tenantAllowsCrawl;

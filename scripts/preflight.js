@@ -47,10 +47,16 @@ async function verifyStripe(errors) {
 async function verifyPublicHealth(errors) {
     const base = String(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '');
     try {
-        const response = await fetch(`${base}/api/v1/livez`, { signal: AbortSignal.timeout(5000) });
-        if (!response.ok) errors.push('Public liveness endpoint did not return 2xx');
+        const response = await fetch(`${base}/api/v1/readyz`, { signal: AbortSignal.timeout(5000) });
+        if (!response.ok) {
+            errors.push('Public readiness endpoint did not return 2xx');
+            return;
+        }
+        const body = await response.json();
+        const expectedRelease = String(process.env.EXPECTED_RELEASE || '').trim();
+        if (expectedRelease && (!body.release || body.release.commit !== expectedRelease)) errors.push('Public readiness endpoint reports an unexpected release');
     } catch (_) {
-        errors.push('Public liveness endpoint is unreachable');
+        errors.push('Public readiness endpoint is unreachable');
     }
 }
 
@@ -62,7 +68,8 @@ async function main() {
     const dependencies = process.argv.includes('--dependencies') || process.argv.includes('--live');
     if (dependencies && errors.length === 0) {
         await verifyMongo(errors);
-        await verifySmtp(errors);
+        const emailRequired = validation.modes.registration === 'smtp' || validation.modes.handoff === 'smtp';
+        if (emailRequired) await verifySmtp(errors);
         if (['stripe', 'both'].includes(String(process.env.PAYMENT_MODE).toLowerCase())) await verifyStripe(errors);
         if (process.argv.includes('--live')) await verifyPublicHealth(errors);
     }

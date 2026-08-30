@@ -4,6 +4,8 @@ const crypto = require('crypto');
 const { verifyAccessJWT } = require('../api/_auth');
 const { canonicalPlanId } = require('./plans');
 
+const CHECKOUT_LOCK_STATUSES = Object.freeze(['creating_checkout', 'recovering_checkout', 'checkout_started']);
+
 function readCookie(req, name) {
     const source = String(req && req.headers && req.headers.cookie || '');
     const part = source.split(';').map(value => value.trim()).find(value => value.startsWith(`${name}=`));
@@ -78,9 +80,14 @@ async function activateBillingRequest(db, requestId, payment = {}) {
             { $set: { package_type: planId, status: tenant.suspension_reason === 'admin' ? 'suspended' : 'active', expires_at: expiresAt, billing, updated_at: now } },
             options
         );
+        const paymentUpdate = {
+            $set: { status: 'paid', paid_at: now, provider, provider_reference: billing.provider_reference, updated_at: now },
+            $unset: { checkout_key: '' }
+        };
+        if (request.slip_base64) paymentUpdate.$unset.slip_base64 = '';
         await db.collection('billing_requests').updateOne(
             { id: requestId, status: 'activating' },
-            { $set: { status: 'paid', paid_at: now, provider, provider_reference: billing.provider_reference, updated_at: now } },
+            paymentUpdate,
             options
         );
         return db.collection('tenants').findOne({ id: request.tenant_id }, options);
@@ -123,6 +130,7 @@ function cleanEmail(value) {
 }
 
 module.exports = {
+    CHECKOUT_LOCK_STATUSES,
     activateBillingRequest,
     authenticatedBillingTenant,
     cleanEmail,

@@ -3,241 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INDICATOR — สมัครใช้งาน AI Chat Widget</title>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <meta name="description" content="แพ็กเกจ INDICATOR Website Assistant สำหรับธุรกิจ เริ่มต้น 990 บาทต่อเดือน">
+    <title>แพ็กเกจและราคา - INDICATOR</title>
+    <link rel="canonical" href="https://indicator-web-chat.onrender.com/pricing">
+    <link rel="icon" type="image/jpeg" href="/ICON.jpg">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
-        :root {
-            --bg: #0f172a;
-            --bg2: #1e293b;
-            --card: #1e293b;
-            --border: rgba(139,92,246,0.15);
-            --border2: rgba(139,92,246,0.3);
-            --v1: #7c3aed; --v2: #8b5cf6; --v3: #a78bfa;
-            --c1: #06b6d4; --c2: #22d3ee;
-            --g1: #10b981; --g2: #34d399;
-            --a1: #f59e0b;
-            --t1: #f8fafc; --t2: #cbd5e1; --t3: #64748b;
-        }
-        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        * { box-sizing: border-box; }
         html { scroll-behavior: smooth; }
-        body { font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--t1); min-height: 100vh; overflow-x: hidden; }
-
-        .stars { position: fixed; inset: 0; z-index: 0; background: radial-gradient(ellipse at 20% 20%, rgba(124,58,237,0.08) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(6,182,212,0.06) 0%, transparent 60%); }
-        
-        nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; background: rgba(5,5,15,0.8); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); }
-        .nav-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-        .nav-logo { width: 38px; height: 38px; background: linear-gradient(135deg, var(--v1), #4f46e5); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #fff; box-shadow: 0 0 20px rgba(124,58,237,0.5); }
-        .nav-name { font-size: 1.1rem; font-weight: 700; color: var(--t1); }
-        .nav-links { display: flex; gap: 8px; }
-        .nav-btn { padding: 8px 20px; border-radius: 8px; font-size: 0.9rem; text-decoration: none; transition: all 0.2s; border: 1px solid var(--border2); background: rgba(139,92,246,0.1); color: var(--v3); font-weight: 600; cursor: pointer;}
-        .nav-btn.primary { background: linear-gradient(135deg, var(--v1), #4f46e5); border-color: transparent; color: #fff; }
-
-        .hero { position: relative; z-index: 1; padding: 140px 40px 80px; text-align: center; max-width: 900px; margin: 0 auto; }
-        .hero h1 { font-size: 3.5rem; font-weight: 800; margin-bottom: 20px; background: linear-gradient(135deg, #fff 30%, var(--v3) 70%, var(--c2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .hero p { font-size: 1.1rem; color: var(--t2); max-width: 640px; margin: 0 auto 40px; }
-
-        .section { position: relative; z-index: 1; padding: 60px 40px; max-width: 1200px; margin: 0 auto; }
-        .section-title { text-align: center; margin-bottom: 50px; }
-        .section-title h2 { font-size: 2rem; font-weight: 800; margin-bottom: 10px; }
-        
-        .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
-        .plan { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 32px; cursor: pointer; transition: all 0.3s; position: relative; }
-        .plan:hover { transform: translateY(-6px); border-color: var(--border2); }
-        .plan.selected { border-color: var(--v2); box-shadow: 0 0 0 2px rgba(139,92,246,0.3); }
-        .plan-name { font-size: 1.3rem; font-weight: 700; margin-bottom: 8px; }
-        .plan-price { font-size: 2.5rem; font-weight: 800; margin-bottom: 24px; }
-        
-        .order-wrapper { max-width: 680px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 24px; overflow: hidden; display: none; }
-        .order-wrapper.visible { display: block; }
-        .order-header { padding: 28px 32px; background: linear-gradient(135deg, rgba(124,58,237,0.1), transparent); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; }
-        .order-header-icon { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, var(--v1), #4f46e5); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
-        .order-body { padding: 32px; }
-        
-        .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
-        .form-label { font-size: 0.85rem; font-weight: 600; color: var(--t2); }
-        .form-input { padding: 11px 14px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--t1); font-family: 'Sarabun', sans-serif; font-size: 0.95rem; }
-        
-        .btn { padding: 13px 24px; border-radius: 12px; font-family: 'Sarabun', sans-serif; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.25s; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 20px;}
-        .btn-primary { background: linear-gradient(135deg, var(--v1), #4f46e5); color: #fff; }
-        .btn-secondary { background: rgba(255,255,255,0.05); color: var(--t2); border: 1px solid var(--border); }
-
-        .slip-upload-area { border: 2px dashed var(--border2); border-radius: 12px; padding: 32px; text-align: center; cursor: pointer; margin: 16px 0; }
-        .slip-preview { max-width: 200px; border-radius: 10px; margin: 12px auto 0; display: none; }
-        
-        .success-wrapper { max-width: 680px; margin: 0 auto; background: var(--card); border: 1px solid rgba(16,185,129,0.3); border-radius: 24px; padding: 48px 40px; text-align: center; display: none; }
-        .success-wrapper.visible { display: block; }
-        .plugin-code-box { background: #030310; border: 1px solid var(--border2); border-radius: 16px; padding: 24px; text-align: left; margin: 24px 0; position: relative; }
-        .code-block { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #e2e8f0; white-space: pre-wrap; word-break: break-all; }
-
-        @media (max-width: 768px) {
-            nav { padding: 12px 20px; }
-            .hero { padding: 100px 20px 40px; }
-            .hero h1 { font-size: 2.2rem; }
-            .section { padding: 40px 20px; }
-            .plans { grid-template-columns: 1fr; }
-            .order-header { padding: 20px; flex-direction: column; text-align: center; }
-            .order-body { padding: 20px; }
-            .success-wrapper { padding: 30px 20px; }
-            .slip-upload-area { padding: 20px; }
+        body { margin: 0; background: #0f172a; color: #f8fafc; font-family: "Sarabun", sans-serif; }
+        a { color: inherit; }
+        .shell { width: min(1160px, calc(100% - 40px)); margin: 0 auto; }
+        .topbar { position: sticky; top: 0; z-index: 20; background: rgba(15, 23, 42, .88); border-bottom: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(16px); }
+        .topbar-inner { height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+        .brand { display: flex; align-items: center; gap: 11px; text-decoration: none; font-weight: 800; letter-spacing: .08em; }
+        .brand img { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(103,232,249,.35); }
+        .nav-actions { display: flex; align-items: center; gap: 10px; }
+        .nav-link { color: #cbd5e1; text-decoration: none; font-size: .92rem; font-weight: 600; padding: 9px 12px; }
+        .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 18px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); color: #f8fafc; background: rgba(255,255,255,.05); text-decoration: none; font: inherit; font-weight: 700; cursor: pointer; transition: .2s ease; }
+        .button:hover { border-color: rgba(103,232,249,.5); transform: translateY(-1px); }
+        .button.primary { border: 0; background: linear-gradient(135deg, #06b6d4, #2563eb); box-shadow: 0 12px 30px rgba(6,182,212,.2); }
+        .hero { position: relative; overflow: hidden; padding: 92px 0 58px; text-align: center; }
+        .hero::before { content: ""; position: absolute; inset: -40% 10% auto; height: 420px; background: radial-gradient(circle, rgba(6,182,212,.15), transparent 66%); pointer-events: none; }
+        .eyebrow { position: relative; display: inline-flex; align-items: center; gap: 8px; margin-bottom: 20px; padding: 7px 12px; border: 1px solid rgba(251,191,36,.25); border-radius: 999px; color: #fde68a; background: rgba(245,158,11,.07); font-size: .78rem; font-weight: 700; letter-spacing: .05em; }
+        .hero h1 { position: relative; max-width: 800px; margin: 0 auto 18px; font-size: clamp(2.4rem, 6vw, 4.5rem); line-height: 1.05; letter-spacing: -.04em; }
+        .hero h1 span { color: #67e8f9; }
+        .hero p { position: relative; max-width: 660px; margin: 0 auto; color: #94a3b8; font-size: 1.05rem; line-height: 1.8; }
+        .evidence { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 16px auto 54px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; background: rgba(255,255,255,.08); }
+        .evidence div { padding: 16px; background: #172033; text-align: center; }
+        .evidence strong { display: block; color: #f8fafc; font-size: .92rem; }
+        .evidence span { color: #64748b; font-size: .73rem; }
+        .plans { display: grid; grid-template-columns: repeat(3, 1fr); align-items: stretch; gap: 18px; padding-bottom: 38px; }
+        .price-card { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 28px; border: 1px solid rgba(255,255,255,.1); border-radius: 18px; background: linear-gradient(160deg, rgba(30,41,59,.94), rgba(15,23,42,.96)); }
+        .price-card.featured { border-color: #06b6d4; box-shadow: 0 0 0 1px rgba(6,182,212,.22), 0 24px 60px rgba(6,182,212,.1); }
+        .popular { position: absolute; top: 15px; right: 15px; padding: 5px 9px; border-radius: 999px; color: #a5f3fc; background: rgba(6,182,212,.12); border: 1px solid rgba(6,182,212,.3); font-size: .68rem; font-weight: 800; }
+        .plan-kicker { margin-bottom: 8px; color: #94a3b8; font-size: .76rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+        .price-card h2 { margin: 0 0 22px; font-size: 1.45rem; }
+        .price { display: flex; align-items: baseline; gap: 5px; margin-bottom: 7px; font-size: 2.6rem; font-weight: 800; letter-spacing: -.04em; }
+        .price small { color: #94a3b8; font-size: .85rem; font-weight: 500; letter-spacing: 0; }
+        .description { min-height: 48px; margin: 0 0 22px; color: #94a3b8; font-size: .88rem; line-height: 1.6; }
+        .features { display: grid; gap: 12px; padding: 20px 0 26px; margin: 0 0 24px; border-top: 1px solid rgba(255,255,255,.08); list-style: none; flex: 1; }
+        .features li { display: flex; align-items: flex-start; gap: 10px; color: #cbd5e1; font-size: .86rem; line-height: 1.45; }
+        .features i { color: #22d3ee; margin-top: 3px; }
+        .preview-note { margin: 24px 0 72px; padding: 26px 28px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 20px; border: 1px solid rgba(251,191,36,.2); border-radius: 16px; background: rgba(245,158,11,.06); }
+        .preview-note > i { color: #fbbf24; font-size: 1.35rem; }
+        .preview-note h2 { margin: 0 0 4px; font-size: 1rem; }
+        .preview-note p { margin: 0; color: #94a3b8; font-size: .84rem; line-height: 1.55; }
+        footer { padding: 28px 0 42px; border-top: 1px solid rgba(255,255,255,.08); color: #64748b; font-size: .8rem; }
+        .footer-inner { display: flex; justify-content: space-between; gap: 20px; }
+        @media (max-width: 860px) {
+            .plans { grid-template-columns: 1fr; max-width: 600px; margin: 0 auto; }
+            .description { min-height: 0; }
+            .evidence { grid-template-columns: 1fr; }
+            .preview-note { grid-template-columns: auto 1fr; }
+            .preview-note .button { grid-column: 1 / -1; }
+        }
+        @media (max-width: 560px) {
+            .shell { width: min(100% - 28px, 1160px); }
+            .nav-link { display: none; }
+            .topbar-inner { height: 64px; }
+            .hero { padding: 70px 0 44px; }
+            .price-card { padding: 24px; }
+            .footer-inner { flex-direction: column; }
         }
     </style>
     <link rel="stylesheet" href="/styles/indicator-ui.css">
 </head>
 <body class="indicator-ui indicator-pricing">
-
-<div class="stars"></div>
-
-<nav>
-    <a href="/" class="nav-brand">
-        <div class="nav-logo" style="background: none; padding: 0; box-shadow: none;"><img src="/INDICATOR.png" alt="Logo" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"></div>
-        <span class="nav-name">INDICATOR</span>
-    </a>
-    <div class="nav-links">
-        <a href="/admin" class="nav-btn" id="adminLink" style="display:none">Admin</a>
-        <a href="#plans" class="nav-btn primary">สมัครเลย</a>
-    </div>
-</nav>
-
-<div class="hero">
-    <h1>เพิ่มช่องทางตอบคำถามบนเว็บไซต์</h1>
-    <p>เริ่มต้นใช้งาน INDICATOR เพื่อให้ข้อมูลธุรกิจของคุณเข้าถึงลูกค้าได้ตลอดเวลา</p>
-</div>
-
-<div class="section" id="plans">
-    <div class="plans">
-        <div class="plan" onclick="selectPlan('starter', 'Starter', 990, 1)">
-            <div class="plan-name">Starter</div>
-            <div class="plan-price">฿990<span style="font-size:1rem;color:var(--t2)">/เดือน</span></div>
-            <button class="btn btn-secondary">เลือก Starter</button>
+    <header class="topbar">
+        <div class="shell topbar-inner">
+            <a class="brand" href="/"><img src="/INDICATOR.png" alt="INDICATOR"><span>INDICATOR</span></a>
+            <nav class="nav-actions" aria-label="เมนูหลัก">
+                <a class="nav-link" href="/">หน้าหลัก</a>
+                <a class="button" href="/customer-login">เข้าสู่ระบบ</a>
+            </nav>
         </div>
-        <div class="plan" onclick="selectPlan('pro', 'Pro', 2490, 1)">
-            <div class="plan-name" style="color:var(--v3)">Pro</div>
-            <div class="plan-price">฿2,490<span style="font-size:1rem;color:var(--t2)">/เดือน</span></div>
-            <button class="btn btn-primary">เลือก Pro</button>
+    </header>
+
+    <main>
+        <section class="hero shell">
+            <div class="eyebrow"><i class="fa-solid fa-circle-info"></i> FREE PREVIEW · MANUAL ONBOARDING</div>
+            <h1>ราคาโปร่งใส<br><span>ตามปริมาณการใช้งานจริง</span></h1>
+            <p>ทุกแพ็กเกจใช้ระบบตอบคำถามจากข้อมูลธุรกิจ มี tenant isolation และจำกัดการใช้งานจากฝั่งเซิร์ฟเวอร์ ไม่มีค่าติดตั้งแอบแฝง</p>
+        </section>
+
+        <div class="shell evidence" aria-label="หลักฐานคุณภาพ">
+            <div><strong>Safety 100%</strong><span>offline regression gate</span></div>
+            <div><strong>Determinism 100%</strong><span>รันซ้ำ 3 รอบต่อเคส</span></div>
+            <div><strong>Tenant isolated</strong><span>origin, knowledge และ usage</span></div>
         </div>
-    </div>
-</div>
 
-<div class="section">
-    <!-- Order Form -->
-    <div class="order-wrapper" id="orderSection">
-        <div class="order-header">
-            <div class="order-header-icon"><i class="fa-solid fa-cart-shopping"></i></div>
-            <div><h3 id="orderTitle">สมัครใช้งาน</h3></div>
-        </div>
-        <div class="order-body">
-            <div id="step1">
-                <div class="form-group"><label class="form-label">ชื่อบริษัท / ร้านค้า</label><input class="form-input" id="companyName" type="text"></div>
-                <div class="form-group"><label class="form-label">อีเมล</label><input class="form-input" id="email" type="email"></div>
-                
-                <div style="background:rgba(6,182,212,0.06); padding: 16px; border-radius:12px; margin-top:20px;">
-                    <p style="margin-bottom:8px">โอนเงินเข้าบัญชี: <b>ธนาคารกสิกรไทย (KBANK)</b></p>
-                    <p>เลขที่บัญชี: <b>xxx-x-xxxxx-x</b></p>
-                    <p>ชื่อบัญชี: <b>บริษัท INDICATOR จำกัด</b></p>
-                </div>
+        <section class="shell plans" aria-label="แพ็กเกจ">
+            <article class="price-card" id="starter">
+                <div class="plan-kicker">เริ่มต้น</div>
+                <h2>Starter</h2>
+                <div class="price">฿990 <small>/ เดือน</small></div>
+                <p class="description">สำหรับเว็บไซต์ขนาดเล็กที่ต้องการตอบคำถามจากข้อมูลของตนเอง</p>
+                <ul class="features">
+                    <li><i class="fa-solid fa-check"></i><span>1,000 ข้อความต่อเดือน</span></li>
+                    <li><i class="fa-solid fa-check"></i><span>Crawl เว็บไซต์ 20 ครั้งต่อเดือน</span></li>
+                    <li><i class="fa-solid fa-check"></i><span>ส่งต่อเจ้าหน้าที่ 25 ครั้งต่อเดือน</span></li>
+                    <li><i class="fa-solid fa-check"></i><span>จัดการ knowledge 50 ครั้งต่อเดือน</span></li>
+                </ul>
+                <a class="button" href="/?plan=Starter#pricing">เลือก Starter</a>
+            </article>
 
-                <div class="slip-upload-area" onclick="document.getElementById('slipFile').click()">
-                    <input type="file" id="slipFile" accept="image/*" onchange="handleSlipUpload(event)" style="display:none">
-                    <p id="slipText">คลิกเพื่ออัปโหลดสลิปโอนเงิน</p>
-                    <img id="slipPreview" class="slip-preview">
-                </div>
-                
-                <button class="btn btn-primary" id="submitBtn" onclick="submitOrder()">ยืนยันและรับ Plugin Code</button>
-            </div>
-        </div>
-    </div>
+            <article class="price-card featured" id="pro">
+                <span class="popular">ยอดนิยม</span>
+                <div class="plan-kicker">สำหรับทีมที่เติบโต</div>
+                <h2>Pro</h2>
+                <div class="price">฿2,490 <small>/ เดือน</small></div>
+                <p class="description">เพิ่มโควตาสำหรับเว็บไซต์ที่มีบทสนทนาและข้อมูลหลายหน้ามากขึ้น</p>
+                <ul class="features">
+                    <li><i class="fa-solid fa-check"></i><span>10,000 ข้อความต่อเดือน</span></li>
+                    <li><i class="fa-solid fa-check"></i><span>Crawl เว็บไซต์ 100 ครั้งต่อเดือน</span></li>
+                    <li><i class="fa-solid fa-check"></i><span>ส่งต่อเจ้าหน้าที่ 250 ครั้งต่อเดือน</span></li>
+                    <li><i class="fa-solid fa-check"></i><span>จัดการ knowledge 500 ครั้งต่อเดือน</span></li>
+                </ul>
+                <a class="button primary" href="/?plan=Pro#pricing">เลือก Pro</a>
+            </article>
 
-    <!-- Success Section -->
-    <div class="success-wrapper" id="successSection">
-        <h2 id="successTitle">🎉 สมัครสำเร็จ!</h2>
-        <p id="successSubtitle" style="margin-bottom:20px"></p>
-        
-        <div class="plugin-code-box" id="pluginCodeBox" style="display:none">
-            <h4>Plugin Code — วางก่อนปิด &lt;/body&gt;</h4>
-            <div class="code-block" id="pluginCodeDisplay"></div>
-        </div>
-        
-        <div id="pendingNotice" style="display:none; color:var(--a1); margin-top:20px;">
-            เราได้รับคำขอของคุณแล้ว ทีมงานจะตรวจสอบและส่งรหัสผ่านอีเมลภายใน 24 ชม.
-        </div>
-    </div>
-</div>
+            <article class="price-card" id="enterprise">
+                <div class="plan-kicker">องค์กร</div>
+                <h2>Enterprise</h2>
+                <div class="price" style="font-size:2rem">ออกแบบร่วมกัน</div>
+                <p class="description">สำหรับองค์กรที่ต้องการโควตาสูง การกำกับดูแล และขอบเขตสนับสนุนเฉพาะ</p>
+                <ul class="features">
+                    <li><i class="fa-solid fa-check"></i><span>สูงสุด 100,000 ข้อความต่อเดือน</span></li>
+                    <li><i class="fa-solid fa-check"></i><span>Crawl เว็บไซต์ 1,000 ครั้งต่อเดือน</span></li>
+                    <li><i class="fa-solid fa-check"></i><span>ส่งต่อเจ้าหน้าที่ 2,500 ครั้งต่อเดือน</span></li>
+                    <li><i class="fa-solid fa-check"></i><span>กำหนด deployment และ support scope</span></li>
+                </ul>
+                <a class="button" href="https://lin.ee/O1Oa0p5" target="_blank" rel="noopener noreferrer">คุยกับทีมงาน</a>
+            </article>
+        </section>
 
-<script>
-    let selectedPlan = null;
-    let slipBase64 = null;
-    
-    function selectPlan(id, name, price, months) {
-        selectedPlan = { id, name, price, months };
-        document.getElementById('orderTitle').textContent = `สมัคร ${name} Package (฿${price})`;
-        document.getElementById('orderSection').classList.add('visible');
-        document.getElementById('successSection').classList.remove('visible');
-        document.getElementById('orderSection').scrollIntoView({ behavior: 'smooth' });
-    }
+        <aside class="shell preview-note">
+            <i class="fa-solid fa-clock"></i>
+            <div><h2>ข้อจำกัดของรุ่น Preview</h2><p>ระบบออนไลน์ใช้ Render Free จึงอาจมี cold start บัญชีใหม่เปิดแบบเชิญ และการชำระเงินตรวจสอบโดยทีมงานก่อนเปิดแพ็กเกจ</p></div>
+            <a class="button" href="https://lin.ee/O1Oa0p5" target="_blank" rel="noopener noreferrer">ขอสิทธิ์ Preview</a>
+        </aside>
+    </main>
 
-    function handleSlipUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            slipBase64 = e.target.result;
-            document.getElementById('slipText').textContent = '✅ ' + file.name;
-            const preview = document.getElementById('slipPreview');
-            preview.src = slipBase64;
-            preview.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-    }
-
-    async function submitOrder() {
-        const companyName = document.getElementById('companyName').value.trim();
-        const email = document.getElementById('email').value.trim();
-        
-        if (!companyName || !email) { alert('กรุณากรอกข้อมูลให้ครบถ้วน'); return; }
-        if (!slipBase64) { alert('กรุณาอัปโหลดสลิป'); return; }
-        
-        const btn = document.getElementById('submitBtn');
-        btn.textContent = 'กำลังส่ง...'; btn.disabled = true;
-
-        try {
-            const res = await fetch('/api/checkout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    companyName, email,
-                    packageType: selectedPlan.name,
-                    paymentProvider: 'slipok',
-                    slipBase64: slipBase64
-                })
-            });
-            const data = await res.json();
-            
-            document.getElementById('orderSection').classList.remove('visible');
-            document.getElementById('successSection').classList.add('visible');
-            
-            if (data.success && data.apiKey) {
-                document.getElementById('successSubtitle').textContent = companyName + ' พร้อมใช้งานแล้ว';
-                const code = `<!-- INDICATOR AI Chat Widget -->
-<script 
-  src="${window.location.origin}/supreme-boost/boost.js"
-  data-api-key="${data.apiKey}"
-  data-title="AI Assistant"
-  defer>
-<\/script>`;
-                document.getElementById('pluginCodeDisplay').textContent = code;
-                document.getElementById('pluginCodeBox').style.display = 'block';
-            } else if (data.success) {
-                document.getElementById('successSubtitle').textContent = data.activated ? 'ชำระเงินสำเร็จและเปิดแพ็กเกจแล้ว' : 'รอการอนุมัติสลิปโอนเงิน';
-                document.getElementById('pendingNotice').style.display = data.activated ? 'none' : 'block';
-            } else {
-                throw new Error(data.error || 'เกิดข้อผิดพลาด');
-            }
-        } catch (err) {
-            alert('Error: ' + err.message);
-            btn.textContent = 'ยืนยันและรับ Plugin Code'; btn.disabled = false;
-        }
-    }
-</script>
+    <footer>
+        <div class="shell footer-inner"><span>© 2026 INDICATOR</span><span>Website conversation platform</span></div>
+    </footer>
 </body>
 </html>

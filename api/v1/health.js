@@ -7,13 +7,15 @@ const { getRateLimiterStats } = require('../../services/rateLimit');
 const { setCorsHeaders } = require('../../services/cors');
 const router = require('../../services/ai/router');
 const { databaseIsReady } = require('../_mongodb');
-const { verifyAccessJWT } = require('../_auth');
+const { verifyAccessJWT, accessTokenFromRequest } = require('../_auth');
 const { validateProductionConfig } = require('../../services/productionConfig');
 const { criticalIndexesAreReady, mongoSupportsTransactions } = require('../../services/mongoIndexes');
 const { connectToDatabase } = require('../_mongodb');
+const { releaseInfo } = require('../../services/release');
 
 let indexReadiness = { checkedAt: 0, ready: false };
 let topologyReadiness = { checkedAt: 0, ready: false };
+let draining = false;
 
 async function indexesAreReady() {
     if (Date.now() - indexReadiness.checkedAt < 60_000) return indexReadiness.ready;
@@ -32,16 +34,14 @@ async function transactionsAreReady() {
 }
 
 function operationsAuthorized(req) {
-    const authHeader = String(req.headers.authorization || '');
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    const token = accessTokenFromRequest(req);
     const claims = verifyAccessJWT(token);
     if (claims && claims.role === 'admin') return true;
     return Boolean(process.env.METRICS_TOKEN && token === process.env.METRICS_TOKEN);
 }
 
 const startTime = Date.now();
-const requestCounter = { total: 0, success: 0, error: 0, cached: 0 };
-const agentStats = { planner: 0, executor: 0, reviewer: 0, memory: 0, vision: 0 };
+const requestCounter = { total: 0, success: 0, error: 0 };
 
 function getMemoryUsage() {
     try {
@@ -69,6 +69,27 @@ function getUptime() {
     };
 }
 
+async function readinessStatus() {
+    const production = process.env.NODE_ENV === 'production';
+    const mongo = production ? await databaseIsReady() : true;
+    const indexes = production && mongo ? await indexesAreReady() : !production;
+    const transactions = production && mongo ? await transactionsAreReady() : !production;
+    const configuration = production ? validateProductionConfig() : { ok: true, modes: {} };
+    const allOk = Boolean(!draining && mongo && indexes && transactions && configuration.ok);
+    return {
+        ok: allOk,
+        status: allOk ? 'ready' : 'not_ready',
+        checks: {
+            server: draining ? 'draining' : 'ok',
+            mongo: mongo ? 'ok' : 'unavailable',
+            indexes: indexes ? 'ok' : 'missing',
+            transactions: transactions ? 'ok' : 'unsupported',
+            configuration: configuration.ok ? 'ok' : 'invalid'
+        },
+        modes: configuration.modes || {}
+    };
+}
+
 module.exports = async function handler(req, res) {
     if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === 'OPTIONS') return res.status(200).end();
@@ -79,52 +100,42 @@ module.exports = async function handler(req, res) {
     const rateLimiterStats = getRateLimiterStats ? getRateLimiterStats() : {};
 
     if (url.includes('/livez') && req.method === 'GET') {
-        return res.status(200).json({ status: 'live', uptime: uptime.formatted });
+        return res.status(200).json({ status: 'live', uptime: uptime.formatted, release: releaseInfo() });
     }
 
     if (url.includes('/readyz') && req.method === 'GET') {
-        const production = process.env.NODE_ENV === 'production';
-        const mongo = production ? await databaseIsReady() : true;
-        const indexes = production && mongo ? await indexesAreReady() : !production;
-        const transactions = production && mongo ? await transactionsAreReady() : !production;
-        const configuration = production ? validateProductionConfig() : { ok: true };
-        const allOk = Boolean(mongo && indexes && transactions && configuration.ok);
-        return res.status(allOk ? 200 : 503).json({
-            status: allOk ? 'ready' : 'not_ready',
-            checks: { server: 'ok', mongo: mongo ? 'ok' : 'unavailable', indexes: indexes ? 'ok' : 'missing', transactions: transactions ? 'ok' : 'unsupported', configuration: configuration.ok ? 'ok' : 'invalid' }
-        });
+        const readiness = await readinessStatus();
+        return res.status(readiness.ok ? 200 : 503).json({ ...readiness, release: releaseInfo() });
     }
 
     // Detailed dependency and provider state is operational data, not a
     // public probe response.
     if (url.includes('/health') && req.method === 'GET') {
+        const release = releaseInfo();
         if (!operationsAuthorized(req)) {
-            const production = process.env.NODE_ENV === 'production';
-            const mongo = production ? await databaseIsReady() : true;
-            return res.status(mongo ? 200 : 503).json({ status: mongo ? 'healthy' : 'degraded', version: '3.1.0', project: 'INDICATOR' });
+            const readiness = await readinessStatus();
+            return res.status(readiness.ok ? 200 : 503).json({ status: readiness.ok ? 'healthy' : 'degraded', project: 'INDICATOR', version: release.version, release });
         }
         const runtime = router.runtimeStatus();
-        const tenantRequired = process.env.REQUIRE_TENANT_API_KEY === 'true' || process.env.NODE_ENV === 'production';
-        const mongo = tenantRequired ? await databaseIsReady() : null;
+        const readiness = await readinessStatus();
         const checks = {
-            server: 'ok',
+            ...readiness.checks,
             primary_provider: runtime.primaryConfigured ? 'ok' : 'missing',
             fallback_provider: runtime.fallbackConfigured ? 'ok' : 'missing',
-            mongo: tenantRequired ? (mongo ? 'ok' : 'missing') : 'optional',
             supabase: process.env.SUPABASE_URL && process.env.SUPABASE_KEY ? 'ok' : 'optional',
-            cache:       cacheStats.size <= 100        ? 'ok' : 'warn',
-            keep_alive:  process.env.RENDER_EXTERNAL_URL ? 'active' : 'disabled'
+            cache:       cacheStats.size <= 100        ? 'ok' : 'warn'
         };
-        const allOk = checks.server === 'ok' && (!tenantRequired || Boolean(mongo));
 
-        return res.status(allOk ? 200 : 503).json({
-            status: allOk ? 'healthy' : 'degraded',
-            version: '3.1.0',
+        return res.status(readiness.ok ? 200 : 503).json({
+            status: readiness.ok ? 'healthy' : 'degraded',
             project: 'INDICATOR',
+            version: release.version,
+            release,
             timestamp: new Date().toISOString(),
             uptime: uptime.formatted,
             uptime_ms: uptime.ms,
             checks,
+            modes: readiness.modes,
             runtime: { primary: runtime.primary, fallback: runtime.fallback, circuits: runtime.circuits }
         });
     }
@@ -132,23 +143,17 @@ module.exports = async function handler(req, res) {
     // --- GET /metrics ---
     if (url.includes('/metrics') && req.method === 'GET') {
         if (!operationsAuthorized(req)) return res.status(401).json({ error: 'Unauthorized' });
-        const hitRate = requestCounter.total > 0
-            ? ((requestCounter.cached / requestCounter.total) * 100).toFixed(1)
-            : '0.0';
-
         return res.status(200).json({
-            project: 'OMEGA-JARVIS',
-            version: '3.0.0',
+            project: 'INDICATOR',
+            release: releaseInfo(),
             timestamp: new Date().toISOString(),
             uptime: uptime,
+            scope: 'process',
             requests: {
                 total: requestCounter.total,
                 success: requestCounter.success,
-                error: requestCounter.error,
-                cached: requestCounter.cached,
-                cache_hit_rate_pct: parseFloat(hitRate)
+                error: requestCounter.error
             },
-            agents: agentStats,
             cache: {
                 size: cacheStats.size,
                 max_size: 100,
@@ -156,23 +161,7 @@ module.exports = async function handler(req, res) {
             },
             memory: getMemoryUsage(),
             rate_limiter: rateLimiterStats,
-            runtime: router.runtimeStatus(),
-            ai_keys: {
-                gemini_keys_configured: [
-                    process.env.GEMINI_API_KEY,
-                    process.env.GEMINI_API_KEY_2,
-                    process.env.GEMINI_API_KEY_3,
-                    process.env.GEMINI_API_KEY_4,
-                    process.env.GEMINI_API_KEY_5
-                ].filter(Boolean).length,
-                groq: !!process.env.GROQ_API_KEY,
-                cohere: !!process.env.COHERE_API_KEY
-            },
-            targets: {
-                api_latency_ms_target: 800,
-                target_fps: 60,
-                uptime_target_pct: 99.99
-            }
+            runtime: router.runtimeStatus()
         });
     }
 
@@ -180,5 +169,6 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.requestCounter = requestCounter;
-module.exports.agentStats = agentStats;
 module.exports.__operationsAuthorized = operationsAuthorized;
+module.exports.__readinessStatus = readinessStatus;
+module.exports.setDraining = value => { draining = Boolean(value); };

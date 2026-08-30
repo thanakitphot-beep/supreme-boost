@@ -7,6 +7,8 @@ const { maskPII } = require('../services/safety');
 const { checkRateLimit } = require('../services/rateLimit');
 const { applyPluginCors, authorizePluginRequest } = require('../services/tenantAccess');
 const { consumeUsage, entitlementsFor } = require('../services/plans');
+const { normalizeEmail } = require('../services/email');
+const { handoffDeliveryMode } = require('../services/productionConfig');
 
 function cleanText(value, max) {
     return maskPII(String(value || '').replace(/\s+/g, ' ').trim()).slice(0, max);
@@ -14,19 +16,31 @@ function cleanText(value, max) {
 
 function safeContact(settings = {}) {
     const contact = {};
-    const email = cleanText(settings.support_email, 200);
-    const phone = cleanText(settings.support_phone, 40);
-    const url = cleanText(settings.support_url, 500);
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email)) contact.email = email;
+    const email = normalizeEmail(settings.support_email);
+    const phone = String(settings.support_phone || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    const url = String(settings.support_url || '').trim().slice(0, 500);
+    if (email) contact.email = email;
     if (/^[+\d][\d\s()-]{5,30}$/u.test(phone)) contact.phone = phone;
     try {
         const parsed = new URL(url);
-        if (parsed.protocol === 'https:') contact.url = parsed.href;
+        if (parsed.protocol === 'https:' && !parsed.username && !parsed.password) contact.url = parsed.href;
     } catch (_) { }
     return contact;
 }
 
+function pageUrlForOrigin(value, origin) {
+    try {
+        const page = new URL(String(value || ''));
+        const expectedOrigin = new URL(String(origin || '')).origin;
+        if (!['http:', 'https:'].includes(page.protocol) || page.origin !== expectedOrigin || page.username || page.password) return '';
+        return `${page.origin}${page.pathname || '/'}`.slice(0, 500);
+    } catch (_) {
+        return '';
+    }
+}
+
 async function notifySupport(ticket) {
+    if (handoffDeliveryMode() !== 'smtp') return 'queued';
     if (!ticket.contact.email || !process.env.SMTP_USER || !process.env.SMTP_PASS) return 'queued';
     const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -69,11 +83,12 @@ module.exports = async function handoffHandler(req, res) {
     if (!entitlements.features.handoff) return res.status(403).json({ error: 'This plan does not include human handoff' });
     if (!await checkRateLimit(req, res, 'api', { principal: `tenant:${access.tenant.id}`, limit: entitlements.chatPerMinute })) return;
 
-    const db = await connectToDatabase();
-    if (!db) return res.status(503).json({ error: 'Support queue is temporarily unavailable' });
-
     const tenantId = access.tenant.id;
     const idempotencyKey = cleanText(body.idempotencyKey, 120) || crypto.randomUUID();
+    const pageUrl = pageUrlForOrigin(body.url, req.headers.origin);
+    if (body.url && !pageUrl) return res.status(400).json({ error: 'Page URL must match the registered browser origin' });
+    const db = await connectToDatabase();
+    if (!db) return res.status(503).json({ error: 'Support queue is temporarily unavailable' });
     const settings = await db.collection('settings').findOne({ id: tenantId }) || {};
     const contact = safeContact(settings);
     const now = new Date().toISOString();
@@ -90,7 +105,7 @@ module.exports = async function handoffHandler(req, res) {
             role: item && item.role === 'assistant' ? 'assistant' : 'user',
             text: cleanText(item && item.text, 600)
         })).filter(item => item.text) : [],
-        page: { url: cleanText(body.url, 500), title: cleanText(body.title, 200) },
+        page: { url: pageUrl, title: cleanText(body.title, 200) },
         contact,
         created_at: now,
         updated_at: now
@@ -105,6 +120,10 @@ module.exports = async function handoffHandler(req, res) {
     }
     const usage = await consumeUsage(access.tenant, 'handoff');
     if (!usage.allowed) {
+        if (usage.status === 503) {
+            await db.collection('handoff_tickets').deleteOne({ id: ticket.id, status: 'reserving' });
+            return res.status(503).json({ error: usage.reason });
+        }
         await db.collection('handoff_tickets').updateOne({ id: ticket.id }, { $set: { status: 'quota_rejected', updated_at: new Date().toISOString() } });
         return res.status(usage.status || 429).json({ error: usage.reason });
     }
@@ -128,3 +147,6 @@ module.exports = async function handoffHandler(req, res) {
         message: ticket.status === 'delivered' ? 'คำขอถูกส่งถึงช่องทางเจ้าหน้าที่แล้ว' : 'คำขอถูกส่งเข้าคิวเจ้าหน้าที่แล้ว'
     });
 };
+
+module.exports.__safeContact = safeContact;
+module.exports.__pageUrlForOrigin = pageUrlForOrigin;

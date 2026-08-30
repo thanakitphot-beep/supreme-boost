@@ -10,7 +10,8 @@
     <meta property="og:title" content="INDICATOR - Website Conversation Platform">
     <meta property="og:description" content="เพิ่มช่องทางตอบคำถามบนเว็บไซต์จากข้อมูลธุรกิจที่ควบคุมได้">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://test-mu-cyan-21.vercel.app">
+    <meta property="og:url" content="https://indicator-web-chat.onrender.com">
+    <link rel="canonical" href="https://indicator-web-chat.onrender.com/">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -109,8 +110,8 @@
                     <a href="javascript:void(0)" onclick="openAuthModal('login')" id="nav-login-btn" class="hover:text-cyan-400 transition text-cyan-400">เข้าสู่ระบบ</a>
                 </div>
                 <div class="hidden md:block" id="nav-action-container">
-                    <a href="javascript:void(0)" onclick="openAuthModal('register')" id="nav-register-btn" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-6 py-2.5 rounded-full font-semibold shadow-lg shadow-cyan-500/30 transition transform hover:scale-105">
-                        สมัครสมาชิก
+                    <a href="https://lin.ee/O1Oa0p5" target="_blank" rel="noopener noreferrer" id="nav-register-btn" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-6 py-2.5 rounded-full font-semibold shadow-lg shadow-cyan-500/30 transition transform hover:scale-105">
+                        ขอสิทธิ์ Preview
                     </a>
                 </div>
 
@@ -128,7 +129,7 @@
                 <a href="#pricing" onclick="toggleMobileMenu()" class="block text-base font-medium text-slate-300 hover:text-white px-2 py-2">ราคา</a>
                 <a href="#faq" onclick="toggleMobileMenu()" class="block text-base font-medium text-slate-300 hover:text-white px-2 py-2">FAQ</a>
                 <a href="javascript:void(0)" onclick="toggleMobileMenu(); openAuthModal('login')" id="nav-login-btn-mobile" class="block text-base font-medium text-cyan-400 px-2 py-2">เข้าสู่ระบบ</a>
-                <a href="javascript:void(0)" onclick="toggleMobileMenu(); openAuthModal('register')" id="nav-register-btn-mobile" class="block w-full text-center bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold mt-4">สมัครสมาชิก</a>
+                <a href="https://lin.ee/O1Oa0p5" target="_blank" rel="noopener noreferrer" id="nav-register-btn-mobile" class="block w-full text-center bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold mt-4">ขอสิทธิ์ Preview</a>
             </div>
         </div>
     </nav>
@@ -138,10 +139,10 @@
         <div class="hero-glow"></div>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
             <div class="inline-flex items-center space-x-2 bg-slate-800/50 border border-slate-700 rounded-full px-4 py-1.5 mb-8">
-                <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                <span class="text-xs font-medium text-slate-300">พร้อมใช้งานสำหรับเว็บไซต์ธุรกิจ</span>
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span class="text-xs font-medium text-slate-300">Free preview · เปิดบัญชีใหม่แบบเชิญ</span>
             </div>
-            <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight mb-8">
+            <h1 class="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight mb-8">
                 บทสนทนาที่ดีขึ้น<br />
                 <span class="gradient-text">สำหรับเว็บไซต์ของคุณ</span>
             </h1>
@@ -150,8 +151,9 @@
             </p>
             <div class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6">
                 <a href="#pricing" class="w-full sm:w-auto px-8 py-4 rounded-xl text-lg font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:scale-105 transition transform shadow-xl shadow-cyan-500/25">
-                    เลือกแพ็กเกจ
+                    ดูแพ็กเกจ
                 </a>
+                <a href="/customer-login" class="w-full sm:w-auto px-8 py-4 rounded-xl text-lg font-semibold border border-slate-600 text-slate-200 hover:border-cyan-400 hover:text-cyan-300 transition">เข้าสู่พอร์ทัลลูกค้า</a>
             </div>
         </div>
     </section>
@@ -205,10 +207,10 @@
                     <p class="text-slate-400 mb-8 text-sm">เหมาะสำหรับเว็บไซต์ขนาดเล็กที่ต้องการผู้ช่วยตอบคำถาม</p>
                     <ul class="space-y-4 mb-8 flex-1">
                         <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> AI แชทตอบคำถาม 1,000 ข้อความ/เดือน</li>
-                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> เรียนรู้ข้อมูลเว็บอัตโนมัติ</li>
-                        <li class="flex items-center text-slate-500 text-sm"><i class="fa-solid fa-xmark mr-3"></i> ไม่มีการนำทางข้ามหน้า</li>
+                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> Crawl เว็บไซต์ 20 ครั้ง/เดือน</li>
+                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ส่งต่อเจ้าหน้าที่ 25 ครั้ง/เดือน</li>
                     </ul>
-                    <button onclick="openCheckout('Starter', 990)" class="w-full py-3 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition border border-slate-700">เริ่มต้นใช้งาน</button>
+                    <button onclick="beginCheckout('Starter', 990)" class="w-full py-3 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition border border-slate-700">เลือก Starter</button>
                 </div>
 
                 <!-- Pro -->
@@ -220,10 +222,10 @@
                     <ul class="space-y-4 mb-8 flex-1">
                         <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> AI แชท 10,000 ข้อความ/เดือน</li>
                         <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> การนำทางตามบริบท</li>
-                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> แหล่งข้อมูลเว็บไซต์หลายหน้า</li>
-                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> รองรับ 2 ภาษาหลัก (TH/EN)</li>
+                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> Crawl เว็บไซต์ 100 ครั้ง/เดือน</li>
+                        <li class="flex items-center text-white text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ส่งต่อเจ้าหน้าที่ 250 ครั้ง/เดือน</li>
                     </ul>
-                    <button onclick="openCheckout('Pro', 2490)" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:scale-105 transition shadow-lg shadow-cyan-500/25 font-bold">เลือกแพ็กเกจนี้</button>
+                    <button onclick="beginCheckout('Pro', 2490)" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:scale-105 transition shadow-lg shadow-cyan-500/25 font-bold">เลือก Pro</button>
                 </div>
 
                 <!-- Enterprise -->
@@ -232,13 +234,39 @@
                     <div class="text-4xl font-bold mb-6">ติดต่อเรา</div>
                     <p class="text-slate-400 mb-8 text-sm">สำหรับองค์กรที่ต้องการการกำกับดูแล การปรับแต่ง และการสนับสนุนเฉพาะทาง</p>
                     <ul class="space-y-4 mb-8 flex-1">
-                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ไม่จำกัดข้อความ/เดือน</li>
+                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> สูงสุด 100,000 ข้อความ/เดือน</li>
                         <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> ป้อนข้อมูล Knowledge Base (RAG) ขั้นสูง</li>
                         <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> Custom Widget Design</li>
-                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> SLA Support 24/7</li>
+                        <li class="flex items-center text-slate-300 text-sm"><i class="fa-solid fa-check text-cyan-400 mr-3"></i> Support และ SLA ตามสัญญา</li>
                     </ul>
-                    <button onclick="openCheckout('Enterprise', 0)" class="w-full py-3 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition border border-slate-700">ติดต่อทีมขาย</button>
+                    <a href="https://lin.ee/O1Oa0p5" target="_blank" rel="noopener noreferrer" class="block w-full py-3 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition border border-slate-700 text-center">ติดต่อทีมงาน</a>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="preview" class="py-20 bg-slate-900/50 border-y border-slate-800">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 grid md:grid-cols-[1.1fr_.9fr] gap-10 items-start">
+            <div>
+                <p class="text-cyan-400 text-sm font-bold tracking-widest uppercase mb-3">Free Preview</p>
+                <h2 class="text-3xl md:text-4xl font-bold mb-5">ทดลองอย่างโปร่งใส ก่อนอัปเกรดระบบ</h2>
+                <p class="text-slate-400 leading-relaxed">รุ่นออนไลน์ปัจจุบันใช้ Render Free จึงอาจใช้เวลาเริ่มระบบหลังไม่มีการใช้งาน เปิดบัญชีใหม่แบบเชิญ และตรวจสอบการชำระเงินด้วยทีมงาน ระบบตอบคำถามและข้อมูลของแต่ละลูกค้ายังคงแยกจากกันตาม tenant</p>
+            </div>
+            <div class="grid gap-3">
+                <div class="feature-card rounded-xl p-5 flex gap-4"><i class="fa-solid fa-shield-halved text-cyan-400 mt-1"></i><div><h3 class="font-bold mb-1">ควบคุมข้อมูล</h3><p class="text-sm text-slate-400">ตอบจาก catalog และ knowledge ที่กำหนด พร้อมอ้างอิงแหล่งข้อมูล</p></div></div>
+                <div class="feature-card rounded-xl p-5 flex gap-4"><i class="fa-solid fa-flask text-blue-400 mt-1"></i><div><h3 class="font-bold mb-1">ผ่าน regression benchmark</h3><p class="text-sm text-slate-400">ตรวจ safety, determinism, citations และ tenant isolation ก่อน release</p></div></div>
+                <div class="feature-card rounded-xl p-5 flex gap-4"><i class="fa-solid fa-user-lock text-purple-400 mt-1"></i><div><h3 class="font-bold mb-1">บัญชีแบบเชิญ</h3><p class="text-sm text-slate-400">ลูกค้าที่ได้รับบัญชีแล้วสามารถเข้าสู่พอร์ทัลเพื่อจัดการระบบได้ทันที</p></div></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="faq" class="py-20">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12"><h2 class="text-3xl md:text-4xl font-bold mb-3">คำถามที่พบบ่อย</h2><p class="text-slate-400">ข้อจำกัดและขั้นตอนของรุ่น Preview</p></div>
+            <div class="grid gap-4">
+                <details class="feature-card rounded-xl p-5"><summary class="font-semibold cursor-pointer">ทำไมยังสมัครบัญชีเองไม่ได้?</summary><p class="text-slate-400 text-sm leading-relaxed mt-3">Render Free ไม่เหมาะกับการส่ง SMTP อย่างน่าเชื่อถือ รุ่นนี้จึงปิด OTP และเปิดบัญชีผ่านผู้ดูแลเพื่อไม่ให้ผู้ใช้ติดอยู่ในขั้นตอนสมัคร</p></details>
+                <details class="feature-card rounded-xl p-5"><summary class="font-semibold cursor-pointer">ชำระเงินอย่างไร?</summary><p class="text-slate-400 text-sm leading-relaxed mt-3">บัญชีที่ได้รับเชิญสามารถเข้าสู่ระบบ เลือกแพ็กเกจ และส่งหลักฐานผ่านช่องทางที่ผู้ดูแลกำหนด โดยสถานะจะเปลี่ยนหลังตรวจสอบสำเร็จ</p></details>
+                <details class="feature-card rounded-xl p-5"><summary class="font-semibold cursor-pointer">ข้อมูลระหว่างลูกค้าปะปนกันหรือไม่?</summary><p class="text-slate-400 text-sm leading-relaxed mt-3">API key, origin, knowledge, usage และรายการส่งต่อเจ้าหน้าที่ถูกผูกกับ tenant และมี regression test ป้องกันการอ้างอิงข้าม tenant</p></details>
             </div>
         </div>
     </section>
@@ -250,21 +278,18 @@
                 <span class="text-lg font-bold tracking-wider">INDICATOR <span class="text-cyan-400">WEBSITE PLATFORM</span></span>
                 <p class="text-sm text-slate-500 mt-2">&copy; 2026 INDICATOR. All rights reserved.</p>
             </div>
-            <div class="flex space-x-6 text-slate-400">
-                <a href="#" class="hover:text-cyan-400 transition"><i class="fa-brands fa-twitter text-xl"></i></a>
-                <a href="#" class="hover:text-cyan-400 transition"><i class="fa-brands fa-github text-xl"></i></a>
-                <a href="#" class="hover:text-cyan-400 transition"><i class="fa-brands fa-discord text-xl"></i></a>
+            <div class="flex space-x-6 text-sm text-slate-400">
+                <a href="/pricing" class="hover:text-cyan-400 transition">ราคา</a>
+                <a href="/customer-login" class="hover:text-cyan-400 transition">พอร์ทัลลูกค้า</a>
+                <a href="https://github.com/thanakitphot-beep/supreme-boost" rel="noopener noreferrer" class="hover:text-cyan-400 transition">GitHub</a>
             </div>
         </div>
     </footer>
 
-    <!-- Try INDICATOR WEB CHAT Widget on its own landing page! -->
-    <script src="/supreme-boost/boost.js" data-backend-url="/api/chat" data-lang="auto" data-shop-prompt="นี่คือหน้าเว็บขาย INDICATOR Website Platform สำหรับธุรกิจ มีแพ็กเกจ Starter (990), Pro (2490) และ Enterprise ช่วยตอบคำถามจากข้อมูลธุรกิจและนำทางผู้ใช้ไปยังหน้าที่เกี่ยวข้อง" defer></script>
-
     <!-- Customer Dashboard (Removed, moved to Nav Dropdown) -->
 
     <!-- Auth Modal (Login / Register) -->
-    <div id="auth-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
+    <div id="auth-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden p-4">
         <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onclick="closeAuthModal()"></div>
         <div class="glass-nav border border-slate-700 p-8 rounded-2xl w-full max-w-md relative z-10">
             <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
@@ -306,19 +331,19 @@
             </form>
             <div class="flex items-center gap-3 my-5 text-xs text-slate-500"><div class="h-px flex-1 bg-slate-700"></div><span>หรือ</span><div class="h-px flex-1 bg-slate-700"></div></div>
             <div id="landing-google-signin" class="hidden flex justify-center"></div>
-            <div class="mt-4 text-center text-sm text-slate-400">
-                <span id="auth-switch-text">ยังไม่มีบัญชี?</span> 
-                <a href="javascript:void(0)" onclick="toggleAuthMode()" class="text-cyan-400 hover:underline" id="auth-switch-link">สมัครสมาชิก</a>
+            <div class="mt-4 text-center text-sm text-slate-400" id="auth-switch-row">
+                <span id="auth-switch-text">บัญชีใหม่เปิดแบบเชิญในช่วง Preview</span>
+                <a href="javascript:void(0)" onclick="toggleAuthMode()" class="text-cyan-400 hover:underline hidden" id="auth-switch-link">สมัครสมาชิก</a>
             </div>
         </div>
     </div>
     <!-- Checkout Modal -->
-    <div id="checkout-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
+    <div id="checkout-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden p-4">
         <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" onclick="closeCheckout()"></div>
         <div class="glass-nav border border-slate-700 p-8 rounded-2xl w-full max-w-md relative z-10 max-h-[90vh] overflow-y-auto">
             <button onclick="closeCheckout()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
             <h2 class="text-2xl font-bold mb-2">สั่งซื้อแพ็กเกจ <span id="checkout-pkg" class="text-cyan-400"></span></h2>
-            <p class="text-slate-400 text-sm mb-6">กรุณาโอนเงินเข้าบัญชีด้านล่างและแนบสลิปเพื่อรับ API Key</p>
+            <p class="text-slate-400 text-sm mb-6">ตรวจสอบช่องทางชำระเงินที่ระบบแสดง แล้วแนบหลักฐานเพื่อรอการอนุมัติแพ็กเกจ</p>
             
             <div id="payment-methods-container" class="space-y-4 mb-6">
                 <!-- Injected via JS -->
@@ -357,7 +382,7 @@
                 <i class="fa-solid fa-check text-4xl text-green-400"></i>
             </div>
             <h2 class="text-3xl font-bold mb-4">ส่งคำขอสำเร็จ!</h2>
-            <p class="text-slate-300 text-lg mb-8">เราได้รับสลิปของคุณแล้ว<br>แอดมินจะตรวจสอบและส่ง <b>API Key</b> ไปให้ทางอีเมลภายใน 15 นาที</p>
+            <p class="text-slate-300 text-lg mb-8">ระบบได้รับคำขอของคุณแล้ว<br>ทีมงานจะตรวจสอบและแจ้งผลผ่านช่องทางที่ตกลงไว้</p>
             <button onclick="document.getElementById('success-modal').classList.add('hidden')" class="px-8 py-3 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition">กลับสู่หน้าหลัก</button>
         </div>
     </div>
@@ -404,7 +429,7 @@
                         <h3 class="font-bold text-white text-xl mb-2">ยังไม่มีแพ็กเกจที่ใช้งานอยู่</h3>
                         <p class="text-slate-400 text-sm mb-6 max-w-sm mx-auto">คุณยังไม่ได้ซื้อแพ็กเกจ หรือแพ็กเกจของคุณหมดอายุแล้ว กรุณาซื้อแพ็กเกจเพื่อใช้งานตัว Widget และเข้าถึงโค้ดติดตั้ง</p>
                         <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                            <a href="https://lin.ee/O1Oa0p5" target="_blank" onclick="closeMyProductsModal()" class="inline-flex items-center justify-center space-x-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg shadow-amber-500/25">
+                            <a href="https://lin.ee/O1Oa0p5" target="_blank" rel="noopener noreferrer" onclick="closeMyProductsModal()" class="inline-flex items-center justify-center space-x-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg shadow-amber-500/25">
                                 <i class="fa-solid fa-crown"></i>
                                 <span>ติดต่อแอดมินเพื่อซื้อแพ็กเกจ</span>
                             </a>
@@ -412,7 +437,7 @@
                                 <span>ปิดหน้าต่างนี้</span>
                             </button>
                         </div>
-                        <p class="text-xs text-slate-500 mt-4"><i class="fa-solid fa-circle-info mr-1"></i>ซื้อแพ็กเกจแล้วส่งหลักฐาน แอดมินจะอนุมัติและเปิด API Key ให้ภายใน 15 นาที</p>
+                        <p class="text-xs text-slate-500 mt-4"><i class="fa-solid fa-circle-info mr-1"></i>หลังส่งหลักฐาน ทีมงานจะตรวจสอบและแจ้งผลผ่านช่องทางที่ตกลงไว้</p>
                     </div>
 
                     <!-- ACTIVE STATE (shown if paid) -->
@@ -448,12 +473,57 @@
         // === Auth logic ===
         let authMode = 'login'; // 'login' or 'register'
         let otpRequested = false;
+        let registrationEnabled = false;
+        let currentTenantApiKey = '';
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, character => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[character]);
+        }
+
+        function javascriptLiteral(value) {
+            return JSON.stringify(String(value == null ? '' : value)).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
+        }
+
+        function renderGuestAction() {
+            const container = document.getElementById('nav-action-container');
+            const mobile = document.getElementById('nav-register-btn-mobile');
+            if (registrationEnabled) {
+                container.innerHTML = '<a href="javascript:void(0)" onclick="openAuthModal(\'register\')" id="nav-register-btn" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-6 py-2.5 rounded-full font-semibold shadow-lg shadow-cyan-500/30 transition transform hover:scale-105">สมัครสมาชิก</a>';
+                mobile.href = 'javascript:void(0)';
+                mobile.removeAttribute('target');
+                mobile.removeAttribute('rel');
+                mobile.onclick = function () { toggleMobileMenu(); openAuthModal('register'); };
+                mobile.textContent = 'สมัครสมาชิก';
+            } else {
+                container.innerHTML = '<a href="https://lin.ee/O1Oa0p5" target="_blank" rel="noopener noreferrer" id="nav-register-btn" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-6 py-2.5 rounded-full font-semibold shadow-lg shadow-cyan-500/30 transition transform hover:scale-105">ขอสิทธิ์ Preview</a>';
+                mobile.href = 'https://lin.ee/O1Oa0p5';
+                mobile.target = '_blank';
+                mobile.rel = 'noopener noreferrer';
+                mobile.onclick = null;
+                mobile.textContent = 'ขอสิทธิ์ Preview';
+            }
+        }
+
+        async function loadPublicConfig() {
+            try {
+                const response = await fetch('/api/customer-auth?action=public-config');
+                const data = await response.json();
+                registrationEnabled = Boolean(response.ok && data.registrationEnabled);
+            } catch (_) {
+                registrationEnabled = false;
+            }
+            if (!localStorage.getItem('customer_data')) renderGuestAction();
+            updateAuthModalUI();
+        }
 
         function completeLandingLogin(data) {
             localStorage.setItem('customer_data', JSON.stringify(data.tenant));
             localStorage.setItem('tenant_data', JSON.stringify(data.tenant));
             closeAuthModal();
             checkAuthStatus();
+            resumePendingCheckout();
         }
 
         window.handleLandingGoogleCredential = async function (response) {
@@ -493,7 +563,7 @@
         initLandingGoogleSignIn();
 
         function openAuthModal(mode) {
-            authMode = mode;
+            authMode = mode === 'register' && registrationEnabled ? 'register' : 'login';
             updateAuthModalUI();
             document.getElementById('auth-error').classList.add('hidden');
             document.getElementById('auth-modal').classList.remove('hidden');
@@ -504,6 +574,7 @@
         }
 
         function toggleAuthMode() {
+            if (!registrationEnabled) return;
             authMode = authMode === 'login' ? 'register' : 'login';
             updateAuthModalUI();
         }
@@ -526,8 +597,9 @@
                 document.getElementById('auth-title').innerText = 'เข้าสู่ระบบ';
                 document.getElementById('auth-subtitle').innerText = 'จัดการบัญชีและดูสถานะแพ็กเกจของคุณ';
                 document.getElementById('auth-btn-submit').innerText = 'เข้าสู่ระบบ';
-                document.getElementById('auth-switch-text').innerText = 'ยังไม่มีบัญชี?';
+                document.getElementById('auth-switch-text').innerText = registrationEnabled ? 'ยังไม่มีบัญชี?' : 'บัญชีใหม่เปิดแบบเชิญในช่วง Preview';
                 document.getElementById('auth-switch-link').innerText = 'สมัครสมาชิก';
+                document.getElementById('auth-switch-link').classList.toggle('hidden', !registrationEnabled);
                 
                 document.getElementById('auth-email-group').classList.add('hidden');
                 document.getElementById('auth-confirm-group').classList.add('hidden');
@@ -541,6 +613,7 @@
                 document.getElementById('auth-btn-submit').innerText = 'รับ OTP';
                 document.getElementById('auth-switch-text').innerText = 'มีบัญชีแล้ว?';
                 document.getElementById('auth-switch-link').innerText = 'เข้าสู่ระบบ';
+                document.getElementById('auth-switch-link').classList.remove('hidden');
 
                 document.getElementById('auth-email-group').classList.remove('hidden');
                 document.getElementById('auth-confirm-group').classList.remove('hidden');
@@ -661,8 +734,13 @@
 
         function renderAuthUI(tenant) {
             const expireDate = tenant.expires_at ? new Date(tenant.expires_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : 'ไม่มีวันหมดอายุ';
-            const statusText = tenant.status === 'active' ? 'ใช้งานปกติ (Active)' : 'ระงับ (Suspended)';
-            const statusColor = tenant.status === 'active' ? 'text-green-400' : 'text-red-400';
+            const expiryTime = tenant.expires_at ? Date.parse(tenant.expires_at) : null;
+            const expired = tenant.expires_at && (!Number.isFinite(expiryTime) || expiryTime <= Date.now());
+            const statusText = tenant.status === 'pending' ? 'รอเปิดใช้งาน (Pending)' : tenant.status === 'active' && !expired ? 'ใช้งานปกติ (Active)' : expired ? 'หมดอายุ (Expired)' : 'ระงับ (Suspended)';
+            const statusColor = tenant.status === 'active' && !expired ? 'text-green-400' : tenant.status === 'pending' ? 'text-amber-400' : 'text-red-400';
+            const tenantName = escapeHtml(tenant.username || tenant.company_name || 'บัญชีลูกค้า');
+            const packageName = escapeHtml(tenant.package_type || 'none');
+            currentTenantApiKey = String(tenant.api_key || '');
 
             // Update Nav with Dropdown
             document.getElementById('nav-login-btn').classList.add('hidden');
@@ -670,7 +748,7 @@
                 <div class="relative group">
                     <a href="javascript:void(0)" class="bg-slate-800 border border-slate-700 text-white px-6 py-2.5 rounded-full font-semibold hover:bg-slate-700 transition flex items-center space-x-2 cursor-pointer">
                         <i class="fa-solid fa-user-astronaut text-cyan-400"></i>
-                        <span>${tenant.username || tenant.company_name}</span>
+                        <span>${tenantName}</span>
                         <i class="fa-solid fa-chevron-down text-xs ml-2"></i>
                     </a>
                     
@@ -683,7 +761,7 @@
                                 <i class="fa-solid fa-user text-cyan-400"></i>
                             </div>
                             <div>
-                                <p class="font-bold text-white leading-tight">${tenant.username || tenant.company_name}</p>
+                                <p class="font-bold text-white leading-tight">${tenantName}</p>
                                 <p class="text-xs text-slate-400 mt-0.5">สถานะบัญชี: <span class="${statusColor}">${statusText}</span></p>
                             </div>
                         </div>
@@ -707,8 +785,8 @@
                                     <p class="text-xs font-semibold tracking-wider text-slate-400 uppercase"><i class="fa-solid fa-key text-cyan-400 mr-1.5"></i> การเชื่อมต่อ API</p>
                                 </div>
                                 <div class="bg-slate-950 p-3 rounded-lg flex items-center justify-between border border-slate-700/80 hover:border-cyan-500/50 transition">
-                                    <code class="text-sm text-slate-300 blur-sm hover:blur-none transition cursor-pointer font-mono">${tenant.api_key}</code>
-                                    <button onclick="copyKeyFromText('${tenant.api_key}')" class="text-slate-400 hover:text-white p-1" title="คัดลอก API Key"><i class="fa-regular fa-copy"></i></button>
+                                    <code class="text-sm text-slate-300 blur-sm hover:blur-none transition cursor-pointer font-mono">${escapeHtml(currentTenantApiKey)}</code>
+                                    <button onclick="copyCurrentApiKey()" class="text-slate-400 hover:text-white p-1" title="คัดลอก API Key"><i class="fa-regular fa-copy"></i></button>
                                 </div>
                                 <p class="text-[10px] text-slate-500 mt-1.5">* นำ API Key นี้ไปใส่ใน Widget Code หรือระบบของคุณ</p>
                             </div>
@@ -719,7 +797,7 @@
                                 <div class="grid grid-cols-2 gap-2">
                                     <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                                         <p class="text-[10px] text-slate-500 mb-0.5">แพ็กเกจปัจจุบัน</p>
-                                        <p class="font-bold text-white uppercase text-sm">${tenant.package_type}</p>
+                                        <p class="font-bold text-white uppercase text-sm">${packageName}</p>
                                     </div>
                                     <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                                         <p class="text-[10px] text-slate-500 mb-0.5">หมดอายุ</p>
@@ -751,7 +829,10 @@
                     // Fetch fresh profile in background
                     fetch('/api/tenant?action=profile')
                         .then(res => {
-                            if (res.status === 401) { logoutCustomer(); throw new Error('Session expired'); }
+                            if (!res.ok) {
+                                if (res.status === 401 || res.status === 403) logoutCustomer();
+                                throw new Error(res.status === 401 || res.status === 403 ? 'Session expired' : 'Profile unavailable');
+                            }
                             return res.json();
                         })
                         .then(data => {
@@ -772,11 +853,7 @@
             } else {
                 // Not logged in
                 document.getElementById('nav-login-btn').classList.remove('hidden');
-                document.getElementById('nav-action-container').innerHTML = `
-                    <a href="javascript:void(0)" onclick="openAuthModal('register')" id="nav-register-btn" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-6 py-2.5 rounded-full font-semibold shadow-lg shadow-cyan-500/30 transition transform hover:scale-105">
-                        สมัครสมาชิก
-                    </a>
-                `;
+                renderGuestAction();
             }
         }
 
@@ -790,6 +867,10 @@
         function copyKeyFromText(key) {
             navigator.clipboard.writeText(key);
             alert('คัดลอก API Key แล้ว');
+        }
+
+        function copyCurrentApiKey() {
+            if (currentTenantApiKey) copyKeyFromText(currentTenantApiKey);
         }
 
         // === Check if user has active paid package ===
@@ -830,15 +911,20 @@
                 const or = window.location.origin;
                 const boostSrc = or + '/supreme-boost/boost.js';
                 const chatUrl  = or + '/api/chat';
-                const apiKey   = tenant.api_key;
+                const apiKey   = String(tenant.api_key || '');
                 const title    = (tenant.company_name || tenant.username || 'My Shop') + ' AI';
+                const apiKeyLiteral = javascriptLiteral(apiKey);
+                const chatUrlLiteral = javascriptLiteral(chatUrl);
+                const titleLiteral = javascriptLiteral(title);
+                const boostSrcLiteral = javascriptLiteral(boostSrc);
+                const attribute = value => escapeHtml(value);
 
                 _modalEmbedCodes = {
-                    smart:  `<!-- INDICATOR Smart AI Widget -->\n<script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    primaryColor:"#7c3aed",\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n<\/script>`,
-                    single: `<script>window.IndicatorConfig={apiKey:"${apiKey}",backendUrl:"${chatUrl}",title:"${title}",lang:"auto"};(function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));<\/script>`,
-                    simple: `<!-- INDICATOR AI Widget -->\n<script src="${boostSrc}"\n  data-api-key="${apiKey}"\n  data-backend-url="${chatUrl}"\n  data-title="${title}"\n  data-primary="#7c3aed"\n  data-lang="auto"\n  defer>\n<\/script>`,
-                    gtm:    `<!-- Custom HTML Tag สำหรับ Google Tag Manager -->\n<script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    lang:"auto"\n  };\n  var s=document.createElement('script');\n  s.src="${boostSrc}";\n  s.async=true;\n  document.head.appendChild(s);\n<\/script>`,
-                    wp:     `<?php\n// ใส่ใน functions.php หรือ Plugin\nfunction add_indicator_ai_widget() {\n  ?>\n  <script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n  <\/script>\n  <?php\n}\nadd_action('wp_footer', 'add_indicator_ai_widget');`
+                    smart:  `<!-- INDICATOR Smart AI Widget -->\n<script>\n  window.IndicatorConfig={\n    apiKey:${apiKeyLiteral},\n    backendUrl:${chatUrlLiteral},\n    title:${titleLiteral},\n    primaryColor:"#7c3aed",\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src=${boostSrcLiteral};fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n<\/script>`,
+                    single: `<script>window.IndicatorConfig={apiKey:${apiKeyLiteral},backendUrl:${chatUrlLiteral},title:${titleLiteral},lang:"auto"};(function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src=${boostSrcLiteral};fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));<\/script>`,
+                    simple: `<!-- INDICATOR AI Widget -->\n<script src="${attribute(boostSrc)}"\n  data-api-key="${attribute(apiKey)}"\n  data-backend-url="${attribute(chatUrl)}"\n  data-title="${attribute(title)}"\n  data-primary="#7c3aed"\n  data-lang="auto"\n  defer>\n<\/script>`,
+                    gtm:    `<!-- Custom HTML Tag สำหรับ Google Tag Manager -->\n<script>\n  window.IndicatorConfig={\n    apiKey:${apiKeyLiteral},\n    backendUrl:${chatUrlLiteral},\n    title:${titleLiteral},\n    lang:"auto"\n  };\n  var s=document.createElement('script');\n  s.src=${boostSrcLiteral};\n  s.async=true;\n  document.head.appendChild(s);\n<\/script>`,
+                    wp:     `<?php\n// ใส่ใน functions.php หรือ Plugin\nfunction add_indicator_ai_widget() {\n  ?>\n  <script>\n  window.IndicatorConfig={\n    apiKey:${apiKeyLiteral},\n    backendUrl:${chatUrlLiteral},\n    title:${titleLiteral},\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src=${boostSrcLiteral};fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n  <\/script>\n  <?php\n}\nadd_action('wp_footer', 'add_indicator_ai_widget');`
                 };
                 document.getElementById('modal-widget-code').innerText = _modalEmbedCodes.smart;
             }
@@ -872,8 +958,14 @@
             alert('คัดลอกโค้ดติดตั้งเรียบร้อยแล้ว');
         }
 
-        // Initialize auth status on load
-        document.addEventListener('DOMContentLoaded', checkAuthStatus);
+        // Initialize auth status and resume a plan selected on the pricing page.
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuthStatus();
+            loadPublicConfig();
+            const requestedPlan = new URLSearchParams(window.location.search).get('plan');
+            if (requestedPlan === 'Starter') beginCheckout('Starter', 990);
+            if (requestedPlan === 'Pro') beginCheckout('Pro', 2490);
+        });
 
         // === Checkout logic ===
         let currentMode = 'manual';
@@ -894,14 +986,18 @@
                 slipGroup.classList.add('hidden');
                 document.getElementById('slipFile').required = false;
                 btn.innerText = 'ดำเนินการชำระเงิน (Stripe)';
+                btn.disabled = false;
                 return;
             }
             slipGroup.classList.remove('hidden');
             document.getElementById('slipFile').required = true;
             aiBadge.classList.toggle('hidden', currentProvider !== 'slipok');
-            btn.innerText = currentProvider === 'slipok' ? 'อัปโหลดสลิปและตรวจสอบ' : 'ส่งสลิปเพื่อรออนุมัติ';
+            btn.disabled = checkoutPaymentMethods.length === 0;
+            btn.innerText = checkoutPaymentMethods.length === 0
+                ? 'ยังไม่มีช่องทางชำระเงิน'
+                : currentProvider === 'slipok' ? 'อัปโหลดสลิปและตรวจสอบ' : 'ส่งสลิปเพื่อรออนุมัติ';
             const methods = checkoutPaymentMethods.length
-                ? checkoutPaymentMethods.map(m => `<div class="bg-slate-800 p-4 rounded-xl border border-slate-700"><div class="font-bold text-white">${m.bank_name}</div><div class="text-cyan-400 font-mono text-lg">${m.account_number}</div><div class="text-sm text-slate-400">${m.account_name}</div></div>`).join('')
+                ? checkoutPaymentMethods.map(m => `<div class="bg-slate-800 p-4 rounded-xl border border-slate-700"><div class="font-bold text-white">${escapeHtml(m.bank_name)}</div><div class="text-cyan-400 font-mono text-lg">${escapeHtml(m.account_number)}</div><div class="text-sm text-slate-400">${escapeHtml(m.account_name)}</div></div>`).join('')
                 : '<div class="text-red-400 text-sm">ยังไม่มีช่องทางชำระเงิน กรุณาติดต่อแอดมิน</div>';
             container.innerHTML = selector + methods;
         }
@@ -909,6 +1005,45 @@
         function choosePaymentProvider(provider) {
             currentProvider = provider;
             renderCheckoutPayment();
+        }
+
+        function showCheckoutLogin() {
+            openAuthModal('login');
+            document.getElementById('auth-subtitle').innerText = 'เข้าสู่ระบบก่อนเลือกแพ็กเกจ หากยังไม่มีบัญชี กรุณาขอสิทธิ์ Preview ผ่าน LINE';
+        }
+
+        async function beginCheckout(pkgName, amount) {
+            const pending = JSON.stringify({ pkgName, amount });
+            sessionStorage.setItem('indicator_pending_checkout', pending);
+            if (!localStorage.getItem('customer_data')) {
+                showCheckoutLogin();
+                return;
+            }
+            try {
+                const profile = await fetch('/api/tenant?action=profile');
+                if (!profile.ok) {
+                    localStorage.removeItem('customer_data');
+                    localStorage.removeItem('tenant_data');
+                    showCheckoutLogin();
+                    return;
+                }
+            } catch (_) {
+                showCheckoutLogin();
+                return;
+            }
+            sessionStorage.removeItem('indicator_pending_checkout');
+            await openCheckout(pkgName, amount);
+        }
+
+        function resumePendingCheckout() {
+            const value = sessionStorage.getItem('indicator_pending_checkout');
+            if (!value) return;
+            try {
+                const pending = JSON.parse(value);
+                if (['Starter', 'Pro'].includes(pending.pkgName)) beginCheckout(pending.pkgName, Number(pending.amount));
+            } catch (_) {
+                sessionStorage.removeItem('indicator_pending_checkout');
+            }
         }
 
         async function openCheckout(pkgName, amount) {
@@ -971,9 +1106,22 @@
                             return;
                         }
                         closeCheckout();
-                        if (data.autoApproved) {
+                        document.querySelector('#success-modal h2').innerText = 'ส่งคำขอสำเร็จ!';
+                        document.querySelector('#success-modal p').innerHTML = 'ระบบได้รับคำขอของคุณแล้ว<br>ทีมงานจะตรวจสอบและแจ้งผลผ่านช่องทางที่ตกลงไว้';
+                        if (data.activated) {
                             document.querySelector('#success-modal h2').innerText = 'ตรวจสอบสำเร็จ!';
-                            document.querySelector('#success-modal p').innerHTML = `AI ตรวจสอบสลิปถูกต้อง<br><b>API Key ของคุณคือ:</b><br><code class="bg-slate-800 p-2 mt-2 block rounded">${data.apiKey}</code>`;
+                            document.querySelector('#success-modal p').textContent = 'ตรวจสอบสลิปและเปิดใช้งานแพ็กเกจสำเร็จแล้ว';
+                            fetch('/api/tenant?action=profile')
+                                .then(async profileRes => ({ profileRes, profileData: await profileRes.json() }))
+                                .then(({ profileRes, profileData }) => {
+                                    if (profileRes.ok && profileData.tenant) {
+                                        const tenantJson = JSON.stringify(profileData.tenant);
+                                        localStorage.setItem('customer_data', tenantJson);
+                                        localStorage.setItem('tenant_data', tenantJson);
+                                        renderAuthUI(profileData.tenant);
+                                    }
+                                })
+                                .catch(profileError => console.warn('Activated profile refresh failed', profileError));
                         }
                         document.getElementById('success-modal').classList.remove('hidden');
                     } else {
@@ -1011,18 +1159,6 @@
         </div>
     </div>
 
-    <!-- Supreme Boost AI Widget Demo -->
-    <script 
-        id="supreme-boost-script"
-        src="./supreme-boost/boost.js" 
-        data-api-key="INDICATOR_TEST" 
-        data-url="http://localhost:3000/api/chat"
-        data-title="INDICATOR AI"
-        data-primary="#06b6d4"
-        data-position="right"
-        data-lang="th"
-        data-start-open="false">
-    </script>
     <script>
         function toggleMobileMenu() {
             const menu = document.getElementById('mobile-menu');

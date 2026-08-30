@@ -640,7 +640,7 @@
         isExpanded: function () { return this._expanded; }
     };
 
-    var Whisper = { _el: null, _timer: null, _visible: false, init: function (shadow) { this._el = document.getElementById(WIDGET_ID + "-whisper"); }, show: function (text, type) { if (!this._el) return; if (this._timer) clearTimeout(this._timer); var label = "⚡ AI INSIGHT"; if (type === "proactive") label = "🔮 AI ตรวจจับ"; else if (type === "greeting") label = "🤖 AI ทักทาย"; else if (type === "hint") label = "💡 คำแนะนำ"; var words = text.split(" "); var spans = words.map(function (w, i) { return '<span style="opacity:0;display:inline-block;transform:translateY(10px) scale(0.9);animation:sbFloatWord 0.5s cubic-bezier(0.34,1.56,0.64,1) ' + (0.08 + i * 0.06) + 's forwards;">' + w + '</span>'; }).join(' '); this._el.innerHTML = '<span class="sb-whisper-label">' + label + '</span>' + spans; this._el.className = "sb-whisper sb-whisper-" + (type || "info"); this._el.style.opacity = "1"; this._el.style.transform = "translateY(0) scale(1)"; this._visible = true; this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS); }, hide: function () { if (!this._el || !this._visible) return; this._visible = false; this._el.style.opacity = "0"; this._el.style.transform = "translateY(10px) scale(0.95)"; if (this._timer) { clearTimeout(this._timer); this._timer = null; } }, isVisible: function () { return this._visible; } };
+    var Whisper = { _el: null, _timer: null, _visible: false, init: function () { this._el = document.getElementById(WIDGET_ID + "-whisper"); }, hide: function () { if (!this._el || !this._visible) return; this._visible = false; this._el.style.opacity = "0"; this._el.style.transform = "translateY(10px) scale(0.95)"; if (this._timer) { clearTimeout(this._timer); this._timer = null; } }, isVisible: function () { return this._visible; } };
 
     Whisper.show = function (text, type) { if (!this._el) return; if (this._timer) clearTimeout(this._timer); var label = "คำแนะนำ"; if (type === "proactive") label = "ความช่วยเหลือ"; else if (type === "greeting") label = "ยินดีต้อนรับ"; else if (type === "hint") label = "คำแนะนำ"; this._el.textContent = ""; var labelEl = document.createElement("span"); labelEl.className = "sb-whisper-label"; labelEl.textContent = label; this._el.appendChild(labelEl); String(text || "").split(/(\s+)/).forEach(function (word, index) { if (!word) return; var span = document.createElement("span"); span.textContent = word; if (!/^\s+$/.test(word)) { span.style.opacity = "0"; span.style.display = "inline-block"; span.style.transform = "translateY(10px) scale(0.9)"; span.style.animation = "sbFloatWord 0.2s ease-out " + (0.02 + index * 0.02) + "s forwards"; } this._el.appendChild(span); }.bind(this)); this._el.className = "sb-whisper sb-whisper-" + (type || "info"); this._el.style.opacity = "1"; this._el.style.transform = "translateY(0) scale(1)"; this._visible = true; this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS); };
 
@@ -742,7 +742,9 @@
             var whisperContainer = document.createElement("div"); whisperContainer.className = "sb-whisper-container";
             var whisper = document.createElement("div"); whisper.id = WIDGET_ID + "-whisper"; whisper.className = "sb-whisper";
             var panel = document.createElement("section"); panel.className = "sb-panel";
-            panel.innerHTML = '<div class="sb-header"><div style="display:flex;align-items:center;gap:8px;"><img src="/INDICATOR.png" alt="Logo" style="width:28px;height:28px;object-fit:cover;border-radius:50%;border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"><div><div class="sb-title">' + cfg.title + '</div><div class="sb-subtitle"></div></div></div><div class="sb-actions"><button class="sb-icon-btn" type="button" data-action="theme">\u25D0</button><button class="sb-icon-btn" type="button" data-action="close">\u00D7</button></div></div><div class="sb-messages"></div><div class="sb-quick"></div><form class="sb-compose"><textarea class="sb-input" rows="1"></textarea><button class="sb-voice-btn" type="button" style="background:transparent;border:0;cursor:pointer;font-size:18px;color:#64748b;padding:0 8px;transition:color 0.2s;" title="พูดด้วยเสียง">\uD83C\uDFA4</button><button class="sb-send" type="submit"></button></form>';
+            var logoSrc = "/INDICATOR.png";
+            try { var script = getScript(); if (script && script.src) logoSrc = new URL("/INDICATOR.png", script.src).href; } catch (_) { }
+            panel.innerHTML = '<div class="sb-header"><div style="display:flex;align-items:center;gap:8px;"><img src="' + escHtml(logoSrc) + '" alt="Logo" style="width:28px;height:28px;object-fit:cover;border-radius:50%;border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"><div><div class="sb-title">' + escHtml(cfg.title) + '</div><div class="sb-subtitle"></div></div></div><div class="sb-actions"><button class="sb-icon-btn" type="button" data-action="theme">\u25D0</button><button class="sb-icon-btn" type="button" data-action="close">\u00D7</button></div></div><div class="sb-messages"></div><div class="sb-quick"></div><form class="sb-compose"><textarea class="sb-input" rows="1"></textarea><button class="sb-voice-btn" type="button" style="background:transparent;border:0;cursor:pointer;font-size:18px;color:#64748b;padding:0 8px;transition:color 0.2s;" title="พูดด้วยเสียง">\uD83C\uDFA4</button><button class="sb-send" type="submit"></button></form>';
             var orb = document.createElement("button"); orb.className = "sb-orb"; orb.type = "button";
 
             shadow.appendChild(whisperContainer);
@@ -989,7 +991,6 @@
                     // Auto-read the reply if it's not a local command
                     if (reply && !cmd) speakText(reply);
 
-                    if (data.cssCommand && safeCss(data.cssCommand)) { styleEl.textContent += "\n/* AI */\n" + data.cssCommand.trim() + "\n"; }
                     if (data.interactive) { InteractiveWhisper.render(data.interactive, state.locale); }
                     if (data.action) { execAction(data.action); }
                     else if (data.reply) { autoWarpCheck(data.reply); }
@@ -1064,7 +1065,7 @@
             if (r.status === 404) {
                 var isRelative = cfg.backendUrl.indexOf(location.origin) === 0 || cfg.backendUrl.indexOf('/') === 0;
                 if (isRelative) {
-                    throw new Error("⚠️ การเชื่อมต่อ API ล้มเหลว (404) - หากเว็บนี้โฮสต์บน Netlify หรือแบบ Static กรุณานำระบบไปติดตั้งบน Vercel แล้วนำ Backend URL มาใส่ใน Embed Code");
+                    throw new Error("การเชื่อมต่อ API ล้มเหลว (404) โปรดตั้ง Backend URL ให้ชี้ไปยังเซิร์ฟเวอร์ Node.js เช่น Render");
                 }
             }
             var d = await r.json().catch(function () { return {}; });
@@ -1618,7 +1619,6 @@
     function loadScript(src, cb) { if (document.querySelector('script[src="' + src + '"]')) { if (cb) cb(); return; } var s = document.createElement("script"); s.src = src; s.onload = cb; document.head.appendChild(s); }
     function localReply(prompt, loc) { var q = String(prompt || "").toLowerCase(), pc = collectContent(), s = t(loc); if (!pc) return ""; if (!/(อะไร|อะไร|มี|หา|about|what|find|where|search|content|เกี่ยวกับ)/i.test(q)) return ""; var ch = []; var src = pc; var sentences = src.split(/[.!?]\s+/).filter(function (s) { return s.trim().length > 20; }).slice(0, 8); var kw = q.replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(function (w) { return w.length > 2; }); var mt = sentences.filter(function (c) { return kw.some(function (w) { return c.toLowerCase().includes(w); }); }).slice(0, 3); var lines = mt.length ? mt : sentences.slice(0, 3); if (!lines.length) return ""; return s.fallbackIntro + "\n\n" + lines.map(function (l) { return "- " + l.trim(); }).join("\n"); }
     function collectContent() { var c = document.body.cloneNode(true); var w = c.querySelector("#" + WIDGET_ID); if (w) w.remove(); c.querySelectorAll("script,style,noscript,svg").forEach(function (n) { n.remove(); }); return c.textContent.replace(/\s+/g, " ").trim().slice(0, MAX_PAGE_CHARS); }
-    function safeCss(css) { if (!css || typeof css !== "string") return false; var t = css.trim(); if (!t || t.length > 5000) return false; return !/(<|>|@import|url\s*\(|javascript:|expression\s*\(|filter:|blur\()/i.test(t); }
     function ensureStyle(shadow) { var root = shadow || document.getElementById(WIDGET_ID)?.shadowRoot || document; var s = root.getElementById?.(ADAPTIVE_STYLE_ID) || root.querySelector?.("#" + ADAPTIVE_STYLE_ID); if (!s) { s = document.createElement("style"); s.id = ADAPTIVE_STYLE_ID; var target = root === document ? document.head : root; if (target.appendChild) target.appendChild(s); else if (root.firstChild) root.insertBefore(s, root.firstChild); } return s; }
 
     function buildShadowStyles(cfg) {

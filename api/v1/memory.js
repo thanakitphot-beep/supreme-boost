@@ -8,24 +8,13 @@ const { verifyAccessJWT } = require("../_auth.js");
 const { setCorsHeaders } = require('../../services/cors');
 const { checkRateLimit } = require('../../services/rateLimit');
 const { loadEntitledTenant } = require('../../services/plans');
+const { generateGeminiEmbedding: generateEmbedding } = require('../../services/geminiEmbedding');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const supabase = SUPABASE_URL && SUPABASE_KEY
     ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
     : null;
-
-async function generateEmbedding(text, apiKey) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`;
-    const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'models/text-embedding-004', content: { parts: [{ text }] } })
-    });
-    if (!res.ok) throw new Error('Embedding failed: ' + res.status);
-    const data = await res.json();
-    return data.embedding?.values || null;
-}
 
 function canAccessTenant(claims, tenantId) {
     if (!claims || !tenantId) return false;
@@ -175,7 +164,7 @@ module.exports = async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     } catch (err) {
         console.error('[Memory API]', err.message);
-        return res.status(500).json({ error: err.message || 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };
 

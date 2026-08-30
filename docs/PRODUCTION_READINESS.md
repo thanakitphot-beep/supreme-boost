@@ -1,54 +1,77 @@
-# Production Readiness Matrix
+# Production Readiness
 
-Last verified: 2026-08-26
+Last repository verification: 2026-08-30
 
-Percentages measure the repository's implementation and local verification,
-not a claim that a production environment has been deployed. A row marked
-"blocked" cannot be completed without an external account, infrastructure, or
-customer-site integration.
+This document describes the single-instance Render Free preview. It is not an
+SLA, an always-on production claim, or evidence that the current worktree has
+already been deployed.
 
-## Target areas
+## Preview Mode
 
-| Area | Repository readiness | Current basis | Live verification still required |
-| --- | ---: | --- | --- |
-| Horizontal scaling | 85% | Rate limits and billing-period usage counters use conditional atomic MongoDB updates with unique/TTL indexes. Production conversations are stateless, and readiness verifies critical indexes before accepting traffic. | Run concurrent traffic against at least two replicas and a production MongoDB replica set. |
-| Billing and usage limits | 82% | Server-owned plans/prices, per-tenant quotas, authenticated checkout, Stripe raw-body signature verification and transactional activation, SlipOK amount/account/time/duplicate checks, and immutable paid ledger entries are implemented. | Use provider test/live accounts to verify Stripe event delivery/order and real SlipOK response fields. |
-| Production deployment workflow | 76% | Configuration/dependency/live preflight commands, Mongo migration gates, liveness/readiness separation, protected metrics, graceful shutdown, a free Render preview workflow, Compose health checks, and a Kubernetes migration Job/startup probe exist. | Move Render to an always-on paid instance, enable dependency-gated startup, then run domain, SMTP, Mongo, provider, backup/restore, and rollback checks in the target environment. |
+| Capability | Mode | User-visible behavior |
+| --- | --- | --- |
+| Registration | `disabled` | New accounts are invitation-only. Existing customers can sign in. |
+| Human handoff | `contact_only` | Requests remain in the admin queue and the UI presents the configured contact channel. Email delivery is not promised. |
+| Payment | `manual` | Server-owned Starter/Pro prices are shown; activation requires admin approval. |
+| Agent | `owned` | The deterministic tenant-grounded agent controls facts/actions; at least one configured model provider handles free-form conversation. |
 
-| Area | Readiness | What works now | Evidence | Remaining blocker |
-| --- | ---: | --- | --- | --- |
-| Tenant-grounded AI | 85% | The default agent retrieves only the current tenant's knowledge, answers from it, and returns sources shown in the widget. | Node contracts cover tenant knowledge, source display, and cache scope. | Run against a production MongoDB corpus and measure answer quality with customer data. |
-| Conversation isolation | 85% | Memory/cache keys include tenant and conversation; tenant knowledge and long-term-memory API reads/writes are tenant-scoped. | Node contracts cover cache and memory authorization. | Public embed keys are identifiers, not proof of caller identity. A tenant-hosted BFF or signed installation-token protocol is needed for strong request authentication. |
-| Account security | 80% | New passwords use salted `scrypt`; legacy SHA-256/plaintext records upgrade after a successful login. Admin-created tenants receive a random initial password. | Password migration contract test. | Existing credentials in prior Git history and any deployed database must be rotated. |
-| Registration verification | 80% | Registration requires a short-lived, email-bound, single-use verification grant. OTP values are not logged and SMTP absence fails closed. | Grant contract test. | Test the full SMTP/Mongo journey with real mail infrastructure. |
-| Static-file safety | 85% | The local server denies data, source, test, and configuration paths; Vercel rewrites deny sensitive directories. Tracked tenant data file was removed. | Local HTTP contract test and valid `vercel.json`. | Deploy preview and confirm Vercel rewrite precedence. Rotate any key previously committed to Git. |
-| Model action safety | 90% | Production always uses the owned agent; provider output is restricted to handoff/speech. The widget no longer accepts HTML injection, plugin actions, or model-triggered third-party scripts. | Validator and widget contracts. | Perform browser security testing on the deployed widget. |
-| Optional Python intelligence | 80% | Node scopes its site ID to `tenantId`; Python stateful routes require a service token and are not host-published by its Compose stack. | Python tests cover missing/wrong/correct service token. | Configure a private network, service token, and durable Qdrant/Postgres stores. |
-| Human handoff | 75% | Tenant-scoped idempotent ticket claims, monthly quota, PII masking, and SMTP delivery attempt are implemented. | Contracts cover demo behavior; Mongo unique index protects duplicate ticket claims. | Failed SMTP deliveries still need a durable retry worker and real SMTP verification. |
-| MongoDB operations | 85% | A repeatable migration creates unique/TTL/partial indexes for tenants, usage, limits, billing, OTP, and grants; one-shot scripts close their pool and readiness checks critical index options. | Atomic-counter and index-readiness contracts plus migration/preflight code. | Run migration, concurrency, backup, and restore checks against a production replica set. |
-| Container deployment | 78% | Production Dockerfile and Compose startup migration/config gate/health check exist without source bind mounts. | Build configuration, syntax, and local application build inspected. | Docker is unavailable in this workspace, so the image and container probe remain unverified. |
-| Render/Vercel deployment | 70% | Render has a free preview deployment with strict CORS, shared Mongo state, build-time index migration, and liveness routing. Vercel webhook raw-stream handling is implemented. | Configuration contracts and local HTTP tests. | Free Render sleeps, cannot scale beyond one instance, and blocks SMTP ports. Upgrade to an always-on instance, configure provider secrets/domains, and execute dependency/live preflight; Vercel migrations must be run as a separate release step. |
-| Rate limiting and metrics | 85% | Cross-instance atomic Mongo windows, tenant plan limits, trusted-proxy hop selection, fail-closed production behavior, and protected detailed metrics exist. | Concurrency and proxy contracts; readiness rejects missing indexes. | Run distributed load tests and connect aggregate observability/alerting. |
-| Billing and entitlements | 82% | Stripe and SlipOK automatic flows activate only authenticated tenant-linked requests; plans and usage are enforced server-side for chat, crawl, handoff, knowledge-upload operations, and memory. | Billing signature, stream, binding, activation, plan, and quota contracts. | Complete Stripe/SlipOK sandbox and live webhook tests, then add reconciliation/refund operations. |
-| Kubernetes | 72% | Deployment/HPA, migration Job, startup/liveness/readiness probes, service, and ingress templates exist. | Static configuration and application contracts. | Provide an immutable image, secret/config resources, TLS, disruption budget, and cluster validation. |
+## Verified In Repository
+
+| Area | Evidence | Live work still required |
+| --- | --- | --- |
+| Tenant isolation | Tenant-scoped knowledge, memory, cache, billing, handoff, usage, and exact-origin contract tests. | Verify every deployed tenant has the intended exact `allowed_origins`. Public embed keys remain identifiers rather than strong caller authentication. |
+| Account and admin security | Salted `scrypt`, upgrade of legacy hashes after successful login, HttpOnly/SameSite admin and customer sessions, rate limits, strict CORS, no-store API responses, and frame/content-type protections. | Rotate any credential that may have appeared outside the current tree and verify cookies on HTTPS. |
+| Model and DOM safety | Provider actions, CSS, metadata, and carousel output are allowlisted; dynamic dashboard fields and model replies are rendered as text or encoded; slip/QR data URLs require matching PNG/JPEG/WebP bytes. | Repeat browser checks against the deployed revision. |
+| Billing and limits | Server-owned plan IDs/prices, authenticated checkout, quotas, transactional activation, Stripe raw-body verification, SlipOK amount/account/time/duplicate checks, and post-activation slip deletion. | Automatic Stripe/SlipOK modes require provider sandbox and reconciliation tests before enablement. |
+| MongoDB operations | Idempotent unique/TTL/partial indexes, startup migration, transaction/index readiness checks, and atomic counters. | Run migration and dependency preflight against the deployment's replica set. |
+| Runtime and release | Separate liveness/readiness, draining shutdown, release SHA reporting, protected detailed health/metrics, static allowlist, and checks-gated Render deployment. | Confirm the deployed SHA and `/api/v1/readyz` after rollout. |
+| Evaluation | Dataset hash `8621c1eec9c0`; 20 offline cases; `node-agent` pass/safety/determinism all 100%; zero network attempts. | Synthetic regression evidence is not a blinded human/native-speaker study. |
+| Recovery | Backup/restore and application rollback runbooks define RPO/RTO and evidence capture. | Perform and record an encrypted backup plus disposable restore drill. |
+| Optional Python service | Ruff clean and 11 tests pass; stateful endpoints require a service token. | Keep it private and provision durable Qdrant/Postgres/Redis before enabling it. |
+
+## Verification Evidence
+
+Run on 2026-08-30:
+
+```text
+npm run ci
+  JavaScript syntax: 86 files
+  Jest: 12 suites, 148 tests passed
+  node-agent: pass=100.0% safety=100.0% deterministic=100.0%
+  benchmark network attempts: 0
+  npm audit (production): 0 vulnerabilities
+
+python -m ruff check indicator-ai/app indicator-ai/tests
+  All checks passed
+
+python -m pytest indicator-ai/tests
+  11 passed
+```
 
 ## Release Gates
 
-1. Rotate any tenant API keys, OTP secrets, or other credentials previously
-   committed to Git. The removed local data file does not erase Git history.
-2. Provision a MongoDB replica set, run `npm run db:indexes`, then run
-   `npm run preflight:dependencies`.
-3. Set `JWT_SECRET`, `ADMIN_PASSWORD`, `MONGODB_URI`, `CORS_ALLOWED_ORIGINS`,
-   and exact tenant `allowed_origins`; keep `REQUIRE_TENANT_API_KEY=true`.
-4. Configure `PAYMENT_MODE=both`, Stripe prices/webhook, SlipOK receiver
-   account, and SMTP entirely in server-side environment variables.
-5. Configure an AI provider only when needed. The deterministic owned agent
-   works without one, but a provider is required for optional generative paths.
-6. Configure SMTP and a retry worker before advertising human handoff as a
-   guaranteed delivery channel.
-7. For a customer-facing production widget, replace public-key-only requests
-   with a tenant-hosted BFF or short-lived signed installation token. Browser
-   `Origin` and CORS checks are not server authentication.
-8. Build and run the Docker image, deploy a preview, register Stripe webhook
-   events, test SlipOK with a fresh sandbox transfer, and run
-   `npm run preflight:live` before production traffic.
+1. Keep `REGISTRATION_MODE=disabled`, `HANDOFF_DELIVERY_MODE=contact_only`, and
+   `PAYMENT_MODE=manual` for this preview.
+2. Confirm `MONGODB_URI`, a randomly generated 32+ character `JWT_SECRET`, a
+   strong 12+ character `ADMIN_PASSWORD`, at least one AI provider key, exact
+   `CORS_ALLOWED_ORIGINS`, `PUBLIC_BASE_URL`, and exact tenant `allowed_origins`
+   in Render. Never put these values in Git.
+3. Run `npm run db:indexes` and `npm run preflight:dependencies` against the
+   deployment database. `/api/v1/readyz` must remain non-200 until indexes,
+   transactions, configuration, and MongoDB are ready.
+4. Push only after `npm run ci`, Ruff, Pytest, secret scanning, and
+   `git diff --check` pass. Wait for required GitHub checks and Render rollout.
+5. Confirm `/api/v1/livez` reports the new commit SHA, `/api/v1/readyz` returns
+   200, detailed health remains protected, private repository paths return 404,
+   and login/manual checkout work on desktop and mobile.
+6. Perform the backup/restore drill and decommission or restrict old Vercel and
+   GitHub Pages deployments before describing this preview URL as the sole
+   hardened public endpoint.
+
+## Accepted Preview Limitations
+
+- Render Free can sleep, cold-start, run only one instance, and provides no SLA.
+- SMTP delivery is disabled and no email handoff guarantee is made.
+- Payment activation is manual; Stripe and SlipOK are not advertised as live.
+- Distributed load, provider sandbox, container, restore, and rollback drills
+  remain required before an always-on paid production launch.

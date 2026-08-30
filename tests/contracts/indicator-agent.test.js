@@ -1,7 +1,6 @@
 const { runIndicatorAgent } = require('../../services/indicatorAgent');
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
 const { resolveSiteProfile, originIsAllowed, inferSiteIdentity } = require('../../services/siteProfiles');
 
 describe('INDICATOR owned agent — contract', () => {
@@ -311,10 +310,11 @@ describe('INDICATOR owned agent — contract', () => {
         expect(source).toContain('destination.origin !== location.origin');
     });
 
-    test('the pricing page inline script compiles', () => {
+    test('the pricing page uses the authenticated checkout journey without sample bank data', () => {
         const html = fs.readFileSync(path.resolve(__dirname, '../../pricing.html'), 'utf8');
-        const inlineScript = html.match(/<script>\s*([\s\S]*?)<\/script>/i);
-        expect(inlineScript).not.toBeNull();
-        expect(() => new vm.Script(inlineScript[1])).not.toThrow();
+        expect(html).toContain('/?plan=Starter#pricing');
+        expect(html).toContain('/?plan=Pro#pricing');
+        expect(html).not.toContain('xxx-x-xxxxx-x');
+        expect(html).not.toContain('submitOrder');
     });
 });

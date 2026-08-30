@@ -66,6 +66,20 @@ function thaiPhraseScore(query, text) {
     return 0;
 }
 
+function cjkPhraseScore(query, text) {
+    const cjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu;
+    const compactQuery = (normalize(query).match(cjk) || []).join('');
+    const compactText = (normalize(text).match(cjk) || []).join('');
+    if (compactQuery.length < 2 || compactText.length < 2) return 0;
+    const maxLength = Math.min(10, compactQuery.length);
+    for (let length = maxLength; length >= 2; length--) {
+        for (let index = 0; index <= compactQuery.length - length; index++) {
+            if (compactText.includes(compactQuery.slice(index, index + length))) return 8 + length;
+        }
+    }
+    return 0;
+}
+
 function score(query, text, aliases = []) {
     const q = normalize(query);
     const candidates = [text, ...aliases].map(normalize).filter(Boolean);
@@ -83,7 +97,7 @@ function score(query, text, aliases = []) {
     if (phraseScore) return phraseScore;
 
     const wordScore = words(q).reduce((total, word) => total + (word.length >= 3 && all.includes(word) ? 10 : 0), 0);
-    return wordScore + thaiPhraseScore(q, all);
+    return wordScore + thaiPhraseScore(q, all) + cjkPhraseScore(q, all);
 }
 
 function safeText(value, max = 480) {
@@ -974,6 +988,7 @@ function runIndicatorAgent(payload = {}) {
     const tenantKnowledgeAnswer = answerFromWebsiteKnowledge(knowledge, payload, prompt);
     const hasTenantKnowledgeAnswer = tenantKnowledgeAnswer && tenantKnowledgeAnswer.sources &&
         tenantKnowledgeAnswer.sources[0] && tenantKnowledgeAnswer.sources[0].type === 'tenant_knowledge';
+    const asksForContactFact = /(?:เบอร์โทร|หมายเลข|อีเมล|phone\s*(?:number)?|email)/iu.test(normalize(prompt));
     // A brand-only request such as "อยากได้ nike" is still a product request
     // when the brand occurs in the approved catalog.  Specific policy/article
     // wording remains a content request and is not overridden.
@@ -988,7 +1003,7 @@ function runIndicatorAgent(payload = {}) {
     if (
         hasTenantKnowledgeAnswer &&
         !productMatch &&
-        ['answer', 'search_unified', 'find_content', 'define_term'].includes(intent)
+        (['answer', 'search_unified', 'find_content', 'define_term'].includes(intent) || (intent === 'handoff' && asksForContactFact))
     ) {
         // A tenant's approved policy/FAQ is a stronger answer than a generic
         // website-wide search. Its action remains constrained by source origin.

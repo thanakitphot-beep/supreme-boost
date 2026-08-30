@@ -3,7 +3,7 @@ services:
     build:
       context: .
       target: production
-    command: ["sh", "-c", "npm run db:indexes && npm run preflight:dependencies && npm run start:production"]
+    command: ["npm", "run", "release:start"]
     ports:
       - "3000:3000"
     environment:
@@ -24,17 +24,19 @@ services:
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-true}
       - TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-1}
       - RATE_LIMIT_SECRET=${RATE_LIMIT_SECRET:?RATE_LIMIT_SECRET is required}
+      - REGISTRATION_MODE=${REGISTRATION_MODE:-disabled}
+      - HANDOFF_DELIVERY_MODE=${HANDOFF_DELIVERY_MODE:-contact_only}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - SUPABASE_URL=${SUPABASE_URL:-}
       - SUPABASE_KEY=${SUPABASE_KEY:-}
-      - SMTP_HOST=${SMTP_HOST:?SMTP_HOST is required}
+      - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USER=${SMTP_USER:?SMTP_USER is required}
-      - SMTP_PASS=${SMTP_PASS:?SMTP_PASS is required}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-}
-      - PAYMENT_MODE=${PAYMENT_MODE:-both}
+      - PAYMENT_MODE=${PAYMENT_MODE:-manual}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
       - STRIPE_PRICE_STARTER=${STRIPE_PRICE_STARTER:-}

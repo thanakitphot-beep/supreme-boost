@@ -6,6 +6,7 @@ const { setCorsHeaders } = require('../services/cors');
 const { checkRateLimit } = require('../services/rateLimit');
 const { canonicalPlanId, entitlementsFor } = require('../services/plans');
 const { activateBillingRequest, authenticatedBillingTenant, cleanEmail } = require('../services/billing');
+const { parseImageDataUrl } = require('../services/imageData');
 
 function stripePriceId(planId) {
     return String(process.env[`STRIPE_PRICE_${planId.toUpperCase()}`] || '').trim();
@@ -13,6 +14,17 @@ function stripePriceId(planId) {
 
 function stripeCheckoutKey(tenantId) {
     return `stripe-open:${String(tenantId)}`;
+}
+
+function stripeIdempotencyKey(requestId) {
+    return `indicator-checkout-${String(requestId)}`;
+}
+
+function stripeErrorDefinitelyHasNoSession(status, type, code) {
+    const errorType = String(type || '').toLowerCase();
+    const errorCode = String(code || '').toLowerCase();
+    if (Number(status) === 409 || Number(status) === 429 || errorType === 'idempotency_error' || errorCode.includes('idempotency')) return false;
+    return Number(status) === 401 || Number(status) === 403 || (Number(status) === 400 && errorType === 'invalid_request_error');
 }
 
 function configuredProviders(mode) {
@@ -28,7 +40,9 @@ async function createStripeCheckout(request, email) {
     const price = stripePriceId(request.package_type);
     const successUrl = String(process.env.STRIPE_SUCCESS_URL || '').trim();
     const cancelUrl = String(process.env.STRIPE_CANCEL_URL || '').trim();
-    if (!secret || !price || !successUrl || !cancelUrl) throw new Error('Stripe is not configured');
+    if (!secret || !price || !successUrl || !cancelUrl) {
+        throw Object.assign(new Error('Stripe is not configured'), { definiteNoSession: true });
+    }
 
     const body = new URLSearchParams({
         mode: 'subscription',
@@ -49,12 +63,41 @@ async function createStripeCheckout(request, email) {
         headers: {
             Authorization: `Basic ${Buffer.from(`${secret}:`).toString('base64')}`,
             'Content-Type': 'application/x-www-form-urlencoded',
-            'Idempotency-Key': `indicator-${request.checkout_key}`
+            'Idempotency-Key': stripeIdempotencyKey(request.id)
         },
-        body
+        body,
+        signal: AbortSignal.timeout(10_000)
     });
-    if (!response.ok) throw new Error('Stripe checkout session could not be created');
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const stripeError = payload && payload.error || {};
+        throw Object.assign(new Error('Stripe checkout session could not be created'), {
+            definiteNoSession: stripeErrorDefinitelyHasNoSession(response.status, stripeError.type, stripeError.code)
+        });
+    }
     return response.json();
+}
+
+async function provisionStripeCheckout(db, request) {
+    let session;
+    try {
+        session = await createStripeCheckout(request, request.contact_email);
+    } catch (error) {
+        if (error && error.definiteNoSession) {
+            await db.collection('billing_requests').updateOne(
+                { id: request.id, status: request.status },
+                { $set: { status: 'failed', updated_at: new Date().toISOString() }, $unset: { checkout_key: '' } }
+            ).catch(() => {});
+        }
+        throw error;
+    }
+    if (!session || typeof session.id !== 'string' || typeof session.url !== 'string') throw new Error('Stripe returned an invalid checkout session');
+    const updated = await db.collection('billing_requests').updateOne(
+        { id: request.id, status: request.status },
+        { $set: { stripe_session_id: session.id, checkout_url: session.url, status: 'checkout_started', updated_at: new Date().toISOString() } }
+    );
+    if (!updated.modifiedCount) throw new Error('Stripe checkout ownership was lost');
+    return session;
 }
 
 function slipTimestamp(data) {
@@ -118,17 +161,17 @@ module.exports = async function handler(req, res) {
         const settings = await db.collection('settings').findOne({ id: 'global' });
         const mode = String(process.env.PAYMENT_MODE || settings && settings.payment_mode || 'manual').toLowerCase();
         const providers = configuredProviders(mode);
+        const tenant = await authenticatedBillingTenant(req, db);
+        if (!tenant) return res.status(401).json({ error: 'Sign in before purchasing a plan' });
 
         if (req.method === 'GET') {
             const methods = providers.includes('manual') || providers.includes('slipok')
-                ? await db.collection('payment_methods').find({ is_active: true }).project({ id: 1, bank_name: 1, account_number: 1, account_name: 1, qr_base64: 1 }).toArray()
+                ? await db.collection('payment_methods').find({ is_active: true }).project({ _id: 0, id: 1, bank_name: 1, account_number: 1, account_name: 1 }).limit(20).toArray()
                 : [];
             return res.status(200).json({ paymentMethods: methods, paymentMode: mode, providers });
         }
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-        const tenant = await authenticatedBillingTenant(req, db);
-        if (!tenant) return res.status(401).json({ error: 'Sign in before purchasing a plan' });
         const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
         const planId = canonicalPlanId(body.packageType);
         if (!planId) return res.status(400).json({ error: 'Invalid package type' });
@@ -157,6 +200,19 @@ module.exports = async function handler(req, res) {
             request.checkout_key = stripeCheckoutKey(tenant.id);
             const existing = await db.collection('billing_requests').findOne({ checkout_key: request.checkout_key });
             if (existing && existing.checkout_url && existing.package_type === planId) return res.status(200).json({ redirectUrl: existing.checkout_url, requestId: existing.id, reused: true });
+            if (existing && existing.package_type === planId && ['creating_checkout', 'recovering_checkout'].includes(existing.status)) {
+                const lastAttempt = Date.parse(existing.updated_at || existing.created_at || '');
+                if (Number.isFinite(lastAttempt) && Date.now() - lastAttempt < 2 * 60_000) {
+                    return res.status(409).json({ error: 'A checkout session is already being created' });
+                }
+                const claimed = await db.collection('billing_requests').updateOne(
+                    { id: existing.id, status: existing.status },
+                    { $set: { status: 'recovering_checkout', updated_at: new Date().toISOString() } }
+                );
+                if (!claimed.modifiedCount) return res.status(409).json({ error: 'A checkout session is already being recovered' });
+                const recovered = await provisionStripeCheckout(db, { ...existing, status: 'recovering_checkout' });
+                return res.status(200).json({ redirectUrl: recovered.url, requestId: existing.id, reused: true });
+            }
             if (existing) return res.status(409).json({ error: 'A checkout session is already being created' });
             try {
                 await db.collection('billing_requests').insertOne(request);
@@ -164,24 +220,14 @@ module.exports = async function handler(req, res) {
                 if (error && error.code === 11000) return res.status(409).json({ error: 'A checkout session already exists for this plan' });
                 throw error;
             }
-            try {
-                const session = await createStripeCheckout(request, request.contact_email);
-                await db.collection('billing_requests').updateOne(
-                    { id: request.id },
-                    { $set: { stripe_session_id: session.id, checkout_url: session.url, status: 'checkout_started', updated_at: new Date().toISOString() } }
-                );
-                return res.status(200).json({ redirectUrl: session.url, requestId: request.id });
-            } catch (error) {
-                await db.collection('billing_requests').updateOne({ id: request.id }, { $set: { status: 'failed', updated_at: new Date().toISOString() }, $unset: { checkout_key: '' } });
-                throw error;
-            }
+            const session = await provisionStripeCheckout(db, request);
+            return res.status(200).json({ redirectUrl: session.url, requestId: request.id });
         }
 
-        const rawSlip = String(body.slipBase64 || '');
-        const mimeMatch = rawSlip.match(/^data:(image\/(?:png|jpeg|webp));base64,/iu);
-        const mimeType = mimeMatch ? mimeMatch[1].toLowerCase() : 'image/jpeg';
-        const base64 = rawSlip.includes(',') ? rawSlip.slice(rawSlip.indexOf(',') + 1) : rawSlip;
-        if (!base64 || base64.length > 1_400_000) return res.status(400).json({ error: 'A valid slip image is required' });
+        const slipImage = parseImageDataUrl(body.slipBase64, 1_000_000);
+        if (!slipImage) return res.status(400).json({ error: 'A valid PNG, JPEG, or WebP slip image is required' });
+        const { base64, mimeType } = slipImage;
+        request.slip_fingerprint = crypto.createHash('sha256').update(Buffer.from(base64, 'base64')).digest('hex');
 
         if (provider === 'slipok') {
             const slip = await verifySlip(base64, mimeType, plan.monthlyPriceThb);
@@ -205,8 +251,13 @@ module.exports = async function handler(req, res) {
         }
 
         request.status = 'pending';
-        request.slip_base64 = rawSlip;
-        await db.collection('billing_requests').insertOne(request);
+        request.slip_base64 = slipImage.dataUrl;
+        try {
+            await db.collection('billing_requests').insertOne(request);
+        } catch (error) {
+            if (error && error.code === 11000) return res.status(409).json({ error: 'This payment slip has already been submitted' });
+            throw error;
+        }
         return res.status(200).json({ success: true, message: 'Request submitted. Waiting for admin approval.', requestId: request.id });
     } catch (error) {
         console.error('Checkout API error:', error.message);
@@ -216,5 +267,7 @@ module.exports = async function handler(req, res) {
 
 module.exports.__configuredProviders = configuredProviders;
 module.exports.__stripeCheckoutKey = stripeCheckoutKey;
+module.exports.__stripeIdempotencyKey = stripeIdempotencyKey;
+module.exports.__stripeErrorDefinitelyHasNoSession = stripeErrorDefinitelyHasNoSession;
 module.exports.__slipDetails = slipDetails;
 module.exports.__slipRequestForm = slipRequestForm;

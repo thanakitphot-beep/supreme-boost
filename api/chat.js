@@ -39,7 +39,7 @@ const MAX_ENTITY_DESCRIPTION = 600;
 const MAX_BRAIN_PAGE_CHARS = 5000;
 const MAX_BRAIN_ENTITY_ITEMS = 30;
 const MAX_TENANT_KNOWLEDGE_MATCHES = 5;
-const ALLOWED_TENANT_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gpt-5.6-terra', 'gpt-5.6-sol', 'llama-3.3-70b-versatile']);
+const ALLOWED_TENANT_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.5-pro', 'gpt-5.6-terra', 'gpt-5.6-sol', 'llama-3.3-70b-versatile']);
 
 const GROUNDED_INTENTS = new Set([
     'recommend_products',
@@ -74,6 +74,17 @@ function cleanText(value, maxLength) {
 
 function cleanOptionalText(value, maxLength) {
     return cleanText(typeof value === 'string' ? value : '', maxLength);
+}
+
+function pageUrlForOrigin(value, origin) {
+    try {
+        const page = new URL(String(value || ''));
+        const requestOrigin = new URL(String(origin || '')).origin;
+        if (!['http:', 'https:'].includes(page.protocol) || page.origin !== requestOrigin || page.username || page.password) return '';
+        return `${page.origin}${page.pathname || '/'}`.slice(0, 500);
+    } catch (_) {
+        return '';
+    }
 }
 
 function knowledgeScore(query, chunk) {
@@ -583,6 +594,8 @@ async function handler(req, res) {
         }
 
         const rawPrompt = cleanText(body.prompt, MAX_PROMPT_CHARS);
+        const pageUrl = pageUrlForOrigin(body.url, req.headers.origin);
+        if (body.url && !pageUrl) return res.status(400).json({ error: 'Page URL must match the registered browser origin' });
         const siteProfile = resolveSiteProfile(cleanText(body.siteKey || body.apiKey, 300));
         const isProactive = body.proactive === true;
         if (!rawPrompt && !isProactive) return res.status(400).json({ error: 'กรุณาพิมพ์ข้อความก่อนส่ง' });
@@ -621,7 +634,7 @@ async function handler(req, res) {
             pageContent: maskPII(cleanText(body.pageContent, MAX_PAGE_CHARS)),
             selectedText: maskPII(cleanText(body.selectedText, MAX_SELECTED_CHARS)),
             history: maskHistory(body.history),
-            url: cleanText(body.url, 500),
+            url: pageUrl,
             title: maskPII(cleanText(body.title, 200)),
             locale: normalizeLocale(body.locale),
             conversationId: cleanText(body.conversationId, 120),
@@ -796,3 +809,4 @@ module.exports.cacheStats = function cacheStats(req, res) {
 module.exports.__sanitizeDNA = sanitizeDNA;
 module.exports.__cacheEligible = cacheEligible;
 module.exports.__formatTenantKnowledge = formatTenantKnowledge;
+module.exports.__pageUrlForOrigin = pageUrlForOrigin;

@@ -79,7 +79,10 @@ async function loadEntitledTenant(tenantId) {
     if (!db) return null;
     const tenant = await db.collection('tenants').findOne({ id: String(tenantId || '') });
     if (!tenant || tenant.status !== 'active') return null;
-    if (tenant.expires_at && new Date(tenant.expires_at).getTime() < Date.now()) return null;
+    if (tenant.expires_at) {
+        const expiry = new Date(tenant.expires_at).getTime();
+        if (!Number.isFinite(expiry) || expiry < Date.now()) return null;
+    }
     return { ...tenant, entitlements: entitlementsFor(tenant) };
 }
 

@@ -29,8 +29,8 @@ function tenantKeyRequired() {
 }
 
 function firstPartyDemoAllowed(origin) {
-    if (process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO === 'false') return false;
-    const serviceOrigin = canonicalOrigin(process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
+    if (process.env.INDICATOR_ALLOW_FIRST_PARTY_DEMO !== 'true') return false;
+    const serviceOrigin = canonicalOrigin(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
     return Boolean(serviceOrigin && canonicalOrigin(origin) === serviceOrigin);
 }
 
@@ -67,7 +67,7 @@ async function authorizePluginRequest({ apiKey, origin }) {
 
     const canonical = canonicalOrigin(origin);
     if (tenantKeyRequired() && !canonical) return { error: 'Plugin requests must include a registered browser origin' };
-    const serviceOrigin = canonicalOrigin(process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
+    const serviceOrigin = canonicalOrigin(process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || process.env.RENDER_SERVICE_URL);
     if (canonical && canonical !== serviceOrigin && !normalizeAllowedOrigins(tenant.allowed_origins).includes(canonical)) {
         return { error: 'This website origin is not registered for the tenant' };
     }

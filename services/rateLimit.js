@@ -123,4 +123,4 @@ function getRateLimiterStats() {
     return { mode: process.env.NODE_ENV === 'production' ? 'mongo-required' : 'mongo-with-local-fallback', local_windows: store.size, window_ms: windowMs() };
 }
 
-module.exports = { checkRateLimit, getRateLimiterStats, __opaqueKey: opaqueKey, __requestIp: requestIp };
+module.exports = { checkRateLimit, getRateLimiterStats, requestIp, __opaqueKey: opaqueKey, __requestIp: requestIp };

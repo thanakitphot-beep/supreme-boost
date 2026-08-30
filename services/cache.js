@@ -1,4 +1,6 @@
 // Semantic Cache Service
+const crypto = require('crypto');
+
 const semanticCache = {
     // Bump this whenever answer policy or the intelligence backend changes.
     // Keeping it in every key prevents a reply produced by an older agent
@@ -10,14 +12,7 @@ const semanticCache = {
     _ttlMs: 600000,
     
     _hash: function (text) {
-        let hash = 0;
-        if (!text) return "0";
-        for (let i = 0; i < text.length; i++) { 
-            let chr = text.charCodeAt(i); 
-            hash = ((hash << 5) - hash) + chr; 
-            hash |= 0; 
-        }
-        return String(hash);
+        return crypto.createHash('sha256').update(String(text || '')).digest('base64url');
     },
     
     _makeKey: function (payload) {
