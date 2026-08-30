@@ -27,7 +27,7 @@
     "status": "pm2 status"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.108.2",
+    "@supabase/supabase-js": "^2.112.4",
     "cheerio": "^1.0.0-rc.12",
     "esbuild": "^0.28.1",
     "google-auth-library": "^10.9.1",
