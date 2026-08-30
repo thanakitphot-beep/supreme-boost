@@ -1369,9 +1369,14 @@
         return target.length >= 2 ? source.indexOf(target) : -1;
     }
 
-    function highlightExactPhrase(phrase) {
+    function headingPhraseValue(value) {
+        var text = String(value || "").replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+        return text.normalize ? text.normalize("NFC") : text;
+    }
+
+    function highlightExactPhrase(phrase, root) {
         if (!document.body || !document.createTreeWalker) return false;
-        var walker = document.createTreeWalker(document.body, window.NodeFilter ? window.NodeFilter.SHOW_TEXT : 4, null);
+        var walker = document.createTreeWalker(root || document.body, window.NodeFilter ? window.NodeFilter.SHOW_TEXT : 4, null);
         var node;
         while ((node = walker.nextNode())) {
             var parent = node.parentElement;
@@ -1393,6 +1398,18 @@
                 setTimeout(function () { if (_activeWarp && _activeWarp.mark === mark) clearActiveWarp(); }, 5000);
                 return true;
             } catch (_) { }
+        }
+        return false;
+    }
+
+    function highlightExactHeading(phrase) {
+        var target = headingPhraseValue(phrase);
+        if (!target) return false;
+        var headings = document.querySelectorAll("h1,h2,h3,h4,h5,h6");
+        for (var i = 0; i < headings.length; i++) {
+            var heading = headings[i];
+            if (!safeEl(heading) || headingPhraseValue(heading.textContent) !== target) continue;
+            return highlightExactPhrase(phrase, heading);
         }
         return false;
     }
@@ -1569,6 +1586,7 @@
                     requestHandoff(_st ? _st.locale : "en", "User requested human agent via chat.", act.priority);
                     break;
                 case "warp":
+                    if (act.exactHeading) { highlightExactHeading(act.exactHeading); break; }
                     if (act.exactText) { highlightExactPhrase(act.exactText); break; }
                     var warpTarget = resolveWarpTarget(act);
                     if (warpTarget) {

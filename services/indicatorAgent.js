@@ -36,7 +36,7 @@ const SENSITIVE_REQUEST = /(?:\b(?:password|token|secret|api.?key|checkout|payme
 
 // Filler words stripped when extracting the real search target from a query.
 // Anything that remains after stripping is what the user actually wants to find.
-const QUERY_FILLER = /(?:หน้า(?=\s|ซึ่ง)|อยากรู้ว่า|พาไป(?:หา)?|ไปหน้า|ช่วยหา|ช่วย|หาให้|หา(?=\s|$)|อยากได้|ต้องการ|ขอดู|อยากดู|อยากรู้|อยู่(?:ที่|ตรง)?ไหน|หน่อย|ให้หน่อย|ได้ไหม|ไหม|มีไหม|มีมั้ย|หรือเปล่า|บ้าง|เลย|นะ|ครับ|ค่ะ|คะ|please|show me|take me to|where is|find|look for|\bget\b|\bsee\b|\bneed\b|\bwant\b)/giu;
+const QUERY_FILLER = /(?:หน้า(?=\s|ซึ่ง)|หัวข้อ|section|heading|อยากรู้ว่า|พาไป(?:หา)?|ไปหน้า|ช่วยหา|ช่วย|หาให้|หา(?=\s|$)|อยากได้|ต้องการ|ขอดู|อยากดู|อยากรู้|อยู่(?:ที่|ตรง)?ไหน|หน่อย|ให้หน่อย|ได้ไหม|ไหม|มีไหม|มีมั้ย|หรือเปล่า|บ้าง|เลย|นะ|ครับ|ค่ะ|คะ|please|show me|take me to|where is|find|look for|\bget\b|\bsee\b|\bneed\b|\bwant\b)/giu;
 
 function normalize(value) {
     return normalizeHumanText(value);
@@ -433,6 +433,24 @@ function livePageScore(querySubject, rawText) {
     return hits.length > 0 ? (hits.length / qWords.length) * 60 : 0;
 }
 
+function headingLabel(value) {
+    return safeText(String(value || '')
+        .replace(/^h[1-6]:/iu, '')
+        .replace(/[^\p{L}\p{M}\p{N}\s]/gu, ' ')
+        .replace(/\s+/gu, ' ')
+        .trim(), 220);
+}
+
+function findExactLiveHeading(headings, subject) {
+    const target = normalize(headingLabel(subject));
+    if (!target) return '';
+    for (const heading of headings || []) {
+        const label = headingLabel(heading);
+        if (label && normalize(label) === target) return label;
+    }
+    return '';
+}
+
 function conversationalReply(prompt, identity) {
     const text = normalize(prompt);
     if (/^(?:สวัสดี|หวัดดี|hello|hi|ดีครับ|ดีค่ะ)[!！. ]*$/iu.test(text)) {
@@ -731,6 +749,7 @@ function searchUnified(knowledge, payload, prompt) {
     const availability = availabilitySubject(prompt);
     const { subject, keywords } = buildWarpKeywords(prompt);
     const targetText = availability || subject || safeText(prompt, 120);
+    const locationRequest = LOCATION_REQUEST.test(normalize(prompt));
 
     // Availability questions must search the whole site before saying an item
     // does not exist. This also works for categories the Agent has never seen.
@@ -747,7 +766,7 @@ function searchUnified(knowledge, payload, prompt) {
     // fuzzy product matching. This prevents a product keyword from hijacking
     // requests such as “พาไปหน้าสมัครใช้งาน AI Chat Widget”.
     const explicitPageIntent = /(?:พาไปหน้า|ไปหน้า|หน้าสมัคร|หน้าราคา|ราคา|แพ็กเกจ|pricing|page|section|หัวข้อ|บทความ|นโยบาย)/iu.test(normalize(prompt));
-    if (explicitPageIntent) {
+    if (explicitPageIntent && !locationRequest) {
         const page = bestMatch(
             knowledge.pages,
             prompt,
@@ -757,20 +776,41 @@ function searchUnified(knowledge, payload, prompt) {
         if (page) return findContent(knowledge, payload, prompt, page);
     }
 
-    const products = rankedProductMatches(knowledge.catalog, prompt);
-    if (products.length > 0) {
-        return findProduct(knowledge, payload, prompt, products);
-    }
-
     const siteDNA = payload && payload.siteDNA || {};
     const liveHeadings = Array.isArray(siteDNA.headings) ? siteDNA.headings : [];
     const liveEntities = Array.isArray(siteDNA.entities) ? siteDNA.entities : [];
     const structuredEntities = Array.isArray(siteDNA.entityIndex) ? siteDNA.entityIndex : [];
     const liveContent = normalize(`${siteDNA.activeSectionText || ''} ${payload.pageContent || ''}`);
 
+    // An exact section heading is a stronger location signal than an article
+    // or card that merely mentions the same word in its body text.
+    const exactHeading = locationRequest && subject ? findExactLiveHeading(liveHeadings, subject) : '';
+    if (exactHeading) {
+        const action = actionFor({
+            title: exactHeading,
+            url: payload.url,
+            currentUrl: payload.url,
+            keywords: keywords.length ? keywords : [exactHeading],
+            permissions: payload.siteProfile && payload.siteProfile.permissions
+        });
+        if (action) {
+            action.exactHeading = exactHeading;
+            action.exactText = exactHeading;
+        }
+        return base(action ? `พบหัวข้อ “${exactHeading}” บนหน้านี้แล้วครับ กำลังพาไปให้` : `พบหัวข้อ “${exactHeading}” บนหน้านี้แล้วครับ`, {
+            action,
+            sources: [{ type: 'heading', query: exactHeading }]
+        });
+    }
+
+    const products = rankedProductMatches(knowledge.catalog, prompt);
+    if (products.length > 0) {
+        return findProduct(knowledge, payload, prompt, products);
+    }
+
     // Prefer a client-indexed card containing the exact requested phrase. Its
     // selector is more precise than a text scan across headings and articles.
-    if (LOCATION_REQUEST.test(normalize(prompt)) && subject) {
+    if (locationRequest && subject) {
         const normalizedSubject = normalize(subject);
         const exactEntity = structuredEntities
             .map((entity, index) => normalizeRuntimeEntity(entity, index, payload.url))
@@ -816,7 +856,7 @@ function searchUnified(knowledge, payload, prompt) {
     }
 
     // Do not substitute a page heading for the phrase a visitor asked to find.
-    if (LOCATION_REQUEST.test(normalize(prompt)) && subject && liveContent.includes(normalize(subject))) {
+    if (locationRequest && subject && liveContent.includes(normalize(subject))) {
         const action = actionFor({
             title: subject,
             url: payload.url,

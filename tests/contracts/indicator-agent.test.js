@@ -273,6 +273,35 @@ describe('INDICATOR owned agent — contract', () => {
         expect(result.sources[0]).toEqual({ type: 'structured_entity', query: 'ต่างประเทศ' });
     });
 
+    test('prefers an exact section heading over an article that only mentions it', () => {
+        const result = runIndicatorAgent({
+            prompt: 'หัวข้อ เทคโนโลยี อยู่ไหน',
+            url: 'https://news.example/articles/long-001',
+            locale: 'th',
+            siteProfile: { permissions: ['navigate_same_origin'] },
+            siteDNA: {
+                headings: ['h1:บทความยาวสำหรับทดสอบ Agent', 'h2:จุดเริ่มต้นของการเปลี่ยนแปลง', 'h2:💻 เทคโนโลยี'],
+                entityIndex: [{
+                    id: 'long-001',
+                    title: 'จาก Chatbot สู่ AI Agent: การเปลี่ยนแปลงที่อาจส่งผลต่อธุรกิจ เทคโนโลยี และตลาดแรงงาน',
+                    description: 'บทความทดสอบ',
+                    selector: '[data-sb-entity-id="long-001"]',
+                    href: 'https://news.example/articles/long-001'
+                }]
+            }
+        });
+
+        expect(result.reply).toContain('หัวข้อ “เทคโนโลยี”');
+        expect(result.action).toMatchObject({
+            type: 'warp',
+            targetText: 'เทคโนโลยี',
+            exactHeading: 'เทคโนโลยี',
+            exactText: 'เทคโนโลยี'
+        });
+        expect(result.action).not.toHaveProperty('entityId');
+        expect(result.sources[0]).toEqual({ type: 'heading', query: 'เทคโนโลยี' });
+    });
+
     test('keeps the widget response schema', () => {
         const result = runIndicatorAgent({ prompt: 'สรุปหน้านี้', pageContent: 'ข้อมูลสำคัญของหน้าปัจจุบัน', locale: 'th' });
         expect(typeof result.reply).toBe('string');
@@ -316,6 +345,8 @@ describe('INDICATOR owned agent — contract', () => {
         expect(bundle).toContain('case"navigate"');
         expect(source).toContain('safeNavigationUrl');
         expect(source).toContain('highlightExactPhrase');
+        expect(source).toContain('highlightExactHeading');
+        expect(source).toContain('act.exactHeading');
         expect(source).toContain('act.exactText');
         expect(source).toContain("credentials: 'omit'");
         expect(source).toContain('new URL(rawUrl, location.href)');
