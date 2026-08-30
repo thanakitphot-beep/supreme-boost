@@ -20,7 +20,7 @@ function googleClient() {
 async function verifyGoogleCredential(credential) {
     const oauthClient = googleClient();
     if (!oauthClient) return { error: 'Google Sign-In is not configured' };
-    if (typeof credential !== 'string' || credential.length < 20) return { error: 'Invalid Google credential' };
+    if (typeof credential !== 'string' || credential.length < 20 || credential.length > 10_000) return { error: 'Invalid Google credential' };
 
     try {
         const ticket = await oauthClient.verifyIdToken({ idToken: credential, audience: configuredClientId() });

@@ -60,11 +60,6 @@
     </div>
 
     <script>
-        // Check if already logged in
-        if (localStorage.getItem('admin_token')) {
-            window.location.href = '/admin';
-        }
-
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-submit');
@@ -85,7 +80,6 @@
                 const data = await res.json();
                 
                 if (res.ok && data.success) {
-                    localStorage.setItem('admin_token', `Bearer ${data.token}`);
                     window.location.href = '/admin';
                 } else {
                     errorMsg.innerText = data.error || 'รหัสผ่านไม่ถูกต้อง';

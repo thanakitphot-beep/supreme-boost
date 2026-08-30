@@ -5,7 +5,8 @@ class OpenAIProvider extends BaseProvider {
         const apiKey = this.config.apiKey || process.env.OPENAI_API_KEY;
         if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
 
-        const model = options.model || this.config.model || process.env.AI_NORMAL_MODEL || 'gpt-4o-mini';
+        const requestedModel = options.model || this.config.model || process.env.OPENAI_MODEL || process.env.AI_NORMAL_MODEL;
+        const model = /^(?:gpt-|o\d)/iu.test(String(requestedModel || '')) ? requestedModel : 'gpt-5.6-terra';
         const url = 'https://api.openai.com/v1/chat/completions';
         
         const payloadMessages = [
@@ -16,8 +17,8 @@ class OpenAIProvider extends BaseProvider {
         const body = {
             model,
             messages: payloadMessages,
-            temperature: options.temperature || 0.7,
-            max_tokens: options.maxTokens || 1024,
+            temperature: options.temperature ?? 0.7,
+            max_tokens: options.maxTokens ?? 1024,
             response_format: { type: "json_object" }
         };
 
@@ -32,10 +33,8 @@ class OpenAIProvider extends BaseProvider {
         });
 
         if (!res.ok) {
-            const errBody = await res.text().catch(() => '');
             let isRateLimit = res.status === 429;
-            let errorMsg = `OpenAI HTTP ${res.status}: ${errBody.slice(0, 200)}`;
-            const err = new Error(errorMsg);
+            const err = new Error(`OpenAI HTTP ${res.status}`);
             err.status = res.status;
             err.isRateLimit = isRateLimit;
             throw err;

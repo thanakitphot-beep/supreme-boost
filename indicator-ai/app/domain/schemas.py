@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class SourceKind(StrEnum):
@@ -103,7 +103,7 @@ class ChatResponse(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     action: SafeAction = Field(default_factory=SafeAction)
     conversation_summary: str = Field(default="", max_length=1000)
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class IngestRequest(BaseModel):
