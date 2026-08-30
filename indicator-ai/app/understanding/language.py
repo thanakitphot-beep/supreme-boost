@@ -8,7 +8,6 @@ same intent while preserving the source text used for a final citation.
 import re
 import unicodedata
 
-
 _SPACE = re.compile(r"\s+")
 _PACKAGE_VARIANTS = re.compile(r"(?:แพคเกจ|แพ็กเกจ|แพ็คเกจ|แพกเกจ|package|packages|plans?)", re.IGNORECASE)
 _PACKAGE_QUESTION = re.compile(

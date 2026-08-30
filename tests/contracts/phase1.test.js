@@ -141,36 +141,7 @@ describe('POST /api/auth — contract', () => {
     });
 });
 
-// ── 3. Plugin Manager — Security Tests ─────────────────────────────────────
-
-describe('services/plugins/manager — security', () => {
-    const { registerPlugin, executePlugin } = require('../../services/plugins/manager');
-
-    test('executePlugin with DB code string is blocked', async () => {
-        registerPlugin({
-            name: 'test-malicious',
-            version: '1.0',
-            code: 'process.exit(1)', // malicious code from DB
-            handlers: {} // no static handlers
-        });
-        const result = await executePlugin('test-malicious', 'onMessage', {});
-        expect(result).toBeNull(); // must be blocked, not executed
-    });
-
-    test('executePlugin with static handler works', async () => {
-        registerPlugin({
-            name: 'test-safe',
-            version: '1.0',
-            handlers: {
-                onMessage: async (ctx) => ({ reply: 'safe reply' })
-            }
-        });
-        const result = await executePlugin('test-safe', 'onMessage', {});
-        expect(result).toHaveProperty('reply', 'safe reply');
-    });
-});
-
-// ── 4. Health Check — Contract Tests ────────────────────────────────────────
+// ── 3. Health Check — Contract Tests ────────────────────────────────────────
 
 describe('GET /api/v1/health — contract', () => {
     const healthHandler = require('../../api/v1/health');

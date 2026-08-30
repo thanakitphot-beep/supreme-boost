@@ -14,6 +14,8 @@ knowledge, permitted actions, and browser origins.
   page, but receive no other tenant's registered knowledge.
 - A registered tenant is isolated: its profile knowledge replaces the demo
   knowledge unless it explicitly opts into the local demo dataset.
+- Tenant-owned knowledge chunks are retrieved for each chat request, answered
+  with their chunk ID as a source, and never used to navigate to another origin.
 - The widget now supports `data-site-key` / `window.IndicatorConfig.siteKey`.
   This is a public site identifier, not a password or an admin key.
 - Cross-page navigation remains same-origin only, and sensitive actions remain
@@ -45,6 +47,9 @@ $env:CORS_ALLOWED_ORIGINS = "https://client.example"
 
 Also register the exact origin in that site's `allowedOrigins`.  A copied
 public site key from another domain is then rejected by `/api/chat`.
+
+The tenant API key is separately checked against the tenant's registered
+`allowed_origins`. Both checks are active for browser requests in production.
 
 ## How backend learning must work
 
@@ -81,3 +86,7 @@ the source URLs with any externally researched response.
 onboarding external customers, move profiles and knowledge to a tenant-scoped
 database, replace legacy browser API keys with public site keys plus a signed
 server-side enrollment flow, and add audit logs for every connector request.
+
+Chat completion audit records now include resolver, latency, cache result,
+knowledge-match count, and source IDs. They deliberately exclude visitor
+prompt text and page contents.
