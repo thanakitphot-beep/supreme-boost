@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://indicatorwebchat.vercel.app/sitemap.xml
+Sitemap: https://indicator-web-chat.onrender.com/sitemap.xml

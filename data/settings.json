@@ -1,7 +1,0 @@
-{
-  "systemModel": "gemini-2.5-flash",
-  "systemPrompt": "You are a helpful, professional, and empathetic AI assistant for our enterprise platform. Answer concisely and accurately based only on the provided context.",
-  "themeColor": "cyber-calm",
-  "maxTokens": 600,
-  "temperature": 0.2
-}

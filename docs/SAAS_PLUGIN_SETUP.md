@@ -13,7 +13,8 @@ ENFORCE_STRICT_CORS=true
 REQUIRE_TENANT_API_KEY=true
 ENABLE_LEGACY_HMAC_AUTH=false
 INDICATOR_FILE_LEARNING=false
-RENDER_EXTERNAL_URL=https://your-service.onrender.com
+PUBLIC_BASE_URL=https://your-service.onrender.com
+CORS_ALLOWED_ORIGINS=https://your-service.onrender.com
 MONGODB_URI=<managed in Render>
 JWT_SECRET=<generated in Render>
 ADMIN_PASSWORD=<managed in Render>
@@ -53,6 +54,7 @@ from another tenant's registered website.
 4. Redeploy Render and open `/customer-login` to confirm the Google button
    appears.
 
-Google ID tokens are verified on the server. A new Google identity creates a
-pending tenant account. An existing password account is never linked only by
-matching email; linking requires a separate account-ownership flow.
+Google ID tokens are verified on the server. With `REGISTRATION_MODE=disabled`,
+only an existing linked identity can sign in and no new tenant is created. An
+existing password account is never linked only by matching email; linking
+requires an authenticated account-ownership flow.

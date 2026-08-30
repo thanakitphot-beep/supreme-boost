@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://indicatorwebchat.vercel.app/</loc>
-    <lastmod>2026-07-23</lastmod>
+    <loc>https://indicator-web-chat.onrender.com/</loc>
+    <lastmod>2026-08-28</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://indicatorwebchat.vercel.app/pricing.html</loc>
-    <lastmod>2026-07-23</lastmod>
+    <loc>https://indicator-web-chat.onrender.com/pricing</loc>
+    <lastmod>2026-08-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>

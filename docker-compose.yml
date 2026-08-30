@@ -1,47 +1,55 @@
-version: '3.8'
-
 services:
-  omega-jarvis:
+  indicator-web-chat:
     build:
       context: .
       target: production
+    command: ["npm", "run", "release:start"]
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - REDIS_URL=redis://redis:6379
-      # Load from host environment variables
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_KEY=${SUPABASE_KEY}
-      - JWT_SECRET=${JWT_SECRET}
-    depends_on:
-      - redis
-    volumes:
-      - ./data:/usr/src/app/data
-      - ./services:/usr/src/app/services
+      - MONGODB_URI=${MONGODB_URI:?MONGODB_URI is required}
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-indicator_db}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}
+      - ENFORCE_STRICT_CORS=true
+      - REQUIRE_TENANT_API_KEY=true
+      - INDICATOR_ALLOW_FIRST_PARTY_DEMO=false
+      - INDICATOR_STRICT_SITE_ORIGIN=true
+      - INDICATOR_FILE_LEARNING=false
+      - ENABLE_LEGACY_HMAC_AUTH=false
+      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-true}
+      - TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-1}
+      - RATE_LIMIT_SECRET=${RATE_LIMIT_SECRET:?RATE_LIMIT_SECRET is required}
+      - REGISTRATION_MODE=${REGISTRATION_MODE:-disabled}
+      - HANDOFF_DELIVERY_MODE=${HANDOFF_DELIVERY_MODE:-contact_only}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_KEY=${SUPABASE_KEY:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - PAYMENT_MODE=${PAYMENT_MODE:-manual}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - STRIPE_PRICE_STARTER=${STRIPE_PRICE_STARTER:-}
+      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO:-}
+      - STRIPE_SUCCESS_URL=${STRIPE_SUCCESS_URL:-}
+      - STRIPE_CANCEL_URL=${STRIPE_CANCEL_URL:-}
+      - SLIPOK_API_KEY=${SLIPOK_API_KEY:-}
+      - SLIPOK_BRANCH_ID=${SLIPOK_BRANCH_ID:-}
+      - SLIPOK_RECEIVER_ACCOUNT=${SLIPOK_RECEIVER_ACCOUNT:-}
+      - SLIPOK_MAX_AGE_SECONDS=${SLIPOK_MAX_AGE_SECONDS:-86400}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/v1/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/v1/readyz"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --save 60 1 --loglevel warning
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-volumes:
-  redis_data:

@@ -5,7 +5,8 @@ class GroqProvider extends BaseProvider {
         const apiKey = this.config.apiKey || process.env.GROQ_API_KEY || process.env.API_KEY;
         if (!apiKey) throw new Error('GROQ_API_KEY is not configured');
 
-        const model = options.model || this.config.model || process.env.AI_FALLBACK_MODEL || 'llama-3.3-70b-versatile';
+        const requestedModel = options.model || this.config.model || process.env.GROQ_MODEL || process.env.AI_FALLBACK_MODEL;
+        const model = /^(?:llama|mixtral|qwen|deepseek|openai\/|groq\/)/iu.test(String(requestedModel || '')) ? requestedModel : 'llama-3.3-70b-versatile';
         const url = 'https://api.groq.com/openai/v1/chat/completions';
         
         const payloadMessages = [
@@ -16,8 +17,8 @@ class GroqProvider extends BaseProvider {
         const body = {
             model,
             messages: payloadMessages,
-            temperature: options.temperature || 0.7,
-            max_tokens: options.maxTokens || 1024,
+            temperature: options.temperature ?? 0.7,
+            max_tokens: options.maxTokens ?? 1024,
             response_format: { type: "json_object" }
         };
 
@@ -32,10 +33,8 @@ class GroqProvider extends BaseProvider {
         });
 
         if (!res.ok) {
-            const errBody = await res.text().catch(() => '');
             let isRateLimit = res.status === 429;
-            let errorMsg = `Groq HTTP ${res.status}: ${errBody.slice(0, 200)}`;
-            const err = new Error(errorMsg);
+            const err = new Error(`Groq HTTP ${res.status}`);
             err.status = res.status;
             err.isRateLimit = isRateLimit;
             throw err;

@@ -270,12 +270,15 @@
                     <label class="fl">โมเดลตอบคำถาม</label>
                     <select class="fi" id="setModel">
                         <option value="gemini-2.5-flash">Gemini 2.5 Flash (แนะนำ)</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
                     </select>
                 </div>
                 <div class="fg">
                     <label class="fl">แนวทางการตอบคำถาม</label>
                     <textarea class="fi" id="setPrompt" rows="5" placeholder="เช่น: คุณคือผู้ช่วยร้านค้าชื่อ... ตอบเป็นภาษาไทยเสมอ..."></textarea>
+                </div>
+                <div class="fg">
+                    <label class="fl">เว็บไซต์ที่อนุญาตให้ฝัง widget</label>
+                    <textarea class="fi" id="setOrigins" rows="3" placeholder="https://shop.example.com"></textarea>
                 </div>
                 <div class="fg">
                     <label class="fl">ความหลากหลายของคำตอบ (0 = แม่นยำ, 1 = หลากหลาย)</label>
@@ -329,37 +332,28 @@
     // ---- Auth ----
     let tenant = null;
 
-    // Check for admin preview token in URL (?preview=base64_encoded_tenant_data)
-    const urlParams = new URLSearchParams(window.location.search);
-    const previewToken = urlParams.get('preview');
-    if (previewToken) {
-        try {
-            const decoded = decodeURIComponent(previewToken);
-            tenant = JSON.parse(decodeURIComponent(escape(atob(decoded))));
-            // Show admin preview badge
-            const previewBadge = document.createElement('div');
-            previewBadge.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;padding:6px 16px;border-radius:999px;font-size:.72rem;font-weight:700;letter-spacing:.05em;box-shadow:0 4px 12px rgba(245,158,11,.4);pointer-events:none;';
-            previewBadge.innerHTML = '<i class="fa-solid fa-shield-halved" style="margin-right:5px"></i>Admin Preview Mode — กำลังดูในฐานะแอดมิน';
-            document.body.appendChild(previewBadge);
-        } catch(e) { tenant = null; }
-    }
+    try { tenant = JSON.parse(localStorage.getItem('tenant_data')); } catch(e) {}
 
-    // Fall back to localStorage (normal customer login)
-    if (!tenant) {
-        try { tenant = JSON.parse(localStorage.getItem('tenant_data')); } catch(e) {}
-    }
-
-    if (!tenant || !tenant.api_key) { window.location.href = '/customer-login'; }
+    if (!tenant || !tenant.api_key) { window.location.href = '/customer-login'; tenant = {}; }
 
     // === Check active status (paid & not expired) ===
     function isActiveTenant(t) {
         if (!t || t.status !== 'active') return false;
-        if (t.expires_at && new Date(t.expires_at) < new Date()) return false;
+        if (t.expires_at) {
+            const expiryTime = Date.parse(t.expires_at);
+            if (!Number.isFinite(expiryTime) || expiryTime <= Date.now()) return false;
+        }
         return true;
     }
 
-    if (!isActiveTenant(tenant)) {
-        // Show locked overlay
+    function syncTenantLock(currentTenant) {
+        const existing = document.getElementById('locked-overlay');
+        if (isActiveTenant(currentTenant)) {
+            if (existing) existing.remove();
+            document.body.style.overflow = 'auto';
+            return;
+        }
+        if (existing) return;
         document.body.style.overflow = 'hidden';
         const overlay = document.createElement('div');
         overlay.id = 'locked-overlay';
@@ -378,12 +372,13 @@
                     <i class="fa-solid fa-right-from-bracket"></i> \u0e2d\u0e2d\u0e01\u0e08\u0e32\u0e01\u0e23\u0e30\u0e1a\u0e1a
                 </button>
             </div>
-            <p style="color:#475569;font-size:.7rem;margin-top:20px;"><i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>\u0e0b\u0e37\u0e49\u0e2d\u0e41\u0e1e\u0e47\u0e01\u0e40\u0e01\u0e08\u0e41\u0e25\u0e49\u0e27\u0e2a\u0e48\u0e07\u0e2b\u0e25\u0e31\u0e01\u0e10\u0e32\u0e19 \u0e41\u0e2d\u0e14\u0e21\u0e34\u0e19\u0e08\u0e30\u0e2d\u0e19\u0e38\u0e21\u0e31\u0e15\u0e34\u0e41\u0e25\u0e30\u0e40\u0e1b\u0e34\u0e14\u0e2a\u0e34\u0e17\u0e18\u0e34\u0e4c\u0e43\u0e2b\u0e49\u0e20\u0e32\u0e22\u0e43\u0e19 15 \u0e19\u0e32\u0e17\u0e35</p>
+            <p style="color:#475569;font-size:.7rem;margin-top:20px;"><i class="fa-solid fa-circle-info" style="margin-right:4px;"></i>หลังส่งหลักฐาน ทีมงานจะตรวจสอบและแจ้งผลผ่านช่องทางที่ตกลงไว้</p>
         `;
         document.body.appendChild(overlay);
     }
+    syncTenantLock(tenant);
 
-    const AUTH = { Authorization: `Bearer ${tenant.api_key}`, 'Content-Type': 'application/json' };
+    const AUTH = { 'Content-Type': 'application/json' };
 
     function updateTenantUI() {
         document.getElementById('tenantName').textContent = tenant.company_name || tenant.username || '—';
@@ -397,17 +392,19 @@
 
     // Fetch fresh profile in background
     fetch('/api/tenant?action=profile', { headers: AUTH })
-        .then(res => res.json())
+        .then(res => {
+            if (res.status === 401 || res.status === 403) { logout(); throw new Error('Session expired'); }
+            if (!res.ok) throw new Error('Profile unavailable');
+            return res.json();
+        })
         .then(data => {
             if (data.tenant) {
                 tenant = data.tenant;
                 localStorage.setItem('tenant_data', JSON.stringify(tenant));
+                localStorage.setItem('customer_data', JSON.stringify(tenant));
                 updateTenantUI();
-                if (isActiveTenant(tenant)) {
-                    const overlay = document.getElementById('locked-overlay');
-                    if (overlay) overlay.remove();
-                    document.body.style.overflow = 'auto';
-                }
+                syncTenantLock(tenant);
+                buildEmbedCodes();
             }
         })
         .catch(err => console.error('Profile sync failed', err));
@@ -416,16 +413,27 @@
     const origin = window.location.origin;
     const boostSrc = origin + '/supreme-boost/boost.js';
     const chatUrl  = origin + '/api/chat';
-    const apiKey   = tenant.api_key;
-    const title    = (tenant.company_name || tenant.username || 'My Shop') + ' AI';
+    const javascriptLiteral = value => JSON.stringify(String(value || '')).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
+    const attributeValue = value => String(value || '').replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[character]);
+    const chatUrlLiteral = javascriptLiteral(chatUrl);
+    const boostSrcLiteral = javascriptLiteral(boostSrc);
 
-    const embedCodes = {
-        smart: `<!-- INDICATOR Smart AI Widget -->\n<script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    primaryColor:"#7c3aed",\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n<\/script>`,
-        single: `<script>window.IndicatorConfig={apiKey:"${apiKey}",backendUrl:"${chatUrl}",title:"${title}",lang:"auto"};(function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));<\/script>`,
-        simple: `<!-- INDICATOR AI Widget -->\n<script src="${boostSrc}"\n  data-api-key="${apiKey}"\n  data-backend-url="${chatUrl}"\n  data-title="${title}"\n  data-primary="#7c3aed"\n  data-lang="auto"\n  defer>\n<\/script>`,
-        gtm: `<!-- Custom HTML Tag สำหรับ Google Tag Manager -->\n<script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    lang:"auto"\n  };\n  var s=document.createElement('script');\n  s.src="${boostSrc}";\n  s.async=true;\n  document.head.appendChild(s);\n<\/script>`,
-        wp: `<?php\n// ใส่ใน functions.php ของ Theme หรือ Plugin\nfunction add_indicator_ai_widget() {\n  ?>\n  <script>\n  window.IndicatorConfig={\n    apiKey:"${apiKey}",\n    backendUrl:"${chatUrl}",\n    title:"${title}",\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src="${boostSrc}";fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n  <\/script>\n  <?php\n}\nadd_action('wp_footer', 'add_indicator_ai_widget');`
-    };
+    let embedCodes = {};
+    function buildEmbedCodes() {
+        const apiKey = String(tenant.api_key || '');
+        const title = (tenant.company_name || tenant.username || 'My Shop') + ' AI';
+        const apiKeyLiteral = javascriptLiteral(apiKey);
+        const titleLiteral = javascriptLiteral(title);
+        embedCodes = {
+        smart: `<!-- INDICATOR Smart AI Widget -->\n<script>\n  window.IndicatorConfig={\n    apiKey:${apiKeyLiteral},\n    backendUrl:${chatUrlLiteral},\n    title:${titleLiteral},\n    primaryColor:"#7c3aed",\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src=${boostSrcLiteral};fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n<\/script>`,
+        single: `<script>window.IndicatorConfig={apiKey:${apiKeyLiteral},backendUrl:${chatUrlLiteral},title:${titleLiteral},lang:"auto"};(function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src=${boostSrcLiteral};fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));<\/script>`,
+        simple: `<!-- INDICATOR AI Widget -->\n<script src="${attributeValue(boostSrc)}"\n  data-api-key="${attributeValue(apiKey)}"\n  data-backend-url="${attributeValue(chatUrl)}"\n  data-title="${attributeValue(title)}"\n  data-primary="#7c3aed"\n  data-lang="auto"\n  defer>\n<\/script>`,
+        gtm: `<!-- Custom HTML Tag สำหรับ Google Tag Manager -->\n<script>\n  window.IndicatorConfig={\n    apiKey:${apiKeyLiteral},\n    backendUrl:${chatUrlLiteral},\n    title:${titleLiteral},\n    lang:"auto"\n  };\n  var s=document.createElement('script');\n  s.src=${boostSrcLiteral};\n  s.async=true;\n  document.head.appendChild(s);\n<\/script>`,
+        wp: `<?php\n// ใส่ใน functions.php ของ Theme หรือ Plugin\nfunction add_indicator_ai_widget() {\n  ?>\n  <script>\n  window.IndicatorConfig={\n    apiKey:${apiKeyLiteral},\n    backendUrl:${chatUrlLiteral},\n    title:${titleLiteral},\n    lang:"auto"\n  };\n  (function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.async=true;js.src=${boostSrcLiteral};fjs.parentNode.insertBefore(js,fjs);}(document,'script','indicator-jssdk'));\n  <\/script>\n  <?php\n}\nadd_action('wp_footer', 'add_indicator_ai_widget');`
+        };
+        const code = document.getElementById('codeContent');
+        if (code) code.textContent = embedCodes[_embedFmt] || embedCodes.smart;
+    }
 
     const embedDescs = {
         smart:  '⚡ โหลดแบบ Async ไม่ชะลอเว็บ รองรับทุก Platform (Netlify, Wix, Shopify, Squarespace, GitHub Pages ฯลฯ)',
@@ -436,8 +444,7 @@
     };
 
     let _embedFmt = 'smart';
-    // Set initial code
-    document.getElementById('codeContent').textContent = embedCodes.smart;
+    buildEmbedCodes();
 
     function setEmbedFmt(fmt, btn) {
         _embedFmt = fmt;
@@ -492,6 +499,7 @@
             if (s.support_email) document.getElementById('setSupportEmail').value = s.support_email;
             if (s.support_phone) document.getElementById('setSupportPhone').value = s.support_phone;
             if (s.support_url) document.getElementById('setSupportUrl').value = s.support_url;
+            document.getElementById('setOrigins').value = (tenant.allowed_origins || []).join('\n');
             if (s.temperature !== undefined) {
                 document.getElementById('setTemp').value = s.temperature;
                 document.getElementById('setTempVal').textContent = s.temperature;
@@ -511,7 +519,8 @@
                     temperature: parseFloat(document.getElementById('setTemp').value),
                     support_email: document.getElementById('setSupportEmail').value.trim(),
                     support_phone: document.getElementById('setSupportPhone').value.trim(),
-                    support_url: document.getElementById('setSupportUrl').value.trim()
+                    support_url: document.getElementById('setSupportUrl').value.trim(),
+                    allowed_origins: document.getElementById('setOrigins').value
                 })
             });
             const data = await res.json();
@@ -539,8 +548,8 @@
             document.getElementById('knList').innerHTML = list.map(k => `
                 <div class="kn-item">
                     <div class="kn-ic"><i class="fa-solid fa-${k.type === 'url' ? 'link' : 'align-left'}"></i></div>
-                    <div class="kn-text">${escHtml(k.content || '').slice(0, 200)}${(k.content||'').length > 200 ? '...' : ''}</div>
-                    <button class="kn-del" onclick="deleteKnowledge('${k.id}')"><i class="fa-solid fa-trash"></i></button>
+                    <div class="kn-text">${escHtml(String(k.content || '').slice(0, 200))}${(k.content||'').length > 200 ? '...' : ''}</div>
+                    <button class="kn-del" onclick="deleteKnowledge(decodeURIComponent('${encodeURIComponent(String(k.id||'')).replace(/'/g,'%27')}'))"><i class="fa-solid fa-trash"></i></button>
                 </div>
             `).join('');
         } catch(e) {
@@ -607,7 +616,9 @@
 
     // ---- Logout ----
     function logout() {
+        fetch('/api/customer-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' } }).catch(() => {});
         localStorage.removeItem('tenant_data');
+        localStorage.removeItem('customer_data');
         window.location.href = '/customer-login';
     }
 
