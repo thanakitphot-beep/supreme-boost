@@ -6,7 +6,7 @@ const { activateBillingRequest, CHECKOUT_LOCK_STATUSES, verifyStripeSignature } 
 const { __rejectBillingRequest: rejectBillingRequest, __knowledgeDeleteFilter: knowledgeDeleteFilter } = require('../../api/admin');
 const checkout = require('../../api/checkout');
 const stripeWebhook = require('../../api/stripe-webhook');
-const { handoffDeliveryMode, registrationMode, validateProductionConfig } = require('../../services/productionConfig');
+const { deploymentOrigin, handoffDeliveryMode, registrationMode, validateProductionConfig } = require('../../services/productionConfig');
 const { parseImageDataUrl } = require('../../services/imageData');
 
 function getPath(document, path) {
@@ -295,6 +295,12 @@ describe('Production configuration gate', () => {
         expect(registrationMode({})).toBe('disabled');
         expect(handoffDeliveryMode({})).toBe('contact_only');
         expect(validateProductionConfig({}).modes.payment).toBe('manual');
+    });
+
+    test('derives the exact service origin from trusted Render metadata', () => {
+        expect(deploymentOrigin({ RENDER_SERVICE_NAME: 'indicator-web-chat' })).toBe('https://indicator-web-chat.onrender.com');
+        expect(deploymentOrigin({ RENDER_SERVICE_NAME: 'invalid.example.com' })).toBe('');
+        expect(deploymentOrigin({ PUBLIC_BASE_URL: 'http://invalid.example', RENDER_SERVICE_NAME: 'indicator-web-chat' })).toBe('');
     });
 
     test('compares runtime signing secrets after trimming whitespace', () => {

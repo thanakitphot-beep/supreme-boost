@@ -2,6 +2,7 @@
 // Restricts API access to verified domains.
 // CORS_ALLOWED_ORIGINS is intentionally read at call-time (not module load)
 // so that runtime env changes and tests work correctly.
+const { deploymentOrigin } = require('./productionConfig');
 
 function getAllowedDomains() {
     const configured = (process.env.CORS_ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -9,6 +10,8 @@ function getAllowedDomains() {
         const renderUrl = new URL(String(process.env.RENDER_EXTERNAL_URL || ''));
         if (renderUrl.protocol === 'https:' || renderUrl.protocol === 'http:') configured.push(renderUrl.origin);
     } catch (_) { }
+    const serviceOrigin = deploymentOrigin();
+    if (serviceOrigin) configured.push(serviceOrigin);
     return [...new Set(configured)];
 }
 

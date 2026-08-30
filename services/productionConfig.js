@@ -14,6 +14,15 @@ function exactHttpsOrigin(value) {
     }
 }
 
+function deploymentOrigin(env = process.env) {
+    for (const value of [env.PUBLIC_BASE_URL, env.RENDER_EXTERNAL_URL, env.RENDER_SERVICE_URL]) {
+        const candidate = String(value || '').trim();
+        if (candidate) return exactHttpsOrigin(candidate) ? new URL(candidate).origin : '';
+    }
+    const serviceName = String(env.RENDER_SERVICE_NAME || '').trim().toLowerCase();
+    return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(serviceName) ? `https://${serviceName}.onrender.com` : '';
+}
+
 function hasCharacterDiversity(value, minimumUnique) {
     return new Set(String(value || '')).size >= minimumUnique;
 }
@@ -60,13 +69,14 @@ function validateProductionConfig(env = process.env) {
     if (handoff === 'contact_only') warnings.push('Handoff email delivery is disabled; requests remain in the support queue');
 
     const origins = String(env.CORS_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
+    if (!origins.length && deploymentOrigin(env)) origins.push(deploymentOrigin(env));
     if (!origins.length || origins.some(origin => !exactHttpsOrigin(origin))) errors.push('CORS_ALLOWED_ORIGINS must contain exact HTTPS origins without wildcards or paths');
     if (env.INDICATOR_ALLOW_FIRST_PARTY_DEMO === 'true') errors.push('INDICATOR_ALLOW_FIRST_PARTY_DEMO must not be enabled in production');
     if (env.INDICATOR_FILE_LEARNING === 'true') errors.push('INDICATOR_FILE_LEARNING must not be enabled in production');
     if (env.TRUST_PROXY_HEADERS !== 'true') warnings.push('TRUST_PROXY_HEADERS should be true behind a trusted ingress or platform proxy');
     if (!configured(env.RATE_LIMIT_SECRET) && configured(env.JWT_SECRET)) warnings.push('RATE_LIMIT_SECRET is not set; JWT_SECRET will also key rate-limit identities');
 
-    const publicUrl = env.PUBLIC_BASE_URL || env.RENDER_EXTERNAL_URL;
+    const publicUrl = deploymentOrigin(env);
     if (!exactHttpsOrigin(publicUrl)) errors.push('PUBLIC_BASE_URL or RENDER_EXTERNAL_URL must be an exact HTTPS origin');
 
     const paymentMode = String(env.PAYMENT_MODE || 'manual').trim().toLowerCase();
@@ -89,4 +99,4 @@ function validateProductionConfig(env = process.env) {
     return { ok: errors.length === 0, errors, warnings, modes: { registration, handoff, payment: paymentMode } };
 }
 
-module.exports = { exactHttpsOrigin, handoffDeliveryMode, registrationMode, validateProductionConfig };
+module.exports = { deploymentOrigin, exactHttpsOrigin, handoffDeliveryMode, registrationMode, validateProductionConfig };
