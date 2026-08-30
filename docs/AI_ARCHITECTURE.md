@@ -8,7 +8,7 @@ The new INDICATOR AI Architecture transitions from a highly coupled, direct-to-p
 2. **Deterministic Agent (`indicatorAgent.js`)**: First, the local, deterministic agent tries to fulfill the request. If it matches a strict product query or a simple site navigation action, it generates the response immediately without hitting an LLM.
 3. **AI Gateway (`services/ai/gateway.js`)**: If the deterministic agent defers the request, it goes to the AI Gateway.
 4. **Context Builder (`services/ai/contextBuilder.js`)**: The Gateway sends raw inputs to the Context Builder which enforces token limits and meticulously constructs a structured context (System prompts, Memory, RAG, Tools, and User Query).
-5. **Model Router (`services/ai/router.js`)**: The Model Router determines the optimal AI Provider based on `.env` configurations (Fast, Normal, Reasoning models). It orchestrates the HTTP call with:
+5. **Model Router (`services/ai/router.js`)**: The Model Router selects configured providers and provider-specific models. It orchestrates the HTTP call with:
    - Timeout handlers
    - Exponential Backoff Retries
    - Fallback routing
@@ -31,9 +31,10 @@ Configure your AI routing in `.env`:
 AI_PRIMARY_PROVIDER=gemini
 AI_FALLBACK_PROVIDER=groq
 
-AI_FAST_MODEL=gemini-1.5-flash
+OPENAI_MODEL=gpt-5.6-terra
+GEMINI_MODEL=gemini-2.5-flash
+GROQ_MODEL=llama-3.3-70b-versatile
 AI_NORMAL_MODEL=gemini-2.5-flash
-AI_REASONING_MODEL=gemini-2.5-pro
 AI_FALLBACK_MODEL=llama-3.3-70b-versatile
 
 AI_REQUEST_TIMEOUT_MS=15000
