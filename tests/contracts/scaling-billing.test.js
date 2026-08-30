@@ -300,7 +300,7 @@ describe('Production configuration gate', () => {
     test('derives the exact service origin from trusted Render metadata', () => {
         expect(deploymentOrigin({ RENDER_SERVICE_NAME: 'indicator-web-chat' })).toBe('https://indicator-web-chat.onrender.com');
         expect(deploymentOrigin({ RENDER_SERVICE_NAME: 'invalid.example.com' })).toBe('');
-        expect(deploymentOrigin({ PUBLIC_BASE_URL: 'http://invalid.example', RENDER_SERVICE_NAME: 'indicator-web-chat' })).toBe('');
+        expect(deploymentOrigin({ PUBLIC_BASE_URL: 'http://invalid.example', RENDER_SERVICE_NAME: 'indicator-web-chat' })).toBe('https://indicator-web-chat.onrender.com');
     });
 
     test('compares runtime signing secrets after trimming whitespace', () => {

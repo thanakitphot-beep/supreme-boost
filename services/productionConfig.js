@@ -17,7 +17,7 @@ function exactHttpsOrigin(value) {
 function deploymentOrigin(env = process.env) {
     for (const value of [env.PUBLIC_BASE_URL, env.RENDER_EXTERNAL_URL, env.RENDER_SERVICE_URL]) {
         const candidate = String(value || '').trim();
-        if (candidate) return exactHttpsOrigin(candidate) ? new URL(candidate).origin : '';
+        if (exactHttpsOrigin(candidate)) return new URL(candidate).origin;
     }
     const serviceName = String(env.RENDER_SERVICE_NAME || '').trim().toLowerCase();
     return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(serviceName) ? `https://${serviceName}.onrender.com` : '';
@@ -68,7 +68,9 @@ function validateProductionConfig(env = process.env) {
     if (registration === 'disabled') warnings.push('Public registration is disabled');
     if (handoff === 'contact_only') warnings.push('Handoff email delivery is disabled; requests remain in the support queue');
 
-    const origins = String(env.CORS_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
+    const configuredOrigins = String(env.CORS_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
+    const origins = configuredOrigins.filter(exactHttpsOrigin);
+    if (configuredOrigins.length !== origins.length) warnings.push('Invalid CORS origins are ignored');
     if (!origins.length && deploymentOrigin(env)) origins.push(deploymentOrigin(env));
     if (!origins.length || origins.some(origin => !exactHttpsOrigin(origin))) errors.push('CORS_ALLOWED_ORIGINS must contain exact HTTPS origins without wildcards or paths');
     if (env.INDICATOR_ALLOW_FIRST_PARTY_DEMO === 'true') errors.push('INDICATOR_ALLOW_FIRST_PARTY_DEMO must not be enabled in production');
