@@ -29,13 +29,14 @@ const PRODUCT_LIST_REQUEST = /(?:มี.*(?:อะไรบ้าง|แบบ�
 const PRODUCT_DETAIL_QUESTION = /(?:นุ่ม|ใส่สบาย|รองรับแรงกระแทก|ทน|คุณภาพ|รีวิว|สเปก|เหมาะกับ|comfort|cushion|durab|review|spec|quality)/iu;
 const AVAILABILITY_QUESTION = /^(?:(?:ใน)?ร้าน(?:นี้)?|ที่นี่|เว็บ(?:นี้)?|เว็บไซต์(?:นี้)?)?\s*มี(.+?)(?:ไหม|มั้ย|มัย|หรือเปล่า|รึเปล่า|หรือไม่)[?？]*$/iu;
 const RECOMMENDATION_REQUEST = /(?:มีอะไร(?:แนะนำ|น่าสนใจ|ขายดี)|อะไร(?:แนะนำ|น่าสนใจ|ขายดี)|แนะนำ(?:สินค้า|ของ|หน่อย|ให้หน่อย)?|สินค้า(?:ขายดี|แนะนำ)|ยอดนิยม|best\s*seller|recommend)/iu;
+const LOCATION_REQUEST = /(?:อยู่(?:ที่|ตรง)?ไหน|หา(?:ให้|หน่อย)?|where(?:\s+is)?|find)/iu;
 // English terms use word boundaries so normal words such as "Designing" do
 // not accidentally match the "sign in" safety rule.
 const SENSITIVE_REQUEST = /(?:\b(?:password|token|secret|api.?key|checkout|payment|pay|billing|login|sign[ -]?in|admin)\b|รหัสผ่าน|โทเคน|ชำระ|จ่ายเงิน|เข้าสู่ระบบ|แอดมิน)/iu;
 
 // Filler words stripped when extracting the real search target from a query.
 // Anything that remains after stripping is what the user actually wants to find.
-const QUERY_FILLER = /(?:หน้า(?=\s|ซึ่ง)|อยากรู้ว่า|พาไป(?:หา)?|ไปหน้า|ช่วยหา|ช่วย|หาให้|หา(?=\s|$)|อยากได้|ต้องการ|ขอดู|อยากดู|อยากรู้|หน่อย|ให้หน่อย|ได้ไหม|ไหม|มีไหม|มีมั้ย|หรือเปล่า|บ้าง|เลย|นะ|ครับ|ค่ะ|คะ|please|show me|take me to|where is|find|look for|\bget\b|\bsee\b|\bneed\b|\bwant\b)/giu;
+const QUERY_FILLER = /(?:หน้า(?=\s|ซึ่ง)|อยากรู้ว่า|พาไป(?:หา)?|ไปหน้า|ช่วยหา|ช่วย|หาให้|หา(?=\s|$)|อยากได้|ต้องการ|ขอดู|อยากดู|อยากรู้|อยู่(?:ที่|ตรง)?ไหน|หน่อย|ให้หน่อย|ได้ไหม|ไหม|มีไหม|มีมั้ย|หรือเปล่า|บ้าง|เลย|นะ|ครับ|ค่ะ|คะ|please|show me|take me to|where is|find|look for|\bget\b|\bsee\b|\bneed\b|\bwant\b)/giu;
 
 function normalize(value) {
     return normalizeHumanText(value);
@@ -385,6 +386,7 @@ function extractQuerySubject(rawPrompt) {
     const text = normalize(rawPrompt)
         .replace(QUERY_FILLER, ' ')
         .replace(REQUEST_FILLER, ' ')
+        .replace(/[^\p{L}\p{M}\p{N}\s]/gu, ' ')
         .replace(/\s+/g, ' ')
         .trim();
     // Remove very short leftover particles
@@ -451,6 +453,7 @@ function intentFor(prompt) {
     if (/(ติดต่อ|เบอร์โทร|อีเมล|เจ้าหน้าที่|พนักงาน|human|agent|contact|support)/iu.test(text)) return 'handoff';
     if (/(สรุป|summari[sz]e|ย่อ)/iu.test(text)) return 'summarize';
     if (/(คำศัพท์|คำว่า|หมายถึง|definition|meaning)/iu.test(text)) return 'define_term';
+    if (LOCATION_REQUEST.test(text)) return 'search_unified';
     if (/(หัวข้อ|บทความ|นโยบาย|where|page|section|heading)/iu.test(text)) return 'search_unified';
     if (PRODUCT_TERMS.some(term => text.includes(term)) || /(สินค้า|ราคา|ไซซ์|size|สี|color|รุ่น|อยากได้|ต้องการ|ขอ|looking for|\bneed\b|\bwant\b)/iu.test(text)) return 'search_unified';
     if (/(พาไป|ไปหน้า)/iu.test(text)) return 'search_unified';
@@ -763,7 +766,31 @@ function searchUnified(knowledge, payload, prompt) {
     const liveHeadings = Array.isArray(siteDNA.headings) ? siteDNA.headings : [];
     const liveEntities = Array.isArray(siteDNA.entities) ? siteDNA.entities : [];
     const structuredEntities = Array.isArray(siteDNA.entityIndex) ? siteDNA.entityIndex : [];
-    const liveContent = normalize(String(siteDNA.activeSectionText || payload.pageContent || ''));
+    const liveContent = normalize(`${siteDNA.activeSectionText || ''} ${payload.pageContent || ''}`);
+
+    // Prefer a client-indexed card containing the exact requested phrase. Its
+    // selector is more precise than a text scan across headings and articles.
+    if (LOCATION_REQUEST.test(normalize(prompt)) && subject) {
+        const normalizedSubject = normalize(subject);
+        const exactEntity = structuredEntities
+            .map((entity, index) => normalizeRuntimeEntity(entity, index, payload.url))
+            .find(entity => entity && normalize(`${entity.name} ${entity.description} ${entity.keywords.join(' ')}`).includes(normalizedSubject));
+        if (exactEntity) {
+            const action = actionFor({
+                title: subject,
+                url: exactEntity.url,
+                currentUrl: payload.url,
+                keywords: keywords.length ? keywords : [subject],
+                permissions: payload.siteProfile && payload.siteProfile.permissions,
+                entityId: exactEntity.entityId,
+                selector: exactEntity.selector
+            });
+            return base(action ? `พบ “${subject}” บนหน้านี้แล้วครับ กำลังพาไปให้` : `พบ “${subject}” บนหน้านี้แล้วครับ`, {
+                action,
+                sources: [{ type: 'structured_entity', query: subject }]
+            });
+        }
+    }
 
     // Structured entity match first so answer + warp share the same exact DOM id.
     let bestStructured = null;
@@ -784,6 +811,21 @@ function searchUnified(knowledge, payload, prompt) {
         return base(`พบ “${bestStructured.name}” บนหน้านี้แล้วครับ กำลังพาไปให้`, {
             action: { type: 'warp', targetText: bestStructured.name, selector: bestStructured.selector, keywords: warpKw, searchAll: false },
             sources: [{ type: 'structured_entity', query: subject }]
+        });
+    }
+
+    // Do not substitute a page heading for the phrase a visitor asked to find.
+    if (LOCATION_REQUEST.test(normalize(prompt)) && subject && liveContent.includes(normalize(subject))) {
+        const action = actionFor({
+            title: subject,
+            url: payload.url,
+            currentUrl: payload.url,
+            keywords: keywords.length ? keywords : [subject],
+            permissions: payload.siteProfile && payload.siteProfile.permissions
+        });
+        return base(action ? `พบ “${subject}” บนหน้านี้แล้วครับ กำลังพาไปให้` : `พบ “${subject}” บนหน้านี้แล้วครับ`, {
+            action,
+            sources: [{ type: 'live_page', query: subject }]
         });
     }
 

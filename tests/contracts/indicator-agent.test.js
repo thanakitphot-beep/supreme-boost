@@ -223,6 +223,54 @@ describe('INDICATOR owned agent — contract', () => {
         expect(result.action).toMatchObject({ type: 'navigate', url: '/contact' });
     });
 
+    test('warps to the exact Thai phrase requested on the current page', () => {
+        const result = runIndicatorAgent({
+            prompt: '🌍 ต่างประเทศ อยู่ไหน',
+            url: 'https://news.example/articles/ai-001',
+            locale: 'th',
+            siteProfile: { permissions: ['navigate_same_origin'] },
+            pageContent: 'ข่าว AI วันนี้ มีหัวข้อท่องเที่ยวและข้อความ 🌍 ต่างประเทศ อยู่ไหน สำหรับผู้อ่าน',
+            siteDNA: {
+                headings: ['ข่าว AI และปัญญาประดิษฐ์'],
+                activeSectionText: 'บทความเกี่ยวกับ AI Agent รุ่นใหม่'
+            }
+        });
+
+        expect(result.reply).toContain('ต่างประเทศ');
+        expect(result.action).toMatchObject({
+            type: 'warp',
+            targetText: 'ต่างประเทศ',
+            keywords: ['ต่างประเทศ']
+        });
+        expect(result.sources[0]).toEqual({ type: 'live_page', query: 'ต่างประเทศ' });
+    });
+
+    test('uses the indexed article selector when it contains the requested phrase', () => {
+        const result = runIndicatorAgent({
+            prompt: 'ต่างประเทศ อยู่ตรงไหน',
+            url: 'https://news.example/articles',
+            locale: 'th',
+            siteProfile: { permissions: ['navigate_same_origin'] },
+            siteDNA: {
+                entityIndex: [{
+                    id: 'news-foreign',
+                    title: 'ข่าวเศรษฐกิจต่างประเทศ',
+                    description: 'สรุปข่าวจากต่างประเทศประจำวัน',
+                    selector: '[data-sb-entity-id="news-foreign"]',
+                    href: 'https://news.example/articles'
+                }]
+            }
+        });
+
+        expect(result.action).toMatchObject({
+            type: 'warp',
+            entityId: 'news-foreign',
+            selector: '[data-sb-entity-id="news-foreign"]',
+            targetText: 'ต่างประเทศ'
+        });
+        expect(result.sources[0]).toEqual({ type: 'structured_entity', query: 'ต่างประเทศ' });
+    });
+
     test('keeps the widget response schema', () => {
         const result = runIndicatorAgent({ prompt: 'สรุปหน้านี้', pageContent: 'ข้อมูลสำคัญของหน้าปัจจุบัน', locale: 'th' });
         expect(typeof result.reply).toBe('string');
