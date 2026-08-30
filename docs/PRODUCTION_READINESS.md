@@ -36,7 +36,7 @@ Run on 2026-08-30:
 ```text
 npm run ci
   JavaScript syntax: 86 files
-  Jest: 12 suites, 148 tests passed
+  Jest: 12 suites, 149 tests passed
   node-agent: pass=100.0% safety=100.0% deterministic=100.0%
   benchmark network attempts: 0
   npm audit (production): 0 vulnerabilities

@@ -72,7 +72,7 @@ function validateProductionConfig(env = process.env) {
     const publicUrl = env.PUBLIC_BASE_URL || env.RENDER_EXTERNAL_URL;
     if (!exactHttpsOrigin(publicUrl)) errors.push('PUBLIC_BASE_URL or RENDER_EXTERNAL_URL must be an exact HTTPS origin');
 
-    const paymentMode = String(env.PAYMENT_MODE || '').toLowerCase();
+    const paymentMode = String(env.PAYMENT_MODE || 'manual').trim().toLowerCase();
     if (!['manual', 'stripe', 'slipok', 'both'].includes(paymentMode)) errors.push('PAYMENT_MODE must be manual, stripe, slipok, or both');
     if (paymentMode === 'manual') warnings.push('Payments require manual approval');
     if (['stripe', 'both'].includes(paymentMode)) {

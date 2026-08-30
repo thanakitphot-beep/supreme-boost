@@ -275,8 +275,8 @@ describe('Production configuration gate', () => {
         expect(result.ok).toBe(true);
     });
 
-    test('rejects wildcard CORS and missing billing secrets', () => {
-        const result = validateProductionConfig({ CORS_ALLOWED_ORIGINS: 'https://*.example.com' });
+    test('rejects wildcard CORS and unknown payment modes', () => {
+        const result = validateProductionConfig({ CORS_ALLOWED_ORIGINS: 'https://*.example.com', PAYMENT_MODE: 'crypto' });
         expect(result.ok).toBe(false);
         expect(result.errors.join(' ')).toContain('CORS_ALLOWED_ORIGINS');
         expect(result.errors.join(' ')).toContain('PAYMENT_MODE');
@@ -293,6 +293,7 @@ describe('Production configuration gate', () => {
         expect(handoffDeliveryMode({ HANDOFF_DELIVERY_MODE: ' SMTP ' })).toBe('smtp');
         expect(registrationMode({})).toBe('disabled');
         expect(handoffDeliveryMode({})).toBe('contact_only');
+        expect(validateProductionConfig({}).modes.payment).toBe('manual');
     });
 
     test('compares runtime signing secrets after trimming whitespace', () => {

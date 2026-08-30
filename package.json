@@ -19,7 +19,7 @@
     "test": "jest --testPathPatterns=tests/contracts --runInBand --detectOpenHandles",
     "test:watch": "jest --testPathPatterns=tests/contracts --runInBand --watch",
     "dev": "nodemon server.js",
-    "start": "node server.js",
+    "start": "npm run release:start",
     "prod": "pm2 start server.js --name supreme-boost --watch --ignore-watch=\"node_modules\"",
     "stop": "pm2 stop supreme-boost",
     "restart": "pm2 restart supreme-boost",

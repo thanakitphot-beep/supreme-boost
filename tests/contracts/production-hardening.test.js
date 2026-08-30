@@ -14,6 +14,7 @@ const { releaseInfo } = require('../../services/release');
 const { signToken, accessTokenFromRequest, setAdminSessionCookie } = require('../../api/_auth');
 const geo = require('../../api/geo');
 const { maskPII } = require('../../services/safety');
+const packageJson = require('../../package.json');
 
 async function requestFromLocalServer(pathname, options) {
     const app = http.createServer(server);
@@ -32,6 +33,11 @@ async function requestFromLocalServer(pathname, options) {
 }
 
 describe('Production hardening', () => {
+    test('routes the platform default start command through release gates', () => {
+        expect(packageJson.scripts.start).toBe('npm run release:start');
+        expect(packageJson.scripts['release:start']).toContain('npm run db:indexes');
+    });
+
     test('uses salted scrypt passwords and upgrades legacy records after verification', async () => {
         const password = 'correct horse battery staple';
         const stored = await hashPassword(password);
