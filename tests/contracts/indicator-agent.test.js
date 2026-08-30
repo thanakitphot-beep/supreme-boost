@@ -240,7 +240,8 @@ describe('INDICATOR owned agent — contract', () => {
         expect(result.action).toMatchObject({
             type: 'warp',
             targetText: 'ต่างประเทศ',
-            keywords: ['ต่างประเทศ']
+            keywords: ['ต่างประเทศ'],
+            exactText: 'ต่างประเทศ'
         });
         expect(result.sources[0]).toEqual({ type: 'live_page', query: 'ต่างประเทศ' });
     });
@@ -266,7 +267,8 @@ describe('INDICATOR owned agent — contract', () => {
             type: 'warp',
             entityId: 'news-foreign',
             selector: '[data-sb-entity-id="news-foreign"]',
-            targetText: 'ต่างประเทศ'
+            targetText: 'ต่างประเทศ',
+            exactText: 'ต่างประเทศ'
         });
         expect(result.sources[0]).toEqual({ type: 'structured_entity', query: 'ต่างประเทศ' });
     });
@@ -313,6 +315,8 @@ describe('INDICATOR owned agent — contract', () => {
         const source = fs.readFileSync(path.resolve(__dirname, '../../src/widget/main.js'), 'utf8');
         expect(bundle).toContain('case"navigate"');
         expect(source).toContain('safeNavigationUrl');
+        expect(source).toContain('highlightExactPhrase');
+        expect(source).toContain('act.exactText');
         expect(source).toContain("credentials: 'omit'");
         expect(source).toContain('new URL(rawUrl, location.href)');
         expect(source).toContain('destination.origin !== location.origin');

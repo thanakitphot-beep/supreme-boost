@@ -785,6 +785,7 @@ function searchUnified(knowledge, payload, prompt) {
                 entityId: exactEntity.entityId,
                 selector: exactEntity.selector
             });
+            if (action) action.exactText = subject;
             return base(action ? `พบ “${subject}” บนหน้านี้แล้วครับ กำลังพาไปให้` : `พบ “${subject}” บนหน้านี้แล้วครับ`, {
                 action,
                 sources: [{ type: 'structured_entity', query: subject }]
@@ -823,6 +824,7 @@ function searchUnified(knowledge, payload, prompt) {
             keywords: keywords.length ? keywords : [subject],
             permissions: payload.siteProfile && payload.siteProfile.permissions
         });
+        if (action) action.exactText = subject;
         return base(action ? `พบ “${subject}” บนหน้านี้แล้วครับ กำลังพาไปให้` : `พบ “${subject}” บนหน้านี้แล้วครับ`, {
             action,
             sources: [{ type: 'live_page', query: subject }]

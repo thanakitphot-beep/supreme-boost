@@ -1352,8 +1352,49 @@
                 el.style.backgroundColor = orig.bg || "";
                 el.removeAttribute("data-sb-warp-active");
             }
+            if (_activeWarp.mark && _activeWarp.mark.parentNode) {
+                var mark = _activeWarp.mark, parent = mark.parentNode;
+                while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+                parent.removeChild(mark);
+                parent.normalize();
+            }
         } catch (_) { }
         _activeWarp = null;
+    }
+
+    function textPhraseIndex(text, phrase) {
+        var source = String(text || "").toLocaleLowerCase();
+        var target = String(phrase || "").toLocaleLowerCase().trim();
+        if (source.normalize) { source = source.normalize("NFC"); target = target.normalize("NFC"); }
+        return target.length >= 2 ? source.indexOf(target) : -1;
+    }
+
+    function highlightExactPhrase(phrase) {
+        if (!document.body || !document.createTreeWalker) return false;
+        var walker = document.createTreeWalker(document.body, window.NodeFilter ? window.NodeFilter.SHOW_TEXT : 4, null);
+        var node;
+        while ((node = walker.nextNode())) {
+            var parent = node.parentElement;
+            var tag = parent && parent.tagName;
+            if (!parent || !safeEl(parent) || (parent.closest && parent.closest("#" + WIDGET_ID)) || /^(?:SCRIPT|STYLE|NOSCRIPT|TEXTAREA)$/i.test(tag || "")) continue;
+            var index = textPhraseIndex(node.nodeValue, phrase);
+            if (index < 0) continue;
+            try {
+                clearActiveWarp();
+                var range = document.createRange();
+                range.setStart(node, index);
+                range.setEnd(node, index + String(phrase).length);
+                var mark = document.createElement("mark");
+                mark.setAttribute("data-sb-exact-match", "1");
+                mark.style.cssText = "background:#fef08a;color:inherit;border-radius:3px;box-shadow:0 0 0 3px rgba(250,204,21,.65);padding:1px 2px;transition:box-shadow .3s ease;";
+                range.surroundContents(mark);
+                _activeWarp = { mark: mark };
+                mark.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+                setTimeout(function () { if (_activeWarp && _activeWarp.mark === mark) clearActiveWarp(); }, 5000);
+                return true;
+            } catch (_) { }
+        }
+        return false;
     }
 
     function warpEl(el) {
@@ -1528,6 +1569,7 @@
                     requestHandoff(_st ? _st.locale : "en", "User requested human agent via chat.", act.priority);
                     break;
                 case "warp":
+                    if (act.exactText) { highlightExactPhrase(act.exactText); break; }
                     var warpTarget = resolveWarpTarget(act);
                     if (warpTarget) {
                         warpEl(warpTarget);
