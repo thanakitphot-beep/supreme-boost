@@ -46,6 +46,16 @@ describe('Shared product visual system', () => {
         expect(source).toContain('getAttr(s, "data-backend-url", DEFAULT_BACKEND_URL)');
     });
 
+    test('widget uses the glowing INDICATOR chat icon', () => {
+        const source = fs.readFileSync(path.resolve(__dirname, '../../src/widget/main.js'), 'utf8');
+        const icon = fs.readFileSync(path.resolve(__dirname, '../../indicator-chat-icon.svg'), 'utf8');
+        expect(source).toContain('indicator-chat-icon.svg');
+        expect(source).toContain('sb-orb-logo');
+        expect(source).toContain('sbIndicatorGlow');
+        expect(icon).toContain('INDICATOR');
+        expect(icon).toContain('linearGradient');
+    });
+
     test('admin control center inline scripts compile', () => {
         const html = fs.readFileSync(path.resolve(__dirname, '../../admin-dashboard.html'), 'utf8');
         const scripts = [...html.matchAll(/<script>\s*([\s\S]*?)<\/script>/gi)].map(match => match[1]);

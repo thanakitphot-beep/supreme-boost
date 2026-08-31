@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">INDICATOR chat</title>
+  <desc id="desc">A cyan speech bubble with the INDICATOR wordmark.</desc>
+  <defs>
+    <linearGradient id="bubble" x1="38" y1="32" x2="218" y2="222" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#77e6e5"/>
+      <stop offset="1" stop-color="#39c8d8"/>
+    </linearGradient>
+    <linearGradient id="word" x1="57" y1="0" x2="204" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#050816"/>
+      <stop offset="0.52" stop-color="#15154c"/>
+      <stop offset="1" stop-color="#3338d1"/>
+    </linearGradient>
+  </defs>
+  <path d="M127.7 21.5c-58.7 0-106.2 43.7-106.2 97.6s47.5 97.6 106.2 97.6c15.9 0 31-3.2 44.5-8.9l56.2 14.8-12.6-51.9c11.5-14.8 18.2-32.6 18.2-51.6 0-53.9-47.6-97.6-106.3-97.6Z" fill="url(#bubble)" stroke="#8c969b" stroke-width="7" stroke-linejoin="round"/>
+  <text x="128" y="126" fill="url(#word)" font-family="Arial, Helvetica, sans-serif" font-size="33" font-style="italic" font-weight="500" letter-spacing="-1.5" text-anchor="middle">INDICATOR</text>
+  <path d="M57 151h54m34 0h54" fill="none" stroke="#2438bd" stroke-linecap="round" stroke-width="2"/>
+  <path d="m128 143 4 4 5-1-1 5 3 4-5 1-2 5-4-4-4 4-2-5-5-1 3-4-1-5 5 1 4-4Z" fill="#183cae"/>
+</svg>

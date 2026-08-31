@@ -11,6 +11,7 @@
     var DEFAULT_TITLE = "INDICATOR WEB CHAT";
     var DEFAULT_PRIMARY = "#667eea";
     var DEFAULT_BACKEND_URL = "https://indicator-web-chat.onrender.com/api/chat";
+    var DEFAULT_ICON_URL = "https://indicator-web-chat.onrender.com/indicator-chat-icon.svg";
     var MAX_PAGE_CHARS = 12000;
     var MAX_HISTORY = 8;
     var PAGE_TEXT_CLASS = "supreme-boost-large-text";
@@ -655,7 +656,17 @@
 
     function applyWidgetSymbolStyle(shadow) {
         var style = document.createElement("style");
-        style.textContent = '.sb-orb::after{content:"\\1F4AC"}';
+        style.textContent = [
+            '.sb-orb{width:64px;height:64px;padding:3px;border:1px solid rgba(103,232,249,.78);border-radius:50%;background:rgba(8,15,32,.96);box-shadow:0 0 0 2px rgba(34,211,238,.18),0 0 18px rgba(34,211,238,.72),0 0 42px rgba(59,130,246,.42);animation:sbIndicatorGlow 2.8s ease-in-out infinite;isolation:isolate;}',
+            '.sb-orb-logo{display:block;width:100%;height:100%;object-fit:contain;border-radius:50%;filter:drop-shadow(0 0 5px rgba(103,232,249,.75));pointer-events:none;user-select:none;}',
+            '.sb-orb::before{display:block;content:"";position:absolute;inset:-8px;border-radius:50%;background:radial-gradient(circle,rgba(103,232,249,.34) 0,rgba(34,211,238,.16) 45%,transparent 72%);filter:blur(7px);opacity:.9;z-index:-1;animation:sbIndicatorHalo 2.8s ease-in-out infinite;}',
+            '.sb-orb::after{content:"";}',
+            ':host(.sb-expanded) .sb-orb-logo{display:none;}',
+            '@keyframes sbIndicatorGlow{0%,100%{box-shadow:0 0 0 2px rgba(34,211,238,.16),0 0 16px rgba(34,211,238,.62),0 0 34px rgba(59,130,246,.34)}50%{box-shadow:0 0 0 3px rgba(103,232,249,.3),0 0 26px rgba(34,211,238,.94),0 0 58px rgba(59,130,246,.58)}}',
+            '@keyframes sbIndicatorHalo{0%,100%{opacity:.55;transform:scale(.92)}50%{opacity:1;transform:scale(1.1)}}',
+            '@media(max-width:480px){.sb-orb{width:58px;height:58px}}',
+            '@media(prefers-reduced-motion:reduce){.sb-orb,.sb-orb::before{animation:none!important}}'
+        ].join('');
         shadow.appendChild(style);
     }
 
@@ -745,8 +756,9 @@
             var whisperContainer = document.createElement("div"); whisperContainer.className = "sb-whisper-container";
             var whisper = document.createElement("div"); whisper.id = WIDGET_ID + "-whisper"; whisper.className = "sb-whisper";
             var panel = document.createElement("section"); panel.className = "sb-panel";
-            panel.innerHTML = '<div class="sb-header"><div style="display:flex;align-items:center;gap:8px;"><img src="/INDICATOR.png" alt="Logo" style="width:28px;height:28px;object-fit:cover;border-radius:50%;border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"><div><div class="sb-title">' + cfg.title + '</div><div class="sb-subtitle"></div></div></div><div class="sb-actions"><button class="sb-icon-btn" type="button" data-action="close">\u00D7</button></div></div><div class="sb-messages"></div><div class="sb-quick"></div><form class="sb-compose"><textarea class="sb-input" rows="1"></textarea><button class="sb-voice-btn" type="button" style="background:transparent;border:0;cursor:pointer;font-size:18px;color:#64748b;padding:0 8px;transition:color 0.2s;" title="พูดด้วยเสียง">\uD83C\uDFA4</button><button class="sb-send" type="submit"></button></form>';
+            panel.innerHTML = '<div class="sb-header"><div style="display:flex;align-items:center;gap:8px;"><img src="' + DEFAULT_ICON_URL + '" alt="Logo" style="width:28px;height:28px;object-fit:contain;border-radius:50%;border:1px solid rgba(255,255,255,0.3);flex-shrink:0;"><div><div class="sb-title">' + cfg.title + '</div><div class="sb-subtitle"></div></div></div><div class="sb-actions"><button class="sb-icon-btn" type="button" data-action="close">\u00D7</button></div></div><div class="sb-messages"></div><div class="sb-quick"></div><form class="sb-compose"><textarea class="sb-input" rows="1"></textarea><button class="sb-voice-btn" type="button" style="background:transparent;border:0;cursor:pointer;font-size:18px;color:#64748b;padding:0 8px;transition:color 0.2s;" title="พูดด้วยเสียง">\uD83C\uDFA4</button><button class="sb-send" type="submit"></button></form>';
             var orb = document.createElement("button"); orb.className = "sb-orb"; orb.type = "button";
+            var orbLogo = document.createElement("img"); orbLogo.className = "sb-orb-logo"; orbLogo.src = DEFAULT_ICON_URL; orbLogo.alt = ""; orbLogo.setAttribute("aria-hidden", "true"); orb.appendChild(orbLogo);
 
             shadow.appendChild(whisperContainer);
             shadow.appendChild(panel);
