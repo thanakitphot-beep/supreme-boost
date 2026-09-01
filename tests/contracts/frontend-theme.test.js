@@ -22,6 +22,8 @@ describe('Shared product visual system', () => {
         expect(html).not.toContain('God-Tier');
         expect(html).not.toContain('Edge Breathing Glow');
         expect(html).toContain('ศูนย์จัดการ SaaS');
+        expect(html).toContain('รองรับภาษาไทยและอังกฤษ');
+        expect(html).not.toContain('ไทย อังกฤษ จีน และญี่ปุ่น');
     });
 
     test('widget uses the restrained product style layer', () => {
