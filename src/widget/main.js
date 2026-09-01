@@ -1,5 +1,6 @@
 (function () {
     "use strict";
+    var VisitorIntent = require("./intentEngine");
     var _cs = document.currentScript;
     console.log("[INDICATOR] Website assistant ready");
 
@@ -28,6 +29,9 @@
     var WHISPER_DISMISS_MS = 6500;
     var HUMAN_HANDOFF_FRUSTRATION_THRESHOLD = 2;
     var AUTONOMOUS_HIGHLIGHT_DELAY = 800;
+    var INTENT_NUDGE_COOLDOWN_MS = 18000;
+    var INTENT_TARGET_COOLDOWN_MS = 90000;
+    var MAX_INTENT_NUDGES = 4;
 
     // ─── Search / Warp Accuracy v7 ─────────────────────────────────
     // Keep the legacy entities[] payload for backend compatibility,
@@ -427,18 +431,48 @@
         return "sb-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
     }
 
-    function contextualNudge(text, locale) {
-        var value = String(text || "").toLowerCase();
-        if (/(ราคา|แพ็กเกจ|package|plan|฿|บาท|pricing|pro|starter|enterprise)/i.test(value)) {
-            return locale === "th" ? "กำลังเปรียบเทียบแพ็กเกจอยู่ใช่ไหมครับ? ผมช่วยสรุปราคาและความต่างให้ได้" : "Comparing plans? I can summarize the price and key differences.";
-        }
-        if (/(สมัคร|เริ่มต้น|เริ่มใช้งาน|signup|register|start)/i.test(value)) {
-            return locale === "th" ? "สนใจเริ่มใช้งานไหมครับ? ผมช่วยแนะนำขั้นตอนและแพ็กเกจที่เหมาะได้" : "Ready to get started? I can explain the next steps and suitable plan.";
-        }
-        if (/(ฟีเจอร์|feature|ระบบ|setting|ตั้งค่า|integration|plugin)/i.test(value)) {
-            return locale === "th" ? "ต้องการดูว่าฟีเจอร์นี้ช่วยอะไรได้บ้างไหมครับ? ถามผมต่อได้เลย" : "Want to know how this feature helps? Ask me anything about it.";
-        }
-        return locale === "th" ? "มีคำถามเกี่ยวกับส่วนนี้ไหมครับ? ผมช่วยสรุปหรือพาไปยังข้อมูลที่เกี่ยวข้องได้" : "Questions about this section? I can summarize it or guide you to related information.";
+    function intentElementText(el) {
+        return el ? String(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 700) : "";
+    }
+
+    function intentElementLabel(el) {
+        if (!el) return "";
+        var explicit = el.getAttribute("data-indicator-label") || el.getAttribute("aria-label") || "";
+        if (explicit) return String(explicit).replace(/\s+/g, " ").trim().slice(0, 70);
+        var title = null;
+        try { title = el.querySelector("h1,h2,h3,h4,h5,[itemprop='name'],.title,[class*='title'],strong"); } catch (_) { }
+        var value = title ? title.textContent : el.textContent;
+        value = String(value || "").replace(/\s+/g, " ").trim();
+        return value.length <= 70 ? value : "";
+    }
+
+    function intentElementPrice(text) {
+        var match = String(text || "").match(/(?:฿\s?[\d,.]+|[\d,.]+\s?(?:บาท|THB)|\$\s?[\d,.]+|[\d,.]+\s?(?:USD))/i);
+        return match ? match[0].replace(/\s+/g, " ").trim().slice(0, 40) : "";
+    }
+
+    function contextualNudge(info, locale) {
+        var el = info && info.element;
+        var text = intentElementText(el) || String(info && info.snippet || "").slice(0, 700);
+        var customIntent = el ? el.getAttribute("data-indicator-intent") || "" : "";
+        var customHint = el ? el.getAttribute("data-indicator-hint") || "" : "";
+        var relatedIntents = (info && info.recent || []).map(function (entry) {
+            return VisitorIntent.detectIntent({ text: entry.text, type: entry.type }).intent;
+        });
+        var interest = info && info.interest || {};
+        return VisitorIntent.buildRecommendation({
+            text: text,
+            type: info && info.type,
+            customIntent: customIntent,
+            customHint: customHint,
+            label: intentElementLabel(el),
+            price: intentElementPrice(text),
+            locale: locale,
+            visits: interest.visits,
+            clicks: interest.clicks,
+            duration: (interest.totalDwell || 0) + (info && info.duration || 0),
+            relatedIntents: relatedIntents
+        });
     }
 
     var SessionDB = {
@@ -458,16 +492,23 @@
 
     var Observer = {
         _trail: [], _scrollHist: [], _clicks: [], _hoverEl: null, _hoverSec: null, _hoverStart: 0, _hoverTimer: null, _lastY: 0, _enabled: true, _listeners: [],
+        _interest: new WeakMap(), _recentFocus: [], _lastNudgeAt: 0, _nudgeCount: 0,
         onHesitation: null, onFrustration: null, onConfusion: null, _handoffFrustrationCount: 0,
-        init: function () { var self = this; this._lastY = window.scrollY; this._add(document, "mouseover", function (e) { self._onHover(e); }, true); this._add(document, "mousemove", function (e) { if (self._mouseTimer) return; self._mouseTimer = setTimeout(function () { self._mouseTimer = null; }, 50); self._trail.push({ x: e.clientX, y: e.clientY, t: performance.now() }); if (self._trail.length > 60) self._trail.shift(); }, true); this._add(document, "click", function (e) { self._onClick(e); }, true); this._add(window, "scroll", function (e) { self._onScroll(e); }, true); },
-        destroy: function () { this._enabled = false; for (var i = 0; i < this._listeners.length; i++) { var l = this._listeners[i]; l.el.removeEventListener(l.evt, l.handler, l.passive); } this._listeners = []; if (this._hoverTimer) { clearTimeout(this._hoverTimer); this._hoverTimer = null; } },
-        _add: function (el, evt, handler, pas) { el.addEventListener(evt, handler, { passive: pas }); this._listeners.push({ el: el, evt: evt, handler: handler, passive: pas }); },
+        init: function () { var self = this; this._lastY = window.scrollY; this._add(document, "mouseover", function (e) { self._onHover(e); }, true); this._add(document, "mouseout", function (e) { self._onHoverOut(e); }, true); this._add(document, "mousemove", function (e) { if (self._mouseTimer) return; self._mouseTimer = setTimeout(function () { self._mouseTimer = null; }, 50); self._trail.push({ x: e.clientX, y: e.clientY, t: performance.now() }); if (self._trail.length > 60) self._trail.shift(); }, true); this._add(document, "click", function (e) { self._onClick(e); }, true); this._add(window, "scroll", function (e) { self._onScroll(e); }, true); },
+        destroy: function () { this._enabled = false; for (var i = 0; i < this._listeners.length; i++) { var l = this._listeners[i]; l.el.removeEventListener(l.evt, l.handler, l.options); } this._listeners = []; this._finishHover(); if (this._mouseTimer) { clearTimeout(this._mouseTimer); this._mouseTimer = null; } },
+        _add: function (el, evt, handler, pas) { var options = { passive: pas }; el.addEventListener(evt, handler, options); this._listeners.push({ el: el, evt: evt, handler: handler, options: options }); },
         _type: function (el) { if (!el || el.id === WIDGET_ID || el.closest("#" + WIDGET_ID)) return null; var tag = el.tagName, cls = (el.className || "") + " " + (el.id || ""), txt = (el.textContent || "").toLowerCase(), role = el.getAttribute("role") || ""; if (tag === "FORM" || tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || role === "form" || role === "searchbox") return "form"; if (tag === "ARTICLE" || role === "article" || /post|entry|article|blog|content/i.test(cls)) return "article"; if (tag === "NAV" || tag === "MENU" || role === "navigation" || role === "menu" || /nav|menu/i.test(cls)) return "navigation"; if (tag === "BUTTON" || tag === "A" || role === "button" || role === "link") return "interactive"; if (/product|item|card|grid|listing|shop|store|catalog|service/gi.test(cls)) return "catalog"; if (/form|input|search|signup|register|contact/i.test(cls)) return "form"; if (/price|cost|fee|rate|package|plan|pricing/i.test(cls)) return "pricing"; if (tag === "TABLE" || tag === "LI" || role === "list" || role === "listitem") return "list"; return "content"; },
+        _focusTarget: function (el) { if (!el || !el.closest) return null; if (el.closest("#" + WIDGET_ID) || el.closest("#" + WIDGET_ID + "-whisper") || matchesSafeSel(el)) return null; var focus = null, node = el; while (node && node !== document.body) { var explicit = node.hasAttribute("data-indicator-intent") || node.hasAttribute("data-indicator-hint") || node.hasAttribute("data-sb-entity-id") || node.hasAttribute("data-product") || node.hasAttribute("data-product-id") || /Product/i.test(node.getAttribute("itemtype") || ""); if (VisitorIntent.isSemanticContainer({ explicit: explicit, tag: node.tagName, role: node.getAttribute("role"), className: String(node.className || "") })) { focus = node; break; } node = node.parentElement; } if (!focus) { try { focus = el.closest("li,[role='listitem'],a,button,[role='button'],[role='link'],h1,h2,h3,h4,p"); } catch (_) { } } if (!focus || containsSensitiveArea(focus)) return null; var text = intentElementText(focus); return text.length >= 8 ? focus : null; },
+        _interestFor: function (el) { var interest = this._interest.get(el); if (!interest) { interest = { visits: 0, clicks: 0, totalDwell: 0, lastShown: 0 }; this._interest.set(el, interest); } return interest; },
         _captureSnippet: function (el) { if (!el) return ""; var exact = el.cloneNode(true); exact.querySelectorAll("script,style,svg").forEach(function (n) { n.remove(); }); var exactText = exact.textContent.replace(/\s+/g, " ").trim(); var parent = el.closest('section, article, [class*="card"], [class*="container"]') || el.parentElement || el; var pclone = parent.cloneNode(true); pclone.querySelectorAll("script,style,svg").forEach(function (n) { n.remove(); }); var parentText = pclone.textContent.replace(/\s+/g, " ").trim().slice(0, 500); if (exactText.length > 80 || exact === parent) return exactText; return "Exact focus: \"" + exactText + "\" (Context: " + parentText + ")"; },
-        _onHover: function (e) { if (!this._enabled) return; var el = e.target, tp = this._type(el); if (!tp) return; if (this._hoverEl !== el) { if (this._hoverTimer) { clearTimeout(this._hoverTimer); this._hoverTimer = null; } this._hoverEl = el; this._hoverSec = tp; this._hoverStart = Date.now(); this._hoverTimer = setTimeout(function (self, el, tp) { return function () { if (!self._enabled) return; if (document.body.contains(el) && self._hoverEl === el && Date.now() - self._hoverStart >= HESITATION_MS) { var snippet = self._captureSnippet(el); if (self.onHesitation) self.onHesitation({ element: el, type: tp, duration: Date.now() - self._hoverStart, snippet: snippet }); } }; }(this, el, tp), HESITATION_MS); } },
-        _onClick: function (e) { if (!this._enabled) return; var x = e.clientX, y = e.clientY, now = Date.now(); this._clicks.push({ x: x, y: y, t: now, el: e.target }); this._clicks = this._clicks.filter(function (c) { return now - c.t < RAGE_CLICK_WINDOW; }); var cnt = 0; for (var i = 0; i < this._clicks.length; i++) { var c = this._clicks[i]; if (Math.abs(c.x - x) < RAGE_CLICK_CLUSTER_PX && Math.abs(c.y - y) < RAGE_CLICK_CLUSTER_PX) cnt++; } if (cnt >= 3) { var el = e.target; var snippet = this._captureSnippet(el); this._handoffFrustrationCount++; if (this.onFrustration) this.onFrustration({ x: x, y: y, el: el, size: cnt, handoffCount: this._handoffFrustrationCount, snippet: snippet }); this._clicks = []; } },
+        _finishHover: function () { if (this._hoverTimer) { clearTimeout(this._hoverTimer); this._hoverTimer = null; } if (this._hoverEl && this._hoverStart) this._interestFor(this._hoverEl).totalDwell += Math.max(0, Date.now() - this._hoverStart); this._hoverEl = null; this._hoverSec = null; this._hoverStart = 0; },
+        _onHover: function (e) { if (!this._enabled) return; var el = this._focusTarget(e.target), tp = this._type(el); if (!el || !tp || this._hoverEl === el) return; this._finishHover(); this._hoverEl = el; this._hoverSec = tp; this._hoverStart = Date.now(); var interest = this._interestFor(el); interest.visits++; this._hoverTimer = setTimeout(function (self, target, type) { return function () { self._hoverTimer = null; if (!self._enabled || self._hoverEl !== target || !document.body.contains(target)) return; var duration = Date.now() - self._hoverStart; if (duration < HESITATION_MS) return; var snippet = self._captureSnippet(target); var cutoff = Date.now() - 120000; self._recentFocus = self._recentFocus.filter(function (item) { return item.at >= cutoff; }).slice(-7); var recent = self._recentFocus.slice(); if (self.onHesitation) self.onHesitation({ element: target, type: type, duration: duration, snippet: snippet, interest: self._interestFor(target), recent: recent }); self._recentFocus.push({ element: target, type: type, text: intentElementText(target), at: Date.now() }); }; }(this, el, tp), HESITATION_MS); },
+        _onHoverOut: function (e) { if (!this._enabled || !this._hoverEl) return; var next = this._focusTarget(e.relatedTarget); if (next !== this._hoverEl) this._finishHover(); },
+        _onClick: function (e) { if (!this._enabled) return; var focus = this._focusTarget(e.target); if (focus) this._interestFor(focus).clicks++; var x = e.clientX, y = e.clientY, now = Date.now(); this._clicks.push({ x: x, y: y, t: now, el: e.target }); this._clicks = this._clicks.filter(function (c) { return now - c.t < RAGE_CLICK_WINDOW; }); var cnt = 0; for (var i = 0; i < this._clicks.length; i++) { var c = this._clicks[i]; if (Math.abs(c.x - x) < RAGE_CLICK_CLUSTER_PX && Math.abs(c.y - y) < RAGE_CLICK_CLUSTER_PX) cnt++; } if (cnt >= 3) { var el = e.target; var snippet = this._captureSnippet(el); this._handoffFrustrationCount++; if (this.onFrustration) this.onFrustration({ x: x, y: y, el: el, size: cnt, handoffCount: this._handoffFrustrationCount, snippet: snippet }); this._clicks = []; } },
         _onScroll: function () { if (!this._enabled) return; var sy = window.scrollY, dir = sy > this._lastY ? "down" : "up"; if (sy !== this._lastY) { this._scrollHist.push({ y: sy, t: performance.now(), d: dir }); if (this._scrollHist.length > 30) this._scrollHist.shift(); } this._lastY = sy; var now = performance.now(), recent = this._scrollHist.filter(function (s) { return now - s.t < CONFUSION_SCROLL_WINDOW; }), self = this; if (recent.length >= 4) { var ch = 0; for (var i = 1; i < recent.length; i++) { if (recent[i].d !== recent[i - 1].d) ch++; } if (ch >= CONFUSION_DIRECTION_CHANGES) { if (this.onConfusion) this.onConfusion({ changes: ch }); this._scrollHist = []; } } },
-        snapshot: function () { var s = { scrollDepth: Math.round((window.scrollY + window.innerHeight) / Math.max(1, document.body.scrollHeight) * 100), timeOnPage: Math.round((Date.now() - (window._sbSess || Date.now())) / 1000), pageUrl: location.href, pageTitle: document.title, _hesitation: false, _frustration: false, _confusion: false, _hoverContext: "" }; if (this._hoverTimer && Date.now() - this._hoverStart > HESITATION_MS * 0.5) s._hesitation = true; if (this._handoffFrustrationCount > 0) s._frustration = true; if (this._hoverEl) { s._hoverContext = this._captureSnippet(this._hoverEl); } return s; }
+        canRecommend: function (el) { if (!el || document.hidden || this._nudgeCount >= MAX_INTENT_NUDGES) return false; var now = Date.now(), interest = this._interestFor(el); if (now - this._lastNudgeAt < INTENT_NUDGE_COOLDOWN_MS) return false; if (interest.lastShown && now - interest.lastShown < INTENT_TARGET_COOLDOWN_MS) return false; return true; },
+        markRecommended: function (el) { var now = Date.now(); this._interestFor(el).lastShown = now; this._lastNudgeAt = now; this._nudgeCount++; },
+        snapshot: function () { var s = { scrollDepth: Math.round((window.scrollY + window.innerHeight) / Math.max(1, document.body.scrollHeight) * 100), timeOnPage: Math.round((Date.now() - (window._sbSess || Date.now())) / 1000), pageUrl: location.href, pageTitle: document.title, _hesitation: false, _frustration: false, _confusion: false, _hoverContext: "" }; if (this._hoverEl && Date.now() - this._hoverStart > HESITATION_MS * 0.5) s._hesitation = true; if (this._handoffFrustrationCount > 0) s._frustration = true; if (this._hoverEl) { s._hoverContext = this._captureSnippet(this._hoverEl); } return s; }
     };
 
     // ─── Guardian Presence System (God-Tier Matrix) ───────────────
@@ -534,6 +575,15 @@
                 if (el.matches && el.matches(s)) return true;
                 if (el.closest && el.closest(s)) return true;
             } catch (e) { }
+        }
+        return false;
+    }
+
+    function containsSensitiveArea(el) {
+        if (!el || matchesSafeSel(el)) return Boolean(el);
+        if (!el.querySelector) return false;
+        for (var i = 0; i < SAFE_SEL.length; i++) {
+            try { if (el.querySelector(SAFE_SEL[i])) return true; } catch (_) { }
         }
         return false;
     }
@@ -646,7 +696,54 @@
 
     var Whisper = { _el: null, _timer: null, _visible: false, init: function (shadow) { this._el = document.getElementById(WIDGET_ID + "-whisper"); }, show: function (text, type) { if (!this._el) return; if (this._timer) clearTimeout(this._timer); var label = "⚡ AI INSIGHT"; if (type === "proactive") label = "🔮 AI ตรวจจับ"; else if (type === "greeting") label = "🤖 AI ทักทาย"; else if (type === "hint") label = "💡 คำแนะนำ"; var words = text.split(" "); var spans = words.map(function (w, i) { return '<span style="opacity:0;display:inline-block;transform:translateY(10px) scale(0.9);animation:sbFloatWord 0.5s cubic-bezier(0.34,1.56,0.64,1) ' + (0.08 + i * 0.06) + 's forwards;">' + w + '</span>'; }).join(' '); this._el.innerHTML = '<span class="sb-whisper-label">' + label + '</span>' + spans; this._el.className = "sb-whisper sb-whisper-" + (type || "info"); this._el.style.opacity = "1"; this._el.style.transform = "translateY(0) scale(1)"; this._visible = true; this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS); }, hide: function () { if (!this._el || !this._visible) return; this._visible = false; this._el.style.opacity = "0"; this._el.style.transform = "translateY(10px) scale(0.95)"; if (this._timer) { clearTimeout(this._timer); this._timer = null; } }, isVisible: function () { return this._visible; } };
 
-    Whisper.show = function (text, type) { if (!this._el) return; if (this._timer) clearTimeout(this._timer); var label = "คำแนะนำ"; if (type === "proactive") label = "ความช่วยเหลือ"; else if (type === "greeting") label = "ยินดีต้อนรับ"; else if (type === "hint") label = "คำแนะนำ"; this._el.textContent = ""; var labelEl = document.createElement("span"); labelEl.className = "sb-whisper-label"; labelEl.textContent = label; this._el.appendChild(labelEl); String(text || "").split(/(\s+)/).forEach(function (word, index) { if (!word) return; var span = document.createElement("span"); span.textContent = word; if (!/^\s+$/.test(word)) { span.style.opacity = "0"; span.style.display = "inline-block"; span.style.transform = "translateY(10px) scale(0.9)"; span.style.animation = "sbFloatWord 0.2s ease-out " + (0.02 + index * 0.02) + "s forwards"; } this._el.appendChild(span); }.bind(this)); this._el.className = "sb-whisper sb-whisper-" + (type || "info"); this._el.style.opacity = "1"; this._el.style.transform = "translateY(0) scale(1)"; this._visible = true; this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS); };
+    Whisper.init = function () {
+        this._el = document.getElementById(WIDGET_ID + "-whisper");
+        if (this._el) this._el.style.pointerEvents = "none";
+    };
+
+    Whisper.show = function (text, type) {
+        if (!this._el || AmbientUI.isExpanded()) return;
+        if (type !== "hesitation") AmbientUI._pending = null;
+        if (this._timer) clearTimeout(this._timer);
+        var label = "คำแนะนำ";
+        if (type === "proactive") label = "ความช่วยเหลือ";
+        else if (type === "greeting") label = "ยินดีต้อนรับ";
+        else if (type === "hint") label = "คำแนะนำ";
+        this._el.textContent = "";
+        var labelEl = document.createElement("span");
+        labelEl.className = "sb-whisper-label";
+        labelEl.textContent = label;
+        this._el.appendChild(labelEl);
+        String(text || "").split(/(\s+)/).forEach(function (word, index) {
+            if (!word) return;
+            var span = document.createElement("span");
+            span.textContent = word;
+            if (!/^\s+$/.test(word)) {
+                span.style.opacity = "0";
+                span.style.display = "inline-block";
+                span.style.transform = "translateY(10px) scale(0.9)";
+                span.style.animation = "sbFloatWord 0.2s ease-out " + (0.02 + index * 0.02) + "s forwards";
+            }
+            this._el.appendChild(span);
+        }.bind(this));
+        this._el.className = "sb-whisper sb-whisper-" + (type || "info");
+        this._el.style.display = "";
+        this._el.style.pointerEvents = "auto";
+        this._el.style.opacity = "1";
+        this._el.style.transform = "translateY(0) scale(1)";
+        this._visible = true;
+        this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS);
+    };
+
+    Whisper.hide = function () {
+        AmbientUI._pending = null;
+        if (this._timer) { clearTimeout(this._timer); this._timer = null; }
+        if (!this._el) return;
+        this._visible = false;
+        this._el.style.pointerEvents = "none";
+        this._el.style.opacity = "0";
+        this._el.style.transform = "translateY(10px) scale(0.95)";
+    };
 
     function applyProductStyles(shadow) {
         var style = document.createElement("style");
@@ -881,21 +978,19 @@
             // ─── Contextual assistance — fires on behavior metrics without user invocation ───
             Observer.onHesitation = function (info) {
                 if (state.open || state.busy) return;
+                var recommendation = contextualNudge(info, normLocale(state.locale));
+                if (!recommendation || !Observer.canRecommend(info.element)) return;
+                Observer.markRecommended(info.element);
                 Whisper.hide(); AmbientUI.showAura(info.element); AmbientUI.setState("watching");
                 AmbientUI.setBrainPhase("groq");
-
-                // ── Universal: read whatever the mouse is over ──────────────
-                var hoverText = info.element
-                    ? (info.element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 400)
-                    : "";
-
-                // Skip if hovered element has no meaningful text (icons, dividers etc.)
-                if (!hoverText || hoverText.length < 8) return;
-
-                // Respond from visible context immediately; do not make the visitor wait for a provider call.
-                Whisper.show(contextualNudge(hoverText, normLocale(state.locale)), "hesitation");
-
-                AmbientUI._pending = { el: info.element, kw: [hoverText.slice(0, 50)], snippet: hoverText };
+                Whisper.show(recommendation.message, "hesitation");
+                AmbientUI._pending = {
+                    el: info.element,
+                    kw: [intentElementLabel(info.element) || intentElementText(info.element).slice(0, 50)],
+                    snippet: info.snippet,
+                    intent: recommendation.intent,
+                    prompt: recommendation.prompt
+                };
 
                 // Soft highlight the hovered element
                 setTimeout(function () {
@@ -926,7 +1021,16 @@
             Observer.init();
             startEntityObserver();
 
-            whisper.addEventListener("click", function () { Whisper.hide(); setOpen(true); AmbientUI.setState("idle"); AmbientUI.clearAura(); AmbientUI.setBrainPhase(null); });
+            whisper.addEventListener("click", function () {
+                var pending = AmbientUI._pending;
+                Whisper.hide(); setOpen(true); AmbientUI.setState("idle"); AmbientUI.clearAura(); AmbientUI.setBrainPhase(null);
+                if (pending && pending.prompt && !String(input.value || "").trim()) {
+                    input.value = pending.prompt;
+                    autoGrow(input);
+                    try { input.focus(); input.setSelectionRange(input.value.length, input.value.length); } catch (_) { }
+                }
+                AmbientUI._pending = null;
+            });
 
             setTimeout(function () { if (!state.open) root.classList.add("sb-nudge"); }, ORB_IDLE_DELAY);
             handlePostWarp();
@@ -937,6 +1041,8 @@
                 if (open) {
                     AmbientUI.expand();
                     AmbientUI.clearAura();
+                    Whisper.hide();
+                    AmbientUI._pending = null;
                     InteractiveWhisper.hide();
                     InlineShelf.hide();
                     root.classList.add("sb-open");
