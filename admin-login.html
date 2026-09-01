@@ -60,15 +60,36 @@
     </div>
 
     <script>
-        // Check if already logged in
-        if (localStorage.getItem('admin_token')) {
-            window.location.href = '/admin';
+        const errorMsg = document.getElementById('error-msg');
+
+        function hasCurrentAdminToken(storedToken) {
+            try {
+                const token = String(storedToken || '').replace(/^Bearer\s+/i, '');
+                const encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+                const padded = encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '=');
+                const payload = JSON.parse(atob(padded));
+                return payload.role === 'admin' && Number(payload.exp) * 1000 > Date.now() + 5000;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        const storedToken = localStorage.getItem('admin_token');
+        const hasCurrentSession = storedToken && hasCurrentAdminToken(storedToken);
+        const sessionExpired = new URLSearchParams(window.location.search).get('reason') === 'session';
+        if (hasCurrentSession) {
+            window.location.replace('/admin');
+        } else if (storedToken) {
+            localStorage.removeItem('admin_token');
+        }
+        if (sessionExpired || storedToken && !hasCurrentSession) {
+            errorMsg.innerText = 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง';
+            errorMsg.classList.remove('hidden');
         }
 
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-submit');
-            const errorMsg = document.getElementById('error-msg');
             const password = document.getElementById('password').value;
 
             btn.innerText = 'กำลังตรวจสอบ...';

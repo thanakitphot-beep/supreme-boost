@@ -56,10 +56,21 @@ describe('Shared product visual system', () => {
         expect(icon).toContain('linearGradient');
     });
 
-    test('admin control center inline scripts compile', () => {
-        const html = fs.readFileSync(path.resolve(__dirname, '../../admin-dashboard.html'), 'utf8');
+    test.each(['admin-login.html', 'admin-dashboard.html'])('%s inline scripts compile', page => {
+        const html = fs.readFileSync(path.resolve(__dirname, '../..', page), 'utf8');
         const scripts = [...html.matchAll(/<script>\s*([\s\S]*?)<\/script>/gi)].map(match => match[1]);
         expect(scripts.length).toBeGreaterThan(0);
         scripts.forEach(script => expect(() => new vm.Script(script)).not.toThrow());
+    });
+
+    test('admin dashboard uses one overview request and recovers expired sessions', () => {
+        const dashboard = fs.readFileSync(path.resolve(__dirname, '../../admin-dashboard.html'), 'utf8');
+        const login = fs.readFileSync(path.resolve(__dirname, '../../admin-login.html'), 'utf8');
+        expect(dashboard).toContain("fetchAPI('overview')");
+        expect(dashboard).toContain('res.status === 401');
+        expect(dashboard).toContain("redirectToAdminLogin('session')");
+        expect(dashboard).not.toContain("Promise.all([fetchAPI('stats')");
+        expect(login).toContain("payload.role === 'admin'");
+        expect(login).toContain('Number(payload.exp) * 1000 > Date.now()');
     });
 });

@@ -8,15 +8,33 @@
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script>
+        const ADMIN_LOGIN_PATH = '/admin-login.html';
+        function redirectToAdminLogin(reason = '') {
+            localStorage.removeItem('admin_token');
+            const target = reason ? `${ADMIN_LOGIN_PATH}?reason=${encodeURIComponent(reason)}` : ADMIN_LOGIN_PATH;
+            window.location.replace(target);
+        }
         if (!localStorage.getItem('admin_token')) {
-            window.location.href = '/admin-login.html';
+            redirectToAdminLogin();
         }
         async function fetchAPI(action, method='GET', body=null) {
             const token = localStorage.getItem('admin_token');
+            if (!token) {
+                redirectToAdminLogin();
+                const error = new Error('Admin session is missing');
+                error.status = 401;
+                throw error;
+            }
             const authHeader = token.startsWith('Bearer ') ? token : 'Bearer ' + token;
             const opts = { method, headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' } };
             if (body) opts.body = JSON.stringify(body);
             const res = await fetch(`/api/admin?action=${action}`, opts);
+            if (res.status === 401) {
+                redirectToAdminLogin('session');
+                const error = new Error('Admin session expired');
+                error.status = 401;
+                throw error;
+            }
             if (res.status === 404) {
                 document.body.innerHTML = `<div style="padding:50px;text-align:center;color:white;font-family:'Prompt',sans-serif;background:#0f172a;min-height:100vh">
                     <i class="fa-solid fa-triangle-exclamation" style="font-size:4rem;color:#f43f5e;margin-bottom:20px"></i>
@@ -28,7 +46,9 @@
             }
             if (!res.ok) {
                 const e = await res.json().catch(()=>({}));
-                throw new Error(e.error || 'API Error');
+                const error = new Error(e.error || `API Error (${res.status})`);
+                error.status = res.status;
+                throw error;
             }
             return res.json();
         }
@@ -895,24 +915,28 @@ async function updateHandoff(id,status){
 // ====OVERVIEW====
 async function loadOv(){
     try{
-        const [sd,td,md]=await Promise.all([fetchAPI('stats'),fetchAPI('tenants'),fetchAPI('payment_methods')]);
-        document.getElementById('sv-total').textContent=sd.tenants||0;
-        document.getElementById('sv-pend').textContent=sd.pendingBilling||0;
-        const act=(td.tenants||[]).filter(t=>t.status==='active');
-        document.getElementById('sv-act').textContent=act.length;
-        const apm=(md.methods||[]).filter(m=>m.is_active);
-        document.getElementById('sv-pay').textContent=apm.length;
-        if(sd.pendingBilling>0){const b=document.getElementById('bdg-billing');b.textContent=sd.pendingBilling;b.style.display='flex'}
-        if(sd.tenants>0){const b=document.getElementById('bdg-tenants');b.textContent=sd.tenants;b.style.display='flex';b.style.background='rgba(139,92,246,.5)';b.style.animation='none'}
-        const rec=(td.tenants||[]).slice(0,5),el=document.getElementById('rec-list');
+        const data=await fetchAPI('overview');
+        const total=Number(data.tenants)||0,pending=Number(data.pendingBilling)||0;
+        document.getElementById('sv-total').textContent=total;
+        document.getElementById('sv-pend').textContent=pending;
+        document.getElementById('sv-act').textContent=Number(data.activeTenants)||0;
+        document.getElementById('sv-pay').textContent=Number(data.activePaymentMethods)||0;
+        const billingBadge=document.getElementById('bdg-billing');billingBadge.textContent=pending;billingBadge.style.display=pending?'flex':'none';
+        const tenantBadge=document.getElementById('bdg-tenants');tenantBadge.textContent=total;tenantBadge.style.display=total?'flex':'none';tenantBadge.style.background='rgba(139,92,246,.5)';tenantBadge.style.animation='none';
+        const rec=(data.recentTenants||[]).slice(0,5),el=document.getElementById('rec-list');
         if(!rec.length){el.innerHTML='<div class="empty"><i class="fa-solid fa-inbox"></i><p>ยังไม่มีลูกค้า</p></div>';return}
-        el.innerHTML=rec.map((t,i)=>`
-            <div class="rec-item" onclick="sw('tenants');setTimeout(()=>openMng('${t.id}'),400)">
-                <div class="tav ${avCls(i)}">${t.company_name.charAt(0)}</div>
-                <div style="flex:1;min-width:0"><p style="font-size:.83rem;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.company_name}</p><p style="font-size:.65rem;color:var(--t3);font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.api_key}</p></div>
-                <span class="badge badge-${t.status==='active'?'active':'suspended'}"><span class="bd"></span>${t.status}</span>
-            </div>`).join('');
-    }catch(e){toast('ไม่สามารถโหลดข้อมูล Overview ได้','error')}
+        el.innerHTML=rec.map((t,i)=>{const id=String(t.id||''),name=String(t.company_name||'ไม่ระบุชื่อ'),key=String(t.api_key||''),status=String(t.status||'suspended');return `
+            <div class="rec-item" data-tenant-id="${encodeURIComponent(id)}">
+                <div class="tav ${avCls(i)}">${safeHtml(name.charAt(0))}</div>
+                <div style="flex:1;min-width:0"><p style="font-size:.83rem;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${safeHtml(name)}</p><p style="font-size:.65rem;color:var(--t3);font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${safeHtml(key)}</p></div>
+                <span class="badge badge-${status==='active'?'active':'suspended'}"><span class="bd"></span>${safeHtml(status)}</span>
+            </div>`}).join('');
+        el.querySelectorAll('[data-tenant-id]').forEach(item=>item.addEventListener('click',()=>{sw('tenants');setTimeout(()=>openMng(decodeURIComponent(item.dataset.tenantId)),400)}));
+    }catch(e){
+        if(e&&e.status===401)return;
+        document.getElementById('rec-list').innerHTML='<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i><p>โหลดข้อมูลไม่สำเร็จ</p><button class="btn btn-gh-vl btn-sm" type="button" onclick="loadOv()">ลองใหม่</button></div>';
+        toast('ไม่สามารถโหลดข้อมูล Overview ได้','error');
+    }
 }
 
 // ====TENANTS====

@@ -12,7 +12,23 @@ function hashPassword(password) {
 function adminTenant(tenant) {
     if (!tenant) return tenant;
     const { password, auth, ...safeTenant } = tenant;
-    return safeTenant;
+    return {
+        ...safeTenant,
+        id: String(safeTenant.id || ''),
+        company_name: String(safeTenant.company_name || 'ไม่ระบุชื่อ'),
+        api_key: String(safeTenant.api_key || ''),
+        status: String(safeTenant.status || 'suspended')
+    };
+}
+
+function adminTenantSummary(tenant) {
+    const safeTenant = adminTenant(tenant) || {};
+    return {
+        id: safeTenant.id,
+        company_name: safeTenant.company_name,
+        api_key: safeTenant.api_key,
+        status: safeTenant.status
+    };
 }
 
 async function authenticateUser(req) {
@@ -27,7 +43,7 @@ module.exports = async function handler(req, res) {
     if (!setCorsHeaders(req, res) && req.headers.origin) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === "OPTIONS") return res.status(200).end();
 
-    if (!checkRateLimit(req, res, 'admin')) return;
+    if (!req._rateLimitChecked && !checkRateLimit(req, res, 'admin')) return;
     const url = new URL(req.url, `http://${req.headers.host}`);
     const action = url.searchParams.get('action');
 
@@ -44,6 +60,27 @@ module.exports = async function handler(req, res) {
 
     try {
         if (req.method === "GET") {
+            if (action === 'overview') {
+                const tenants = db.collection('tenants');
+                const billing = db.collection('billing_requests');
+                const paymentMethods = db.collection('payment_methods');
+                const [tenantCount, pendingBilling, activeTenants, activePaymentMethods, recentTenants] = await Promise.all([
+                    tenants.countDocuments(),
+                    billing.countDocuments({ status: 'pending' }),
+                    tenants.countDocuments({ status: 'active' }),
+                    paymentMethods.countDocuments({ is_active: true }),
+                    tenants.find({}, {
+                        projection: { _id: 0, id: 1, company_name: 1, api_key: 1, status: 1 }
+                    }).sort({ created_at: -1 }).limit(5).toArray()
+                ]);
+                return res.status(200).json({
+                    tenants: tenantCount || 0,
+                    pendingBilling: pendingBilling || 0,
+                    activeTenants: activeTenants || 0,
+                    activePaymentMethods: activePaymentMethods || 0,
+                    recentTenants: (recentTenants || []).map(adminTenantSummary)
+                });
+            }
             if (action === 'stats') {
                 const tenantsCount = await db.collection('tenants').countDocuments();
                 const pendingBilling = await db.collection('billing_requests').countDocuments({ status: 'pending' });

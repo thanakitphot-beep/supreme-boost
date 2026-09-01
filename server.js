@@ -197,13 +197,6 @@ function handleRequest(req, res) {
         return;
     }
 
-    const routeType = pathname.includes('/chat') ? 'chat' : 'api';
-    if (!checkRateLimit(req, wrapRes(res), routeType)) {
-        if (requestCounter) requestCounter.error++;
-        return;
-    }
-    req._rateLimitChecked = true;
-
     const API_HANDLERS = {
         '/api/chat': chatHandler,
         '/api/v1/chat': chatHandler, // New v1 endpoint
@@ -227,6 +220,16 @@ function handleRequest(req, res) {
         '/metrics': require('./api/v1/health.js'),
         '/api/v1/memory': require('./api/v1/memory.js')
     };
+
+    const isApiRequest = pathname.startsWith('/api/') || pathname === '/metrics';
+    if (isApiRequest) {
+        const routeType = pathname.includes('/chat') ? 'chat' : 'api';
+        if (!checkRateLimit(req, wrapRes(res), routeType)) {
+            if (requestCounter) requestCounter.error++;
+            return;
+        }
+        req._rateLimitChecked = true;
+    }
 
     const handler = API_HANDLERS[pathname];
     if (handler) {
