@@ -184,25 +184,39 @@ module.exports = {
         const db = await connectToDatabase();
         if (!db) return null;
         const now = Date.now();
+        const canReplace = {
+            $lte: [
+                { $convert: { input: '$createdAtMs', to: 'long', onError: 0, onNull: 0 } },
+                now - cooldownMs
+            ]
+        };
+        const pipeline = [{
+            $set: {
+                email: { $cond: [canReplace, email, '$email'] },
+                otp: { $cond: [canReplace, otp, '$otp'] },
+                expiresAt: { $cond: [canReplace, expiresAt, '$expiresAt'] },
+                challengeId: { $cond: [canReplace, challengeId, '$challengeId'] },
+                attempts: { $cond: [canReplace, 0, '$attempts'] },
+                createdAtMs: { $cond: [canReplace, now, '$createdAtMs'] },
+                created_at: { $cond: [canReplace, new Date(now).toISOString(), '$created_at'] },
+                verificationTokenHash: { $cond: [canReplace, '$$REMOVE', '$verificationTokenHash'] },
+                verificationExpiresAt: { $cond: [canReplace, '$$REMOVE', '$verificationExpiresAt'] },
+                verified_at: { $cond: [canReplace, '$$REMOVE', '$verified_at'] }
+            }
+        }];
+        const options = { upsert: true, returnDocument: 'after' };
         try {
-            const result = await db.collection('otps').findOneAndUpdate(
-                {
-                    _id: email,
-                    $or: [
-                        { createdAtMs: { $lte: now - cooldownMs } },
-                        { createdAtMs: { $exists: false } }
-                    ]
-                },
-                {
-                    $set: { email, otp, expiresAt, challengeId, attempts: 0, createdAtMs: now, created_at: new Date(now).toISOString() },
-                    $unset: { verificationTokenHash: '', verificationExpiresAt: '', verified_at: '' }
-                },
-                { upsert: true, returnDocument: 'after' }
-            );
-            return Boolean(result && (!Object.prototype.hasOwnProperty.call(result, 'value') || result.value));
+            let result;
+            try {
+                result = await db.collection('otps').findOneAndUpdate({ email }, pipeline, options);
+            } catch (error) {
+                if (!error || error.code !== 11000) throw error;
+                // If two first requests race to upsert, re-read/update the winner.
+                result = await db.collection('otps').findOneAndUpdate({ email }, pipeline, { ...options, upsert: false });
+            }
+            const document = result && Object.prototype.hasOwnProperty.call(result, 'value') ? result.value : result;
+            return Boolean(document && document.challengeId === challengeId);
         } catch (error) {
-            // A concurrent request that loses the upsert race hits the unique _id.
-            if (error && error.code === 11000) return false;
             throw error;
         }
     },
@@ -210,7 +224,7 @@ module.exports = {
     getOtp: async (email) => {
         const db = await connectToDatabase();
         if (!db) return null;
-        return await db.collection('otps').findOne({ _id: email });
+        return await db.collection('otps').findOne({ email });
     },
 
     attemptOtp: async (email, otp, verificationToken, verificationExpiresAt, maxAttempts = 5) => {
@@ -220,7 +234,7 @@ module.exports = {
         const matchesOtp = { $eq: ['$otp', { $literal: otp }] };
         const result = await db.collection('otps').findOneAndUpdate(
             {
-                _id: email,
+                email,
                 expiresAt: { $gt: Date.now() },
                 $expr: { $lt: [{ $ifNull: ['$attempts', 0] }, maxAttempts] }
             },
@@ -244,7 +258,7 @@ module.exports = {
     deleteOtp: async (email, challengeId) => {
         const db = await connectToDatabase();
         if (!db) return false;
-        const filter = challengeId ? { _id: email, challengeId } : { _id: email };
+        const filter = challengeId ? { email, challengeId } : { email };
         await db.collection('otps').deleteOne(filter);
         return true;
     },
@@ -254,7 +268,7 @@ module.exports = {
         if (!db) return false;
         const verificationTokenHash = crypto.createHash('sha256').update(String(token || '')).digest('hex');
         const result = await db.collection('otps').findOneAndDelete({
-            _id: email,
+            email,
             verificationTokenHash,
             verificationExpiresAt: { $gt: Date.now() }
         });
