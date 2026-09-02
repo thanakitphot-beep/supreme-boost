@@ -180,27 +180,85 @@ module.exports = {
     },
 
     // ─── OTPs ───────────────────────────────────────────────────
-    saveOtp: async (email, otp, expiresAt) => {
+    saveOtp: async (email, otp, expiresAt, challengeId, cooldownMs = 60_000) => {
         const db = await connectToDatabase();
-        if (!db) return false;
-        await db.collection('otps').updateOne(
-            { email },
-            { $set: { otp, expiresAt, created_at: new Date().toISOString() } },
-            { upsert: true }
-        );
-        return true;
+        if (!db) return null;
+        const now = Date.now();
+        try {
+            const result = await db.collection('otps').findOneAndUpdate(
+                {
+                    _id: email,
+                    $or: [
+                        { createdAtMs: { $lte: now - cooldownMs } },
+                        { createdAtMs: { $exists: false } }
+                    ]
+                },
+                {
+                    $set: { email, otp, expiresAt, challengeId, attempts: 0, createdAtMs: now, created_at: new Date(now).toISOString() },
+                    $unset: { verificationTokenHash: '', verificationExpiresAt: '', verified_at: '' }
+                },
+                { upsert: true, returnDocument: 'after' }
+            );
+            return Boolean(result && (!Object.prototype.hasOwnProperty.call(result, 'value') || result.value));
+        } catch (error) {
+            // A concurrent request that loses the upsert race hits the unique _id.
+            if (error && error.code === 11000) return false;
+            throw error;
+        }
     },
 
     getOtp: async (email) => {
         const db = await connectToDatabase();
         if (!db) return null;
-        return await db.collection('otps').findOne({ email });
+        return await db.collection('otps').findOne({ _id: email });
     },
 
-    deleteOtp: async (email) => {
+    attemptOtp: async (email, otp, verificationToken, verificationExpiresAt, maxAttempts = 5) => {
+        const db = await connectToDatabase();
+        if (!db) return null;
+        const verificationTokenHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
+        const matchesOtp = { $eq: ['$otp', { $literal: otp }] };
+        const result = await db.collection('otps').findOneAndUpdate(
+            {
+                _id: email,
+                expiresAt: { $gt: Date.now() },
+                $expr: { $lt: [{ $ifNull: ['$attempts', 0] }, maxAttempts] }
+            },
+            [{
+                $set: {
+                    attempts: { $cond: [matchesOtp, '$$REMOVE', { $add: [{ $ifNull: ['$attempts', 0] }, 1] }] },
+                    verificationTokenHash: { $cond: [matchesOtp, verificationTokenHash, '$$REMOVE'] },
+                    verificationExpiresAt: { $cond: [matchesOtp, verificationExpiresAt, '$$REMOVE'] },
+                    verified_at: { $cond: [matchesOtp, new Date().toISOString(), '$$REMOVE'] },
+                    otp: { $cond: [matchesOtp, '$$REMOVE', '$otp'] },
+                    expiresAt: { $cond: [matchesOtp, '$$REMOVE', '$expiresAt'] },
+                    challengeId: { $cond: [matchesOtp, '$$REMOVE', '$challengeId'] }
+                }
+            }],
+            { returnDocument: 'after' }
+        );
+        const document = result && Object.prototype.hasOwnProperty.call(result, 'value') ? result.value : result;
+        return document ? { document, verified: document.verificationTokenHash === verificationTokenHash } : null;
+    },
+
+    deleteOtp: async (email, challengeId) => {
         const db = await connectToDatabase();
         if (!db) return false;
-        await db.collection('otps').deleteOne({ email });
+        const filter = challengeId ? { _id: email, challengeId } : { _id: email };
+        await db.collection('otps').deleteOne(filter);
         return true;
+    },
+
+    consumeOtpVerification: async (email, token) => {
+        const db = await connectToDatabase();
+        if (!db) return false;
+        const verificationTokenHash = crypto.createHash('sha256').update(String(token || '')).digest('hex');
+        const result = await db.collection('otps').findOneAndDelete({
+            _id: email,
+            verificationTokenHash,
+            verificationExpiresAt: { $gt: Date.now() }
+        });
+        const document = result && Object.prototype.hasOwnProperty.call(result, 'value') ? result.value : result;
+        return Boolean(document);
     }
 };

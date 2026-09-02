@@ -56,4 +56,18 @@ describe('Render request rate limiting', () => {
         expect(first.headers['x-ratelimit-limit']).toBe('1');
         expect(second.status).toBe(429);
     });
+
+    test('does not let arbitrary API keys bypass the auth rate limit', async () => {
+        const first = await request(handleRequest)
+            .post('/api/otp')
+            .set('X-Forwarded-For', '198.51.100.14')
+            .send({ action: 'request', email: 'invalid', apiKey: 'attacker-bucket-a' });
+        const second = await request(handleRequest)
+            .post('/api/otp')
+            .set('X-Forwarded-For', '198.51.100.14')
+            .send({ action: 'request', email: 'invalid', apiKey: 'attacker-bucket-b' });
+
+        expect(first.status).toBe(400);
+        expect(second.status).toBe(429);
+    });
 });

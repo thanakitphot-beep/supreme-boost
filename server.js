@@ -223,7 +223,9 @@ function handleRequest(req, res) {
 
     const isApiRequest = pathname.startsWith('/api/') || pathname === '/metrics';
     if (isApiRequest) {
-        const routeType = pathname.includes('/chat') ? 'chat' : 'api';
+        const routeType = pathname.includes('/chat')
+            ? 'chat'
+            : ['/api/otp', '/api/auth', '/api/customer-auth'].includes(pathname) ? 'auth' : 'api';
         if (!checkRateLimit(req, wrapRes(res), routeType)) {
             if (requestCounter) requestCounter.error++;
             return;

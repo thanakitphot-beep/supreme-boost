@@ -293,7 +293,7 @@
                         <span>รหัส OTP (ถูกส่งไปที่อีเมล)</span>
                         <a href="javascript:void(0)" onclick="resetOtp()" class="text-cyan-400 text-xs hover:underline">ขอ OTP ใหม่</a>
                     </label>
-                    <input type="text" id="auth-otp" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-cyan-400 focus:outline-none" placeholder="123456" maxlength="6">
+                    <input type="text" id="auth-otp" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-cyan-400 focus:outline-none" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}">
                 </div>
                 <div id="auth-terms-group" class="hidden flex items-start space-x-2 mt-2">
                     <input type="checkbox" id="auth-terms" class="mt-1 bg-slate-800 border-slate-600 rounded text-cyan-400 focus:ring-cyan-400">
@@ -448,6 +448,15 @@
         // === Auth logic ===
         let authMode = 'login'; // 'login' or 'register'
         let otpRequested = false;
+        let otpVerificationToken = '';
+        let otpRequestController = null;
+        let authFlowVersion = 0;
+
+        function cancelOtpRequest() {
+            if (otpRequestController) otpRequestController.abort();
+            otpRequestController = null;
+            authFlowVersion++;
+        }
 
         function completeLandingLogin(data) {
             localStorage.setItem('customer_data', JSON.stringify(data.tenant));
@@ -500,6 +509,7 @@
         }
 
         function closeAuthModal() {
+            cancelOtpRequest();
             document.getElementById('auth-modal').classList.add('hidden');
         }
 
@@ -509,18 +519,27 @@
         }
 
         function resetOtp() {
+            cancelOtpRequest();
             otpRequested = false;
+            otpVerificationToken = '';
             document.getElementById('auth-otp-group').classList.add('hidden');
             document.getElementById('auth-otp').required = false;
             document.getElementById('auth-otp').value = '';
-            document.getElementById('auth-btn-submit').innerText = 'รับ OTP';
+            document.getElementById('auth-email').readOnly = false;
+            const button = document.getElementById('auth-btn-submit');
+            button.innerText = 'รับ OTP';
+            button.disabled = false;
         }
 
         function updateAuthModalUI() {
+            cancelOtpRequest();
             otpRequested = false;
+            otpVerificationToken = '';
             document.getElementById('auth-otp-group').classList.add('hidden');
             document.getElementById('auth-otp').required = false;
             document.getElementById('auth-otp').value = '';
+            document.getElementById('auth-email').readOnly = false;
+            document.getElementById('auth-btn-submit').disabled = false;
 
             if (authMode === 'login') {
                 document.getElementById('auth-title').innerText = 'เข้าสู่ระบบ';
@@ -551,8 +570,48 @@
             }
         }
 
+        async function submitOtp(action, email, otp) {
+            const controller = new AbortController();
+            otpRequestController = controller;
+            const timeout = setTimeout(() => controller.abort(), 20000);
+            try {
+                const res = await fetch('/api/otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, email, otp }),
+                    signal: controller.signal
+                });
+                const data = await res.json().catch(() => ({}));
+                return { res, data };
+            } finally {
+                clearTimeout(timeout);
+                if (otpRequestController === controller) otpRequestController = null;
+            }
+        }
+
+        async function submitCustomerAuth(payload) {
+            const controller = new AbortController();
+            otpRequestController = controller;
+            const timeout = setTimeout(() => controller.abort(), 20000);
+            try {
+                const res = await fetch('/api/customer-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+                const data = await res.json().catch(() => ({}));
+                return { res, data };
+            } finally {
+                clearTimeout(timeout);
+                if (otpRequestController === controller) otpRequestController = null;
+            }
+        }
+
         document.getElementById('auth-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            cancelOtpRequest();
+            const flowVersion = authFlowVersion;
             const btn = document.getElementById('auth-btn-submit');
             const errorMsg = document.getElementById('auth-error');
             const username = document.getElementById('auth-username').value.trim();
@@ -560,10 +619,11 @@
             const email = document.getElementById('auth-email').value.trim();
             const passwordConfirm = document.getElementById('auth-password-confirm').value.trim();
             const otp = document.getElementById('auth-otp').value.trim();
+            const submitMode = authMode;
 
             errorMsg.classList.add('hidden');
 
-            if (authMode === 'register') {
+            if (submitMode === 'register') {
                 if (password !== passwordConfirm) {
                     errorMsg.innerText = 'รหัสผ่านไม่ตรงกัน';
                     errorMsg.classList.remove('hidden');
@@ -580,16 +640,13 @@
                     btn.innerText = 'กำลังขอ OTP...';
                     btn.disabled = true;
                     try {
-                        const res = await fetch('/api/otp', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'request', email })
-                        });
-                        const data = await res.json();
+                        const { res, data } = await submitOtp('request', email);
+                        if (flowVersion !== authFlowVersion) return;
                         if (res.ok && data.success) {
                             otpRequested = true;
                             document.getElementById('auth-otp-group').classList.remove('hidden');
                             document.getElementById('auth-otp').required = true;
+                            document.getElementById('auth-email').readOnly = true;
                             btn.innerText = 'ยืนยัน OTP และสมัครสมาชิก';
                         } else {
                             errorMsg.innerText = data.error || 'ไม่สามารถขอ OTP ได้';
@@ -597,7 +654,8 @@
                             btn.innerText = 'รับ OTP';
                         }
                     } catch (err) {
-                        errorMsg.innerText = 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
+                        if (flowVersion !== authFlowVersion) return;
+                        errorMsg.innerText = err.name === 'AbortError' ? 'ระบบส่ง OTP ใช้เวลานานเกินไป กรุณาลองใหม่' : 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
                         errorMsg.classList.remove('hidden');
                         btn.innerText = 'รับ OTP';
                     }
@@ -605,30 +663,30 @@
                     return; // Stop here, wait for user to enter OTP
                 }
 
-                // 2. If OTP is requested, verify OTP first
-                btn.innerText = 'กำลังตรวจสอบ OTP...';
-                btn.disabled = true;
-                try {
-                    const resOtp = await fetch('/api/otp', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'verify', email, otp })
-                    });
-                    const dataOtp = await resOtp.json();
-                    
-                    if (!resOtp.ok || !dataOtp.success) {
-                        errorMsg.innerText = dataOtp.error || 'OTP ไม่ถูกต้อง';
+                // 2. Verify once, then keep the short-lived signed proof for a registration retry.
+                if (!otpVerificationToken) {
+                    btn.innerText = 'กำลังตรวจสอบ OTP...';
+                    btn.disabled = true;
+                    try {
+                        const { res: resOtp, data: dataOtp } = await submitOtp('verify', email, otp);
+                        if (flowVersion !== authFlowVersion) return;
+
+                        if (!resOtp.ok || !dataOtp.success || !dataOtp.verificationToken) {
+                            errorMsg.innerText = dataOtp.error || 'OTP ไม่ถูกต้อง';
+                            errorMsg.classList.remove('hidden');
+                            btn.innerText = 'ยืนยัน OTP และสมัครสมาชิก';
+                            btn.disabled = false;
+                            return; // Stop here, OTP invalid
+                        }
+                        otpVerificationToken = dataOtp.verificationToken;
+                    } catch (err) {
+                        if (flowVersion !== authFlowVersion) return;
+                        errorMsg.innerText = err.name === 'AbortError' ? 'ระบบตรวจสอบ OTP ใช้เวลานานเกินไป กรุณาลองใหม่' : 'เกิดข้อผิดพลาดในการตรวจสอบ OTP';
                         errorMsg.classList.remove('hidden');
                         btn.innerText = 'ยืนยัน OTP และสมัครสมาชิก';
                         btn.disabled = false;
-                        return; // Stop here, OTP invalid
+                        return;
                     }
-                } catch (err) {
-                    errorMsg.innerText = 'เกิดข้อผิดพลาดในการตรวจสอบ OTP';
-                    errorMsg.classList.remove('hidden');
-                    btn.innerText = 'ยืนยัน OTP และสมัครสมาชิก';
-                    btn.disabled = false;
-                    return;
                 }
             } // End Register OTP Check
 
@@ -637,25 +695,23 @@
             btn.disabled = true;
 
             try {
-                const res = await fetch('/api/customer-auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: authMode, username, password, email })
-                });
-                const data = await res.json();
+                const { res, data } = await submitCustomerAuth({ action: submitMode, username, password, email, otpVerificationToken });
+                if (flowVersion !== authFlowVersion) return;
                 
                 if (res.ok && data.success) {
                     completeLandingLogin(data);
                 } else {
                     errorMsg.innerText = data.error || 'ล้มเหลว';
                     errorMsg.classList.remove('hidden');
+                    if (submitMode === 'register' && res.status === 401) resetOtp();
                 }
             } catch (err) {
-                errorMsg.innerText = 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
+                if (flowVersion !== authFlowVersion) return;
+                errorMsg.innerText = err.name === 'AbortError' ? 'ระบบสมัครสมาชิกใช้เวลานานเกินไป กรุณาลองใหม่' : 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
                 errorMsg.classList.remove('hidden');
             }
 
-            btn.innerText = authMode === 'login' ? 'เข้าสู่ระบบ' : (otpRequested ? 'ยืนยัน OTP และสมัครสมาชิก' : 'รับ OTP');
+            btn.innerText = submitMode === 'login' ? 'เข้าสู่ระบบ' : (otpRequested ? 'ยืนยัน OTP และสมัครสมาชิก' : 'รับ OTP');
             btn.disabled = false;
         });
 

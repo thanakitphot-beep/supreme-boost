@@ -4,6 +4,8 @@ const { configuredClientId, verifyGoogleCredential } = require('./_googleAuth');
 
 const { checkRateLimit } = require('../services/rateLimit');
 const { setCorsHeaders } = require('../services/cors');
+const { verifyEmailVerificationToken } = require('../services/otpVerification');
+const { consumeOtpVerification } = require('./_db.js');
 
 function hashPassword(password) {
     return crypto.createHash('sha256').update(password).digest('hex');
@@ -128,15 +130,28 @@ module.exports = async function handler(req, res) {
 
             // 1. Register Action
             if (action === 'register') {
-                const { email } = body;
-                if (!username || !password) {
-                    return res.status(400).json({ error: "Username and Password are required" });
+                const email = String(body.email || '').trim().toLowerCase();
+                if (!username || !password || !email) {
+                    return res.status(400).json({ error: "Username, Password and Email are required" });
+                }
+                if (!verifyEmailVerificationToken(body.otpVerificationToken, email)) {
+                    return res.status(401).json({ error: "กรุณายืนยัน OTP อีกครั้งก่อนสมัครสมาชิก" });
                 }
 
-                // Check unique username
-                const existing = await db.collection('tenants').findOne({ username });
+                const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                // Include a case-insensitive legacy email check while new records use email_normalized.
+                const existing = await db.collection('tenants').findOne({
+                    $or: [
+                        { username },
+                        { email_normalized: email },
+                        { email: { $regex: `^${escapedEmail}$`, $options: 'i' } }
+                    ]
+                });
                 if (existing) {
-                    return res.status(400).json({ error: "Username already exists" });
+                    return res.status(400).json({ error: String(existing.email || '').toLowerCase() === email ? "Email already exists" : "Username already exists" });
+                }
+                if (!await consumeOtpVerification(email, body.otpVerificationToken)) {
+                    return res.status(401).json({ error: "OTP ถูกใช้งานแล้วหรือหมดอายุ กรุณาขอรหัสใหม่" });
                 }
 
                 const hashedPassword = hashPassword(password);
@@ -147,6 +162,7 @@ module.exports = async function handler(req, res) {
                     company_name: username,
                     username: username,
                     email: email || '',
+                    email_normalized: email,
                     password: hashedPassword,
                     api_key: newApiKey,
                     status: 'pending',

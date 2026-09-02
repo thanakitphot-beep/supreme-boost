@@ -5,6 +5,7 @@
 const WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10);   // 1 minute
 const MAX_REQUESTS = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10); // per window
 const CHAT_MAX = parseInt(process.env.RATE_LIMIT_CHAT_MAX || '30', 10);          // stricter for chat
+const AUTH_MAX = parseInt(process.env.RATE_LIMIT_AUTH_MAX || '10', 10);          // login and OTP
 const BURST_MAX = parseInt(process.env.RATE_LIMIT_BURST || '10', 10);            // max burst per 5s
 
 // In-memory store for Token Bucket: { key → { tokens, lastRefill, burstTokens, lastBurstRefill, violations } }
@@ -72,7 +73,9 @@ function checkRateLimit(req, res, routeType = 'api') {
     // Extract identifier: API key > IP
     const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown')
         .split(',')[0].trim();
-    const apiKey = req.body?.apiKey || req.headers['x-api-key'] || '';
+    // Auth payloads are unauthenticated, so an attacker-controlled API key must
+    // never create a fresh bucket. Bind login and OTP limits to the client IP.
+    const apiKey = routeType === 'auth' ? '' : req.body?.apiKey || req.headers['x-api-key'] || '';
     const identifier = apiKey ? `key:${apiKey}` : `ip:${ip}`;
 
     // Blocklist check
@@ -92,7 +95,7 @@ function checkRateLimit(req, res, routeType = 'api') {
         blocklist.delete(identifier); // unblock if expired
     }
 
-    const limit = routeType === 'chat' ? CHAT_MAX : MAX_REQUESTS;
+    const limit = routeType === 'chat' ? CHAT_MAX : routeType === 'auth' ? AUTH_MAX : MAX_REQUESTS;
     const bucket = getBucket(identifier, limit, BURST_MAX);
 
     // Burst protection (Token bucket approach for bursts)
@@ -153,6 +156,7 @@ function getRateLimiterStats() {
         window_ms: WINDOW_MS,
         max_requests: MAX_REQUESTS,
         chat_max: CHAT_MAX,
+        auth_max: AUTH_MAX,
         burst_max: BURST_MAX
     };
 }

@@ -89,6 +89,12 @@ services:
         sync: false
 
       # SMTP
+      - key: OTP_EMAIL_PROVIDER
+        value: brevo
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_FROM
+        sync: false
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
