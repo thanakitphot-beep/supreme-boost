@@ -1,6 +1,7 @@
 const { checkRateLimit } = require('../services/rateLimit');
 const { isSafeFetchUrl, isSafeUrl } = require('../services/ssrfBlocker');
 const { applyPluginCors, authorizePluginRequest } = require('../services/tenantAccess');
+const { normalizeHumanText, fuzzyPhraseScore } = require('../services/languageUnderstanding');
 
 const MAX_HTML_BYTES = 500_000;
 const MAX_PAGES = 20;
@@ -32,7 +33,61 @@ function extractText(html) {
         .replace(/\s+/g, ' ').trim();
 }
 
-module.exports = async function crawlHandler(req, res) {
+function extractPageLabels(html) {
+    const labels = [];
+    const titleMatch = String(html || '').match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const title = titleMatch ? extractText(titleMatch[1]) : '';
+    if (title) labels.push(title);
+    const headingRegex = /<h[1-4][^>]*>([\s\S]*?)<\/h[1-4]>/gi;
+    let match;
+    while ((match = headingRegex.exec(String(html || ''))) && labels.length < 20) {
+        const heading = extractText(match[1]);
+        if (heading) labels.push(heading);
+    }
+    return { title, labels };
+}
+
+function scorePageForQuery({ text, html, url, keywords }) {
+    const normalizedText = normalizeHumanText(text);
+    const normalizedKeywords = [...new Set((keywords || []).map(normalizeHumanText).filter(keyword => keyword.length > 1))];
+    if (!normalizedText || !normalizedKeywords.length) return null;
+
+    const { title, labels } = extractPageLabels(html);
+    const normalizedLabels = normalizeHumanText(labels.join(' '));
+    let directContentHits = 0;
+    let directLabelHits = 0;
+    let firstIndex = Infinity;
+    for (const keyword of normalizedKeywords) {
+        const contentIndex = normalizedText.indexOf(keyword);
+        if (contentIndex !== -1) {
+            directContentHits++;
+            firstIndex = Math.min(firstIndex, contentIndex);
+        }
+        if (normalizedLabels.includes(keyword)) directLabelHits++;
+    }
+
+    const fuzzyScores = normalizedKeywords.map(keyword => fuzzyPhraseScore(keyword, labels));
+    const fuzzyLabelScore = fuzzyScores.length ? Math.max(...fuzzyScores) : 0;
+    if (!directContentHits && fuzzyLabelScore < 46) return null;
+
+    const coverage = directContentHits / normalizedKeywords.length;
+    const score = directContentHits * 28
+        + directLabelHits * 95
+        + Math.round(coverage * 70)
+        + fuzzyLabelScore;
+    const start = Number.isFinite(firstIndex) ? Math.max(0, firstIndex - 90) : 0;
+    const snippet = text.slice(start, start + 360).trim();
+    return {
+        url,
+        title: title || url,
+        score,
+        confidence: directLabelHits > 0 || fuzzyLabelScore >= 56 ? 'high' : coverage >= 0.5 ? 'medium' : 'low',
+        matchedTerms: normalizedKeywords.filter(keyword => normalizedText.includes(keyword)),
+        snippet
+    };
+}
+
+async function crawlHandler(req, res) {
     if (!await applyPluginCors(req, res)) return res.status(403).json({ error: 'Origin is not allowed' });
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -57,6 +112,7 @@ module.exports = async function crawlHandler(req, res) {
             if (typeof candidate !== 'string' || !isHtmlUrl(candidate) || !isSafeUrl(candidate)) continue;
             try {
                 const url = new URL(candidate);
+                url.hash = '';
                 if (url.origin === root.origin && !seen.has(url.href)) queue.push({ url: url.href, depth: 0 });
             } catch (_) { }
         }
@@ -68,34 +124,13 @@ module.exports = async function crawlHandler(req, res) {
             while ((match = regex.exec(html)) !== null) {
                 try {
                     const url = new URL(match[1], baseUrl);
+                    url.hash = '';
                     if (url.origin !== root.origin || !isHtmlUrl(url.href) || seen.has(url.href)) continue;
                     if (/(admin|login|password|secure|backend|dashboard|checkout|auth)/i.test(url.pathname)) continue;
                     links.push(url.href);
                 } catch (_) { }
             }
             return links;
-        }
-
-        function scorePage(text, html, url) {
-            const lower = text.toLowerCase();
-            let matchCount = 0;
-            let firstIndex = Infinity;
-            for (const keyword of keywords) {
-                const index = lower.indexOf(keyword);
-                if (index !== -1) {
-                    matchCount++;
-                    firstIndex = Math.min(firstIndex, index);
-                }
-            }
-            if (!matchCount) return null;
-            const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-            const start = Math.max(0, firstIndex - 80);
-            return {
-                url,
-                title: titleMatch ? titleMatch[1].trim() : url,
-                score: matchCount,
-                snippet: text.slice(start, firstIndex + 260).trim()
-            };
         }
 
         async function fetchPage(url) {
@@ -112,7 +147,7 @@ module.exports = async function crawlHandler(req, res) {
                 const html = await response.text();
                 if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) return null;
                 const text = extractText(html);
-                const scored = scorePage(text, html, url);
+                const scored = scorePageForQuery({ text, html, url, keywords });
                 if (scored) results.push(scored);
                 return html;
             } catch (_) {
@@ -139,4 +174,7 @@ module.exports = async function crawlHandler(req, res) {
     } catch (_) {
         return res.status(200).json({ results: [] });
     }
-};
+}
+
+module.exports = crawlHandler;
+module.exports.scorePageForQuery = scorePageForQuery;

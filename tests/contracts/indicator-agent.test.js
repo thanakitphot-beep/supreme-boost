@@ -14,7 +14,8 @@ describe('INDICATOR owned agent — contract', () => {
         });
         expect(result.status).toBe('ok');
         expect(result.reply).toContain('รองเท้าวิ่ง Nike Air');
-        expect(result.action).toMatchObject({ type: 'warp', targetText: 'รองเท้าวิ่ง Nike Air' });
+        expect(result.action).toMatchObject({ type: 'warp', targetText: 'รองเท้าวิ่ง Nike Air', confirmationRequired: true });
+        expect(result.interactive).toMatchObject({ type: 'destination_choices', persist: true });
         expect(result.cssCommand).toBe('');
     });
 
@@ -50,8 +51,9 @@ describe('INDICATOR owned agent — contract', () => {
         });
         expect(result.reply).toContain('รายการที่น่าสนใจ');
         expect(result.action).toBeNull();
-        expect(result.interactive).toMatchObject({ type: 'carousel' });
+        expect(result.interactive).toMatchObject({ type: 'destination_choices', persist: true });
         expect(result.interactive.items.length).toBeGreaterThan(0);
+        expect(result.interactive.items[0].action).toMatchObject({ confirmationRequired: true });
     });
 
     test('searches the current catalog before crawling when a Thai product request is imprecise', () => {
@@ -117,7 +119,78 @@ describe('INDICATOR owned agent — contract', () => {
             locale: 'th',
             siteProfile: resolveSiteProfile('INDICATOR_TEST')
         });
-        expect(result.action).toMatchObject({ type: 'navigate', url: '/pricing.html' });
+        expect(result.action).toMatchObject({ type: 'navigate', url: '/pricing.html', confirmationRequired: true });
+        expect(result.interactive.type).toBe('destination_choices');
+    });
+
+    test('returns ranked alternatives instead of choosing an ambiguous page', () => {
+        const result = runIndicatorAgent({
+            prompt: 'ช่วยหาหน้าบริการ',
+            url: 'https://example.com/',
+            locale: 'th',
+            siteProfile: {
+                id: 'ambiguous-pages',
+                permissions: ['navigate_same_origin'],
+                knowledge: {
+                    pages: [
+                        { id: 'personal', title: 'บริการสำหรับบุคคล', url: '/personal', headings: ['บริการและสิทธิประโยชน์'], keywords: ['บริการ'] },
+                        { id: 'business', title: 'บริการสำหรับองค์กร', url: '/business', headings: ['บริการและโซลูชันธุรกิจ'], keywords: ['บริการ'] }
+                    ],
+                    catalog: [],
+                    glossary: []
+                }
+            }
+        });
+
+        expect(result.action).toBeNull();
+        expect(result.interactive).toMatchObject({ type: 'destination_choices', confidence: 'ambiguous', compare: true, persist: true });
+        expect(result.interactive.items.map(item => item.title)).toEqual(['บริการสำหรับบุคคล', 'บริการสำหรับองค์กร']);
+        expect(result.interactive.items.every(item => item.action.confirmationRequired)).toBe(true);
+    });
+
+    test('finds a published page despite a natural Thai typo', () => {
+        const result = runIndicatorAgent({
+            prompt: 'พาไปหน้าราคคา',
+            url: 'https://example.com/',
+            locale: 'th',
+            siteProfile: {
+                id: 'typo-page',
+                permissions: ['navigate_same_origin'],
+                knowledge: {
+                    pages: [{ id: 'pricing', title: 'ราคาและแพ็กเกจ', url: '/pricing', headings: ['ราคาแพ็กเกจ'], keywords: ['ราคา'] }],
+                    catalog: [],
+                    glossary: []
+                }
+            }
+        });
+
+        expect(result.reply).toContain('ราคาและแพ็กเกจ');
+        expect(result.action).toMatchObject({ type: 'navigate', url: '/pricing', confirmationRequired: true });
+        expect(result.interactive.items[0].title).toBe('ราคาและแพ็กเกจ');
+    });
+
+    test('resolves a customer scenario against published product attributes', () => {
+        const result = runIndicatorAgent({
+            prompt: 'ต้องใช้ตอนเดินเยอะเพราะปวดเท้า',
+            url: 'https://shop.example/',
+            locale: 'th',
+            siteProfile: {
+                id: 'scenario-products',
+                permissions: ['navigate_same_origin'],
+                knowledge: {
+                    pages: [],
+                    catalog: [
+                        { id: 'comfort', name: 'Comfort Walk', description: 'รองเท้านุ่ม รองรับแรงกระแทก', url: '/comfort', keywords: ['นุ่ม', 'ซัพพอร์ต'] },
+                        { id: 'formal', name: 'Oxford Classic', description: 'รองเท้าหนังทางการ', url: '/formal', keywords: ['ทำงาน'] }
+                    ],
+                    glossary: []
+                }
+            }
+        });
+
+        expect(result.reply).toContain('Comfort Walk');
+        expect(result.action).toMatchObject({ type: 'navigate', url: '/comfort', confirmationRequired: true });
+        expect(result.interactive.items.map(item => item.title)).toEqual(['Comfort Walk']);
     });
 
     test('blocks autonomous payment navigation', () => {
@@ -343,6 +416,7 @@ describe('INDICATOR owned agent — contract', () => {
         const bundle = fs.readFileSync(path.resolve(__dirname, '../../supreme-boost/boost.js'), 'utf8');
         const source = fs.readFileSync(path.resolve(__dirname, '../../src/widget/main.js'), 'utf8');
         expect(bundle).toContain('case"navigate"');
+        expect(bundle).toContain('sb-destination-choices');
         expect(source).toContain('safeNavigationUrl');
         expect(source).toContain('highlightExactPhrase');
         expect(source).toContain('highlightExactHeading');
@@ -351,6 +425,11 @@ describe('INDICATOR owned agent — contract', () => {
         expect(source).toContain("credentials: 'omit'");
         expect(source).toContain('new URL(rawUrl, location.href)');
         expect(source).toContain('destination.origin !== location.origin');
+        expect(source).toContain('sb-destination-choices');
+        expect(source).toContain('ยืนยันและวาร์ป');
+        expect(source).toContain('userConfirmed: true');
+        expect(source).not.toContain('autoWarpCheck(data.reply)');
+        expect(source).not.toContain('if (r[0].score > 0) { navigate');
     });
 
     test('the pricing page inline script compiles', () => {

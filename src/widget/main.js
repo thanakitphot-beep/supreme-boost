@@ -590,6 +590,7 @@
 
     function safetyShield(action, locale, onAllow, onDeny) {
         if (!action || !action.type) return true;
+        if (action.searchAll) return true;
         var needsConfirm = false;
 
         if (action.type === "warp" && (action.targetText || action.entityId || action.selector)) {
@@ -625,7 +626,7 @@
     var InteractiveWhisper = {
         _el: null, _container: null, _shadow: null,
         init: function (shadow) { this._shadow = shadow; this._el = shadow.querySelector(".sb-interactive"); this._container = shadow.querySelector(".sb-whisper-container"); },
-        render: function (interactive, locale) { if (!interactive || !interactive.type || !this._container) return; var strings = t(locale); switch (interactive.type) { case "carousel": if (interactive.items && interactive.items.length) { InlineShelf.show(interactive.items, locale); } return; default: break; }this._container.innerHTML = ""; var wrapper = document.createElement("div"); wrapper.className = "sb-i-wrap"; switch (interactive.type) { case "action_slider": this._renderActionSlider(wrapper, interactive, strings); break; case "options": this._renderOptions(wrapper, interactive, strings, locale); break; default: return; }this._container.appendChild(wrapper); this._container.style.display = "block"; var ro = document.getElementById(WIDGET_ID); if (ro) ro.classList.add("sb-iw-open"); },
+        render: function (interactive, locale) { if (!interactive || !interactive.type || !this._container) return; var strings = t(locale); switch (interactive.type) { case "destination_choices": if (_msgs) renderDestinationChoices(interactive, _msgs, locale); return; case "carousel": if (interactive.items && interactive.items.length) { InlineShelf.show(interactive.items, locale); } return; default: break; }this._container.innerHTML = ""; var wrapper = document.createElement("div"); wrapper.className = "sb-i-wrap"; switch (interactive.type) { case "action_slider": this._renderActionSlider(wrapper, interactive, strings); break; case "options": this._renderOptions(wrapper, interactive, strings, locale); break; default: return; }this._container.appendChild(wrapper); this._container.style.display = "block"; var ro = document.getElementById(WIDGET_ID); if (ro) ro.classList.add("sb-iw-open"); },
         hide: function () { if (this._container) { this._container.style.display = "none"; this._container.innerHTML = ""; var ro = document.getElementById(WIDGET_ID); if (ro) ro.classList.remove("sb-iw-open"); } }
     };
 
@@ -694,15 +695,128 @@
         isExpanded: function () { return this._expanded; }
     };
 
-    var Whisper = { _el: null, _timer: null, _visible: false, init: function (shadow) { this._el = document.getElementById(WIDGET_ID + "-whisper"); }, show: function (text, type) { if (!this._el) return; if (this._timer) clearTimeout(this._timer); var label = "⚡ AI INSIGHT"; if (type === "proactive") label = "🔮 AI ตรวจจับ"; else if (type === "greeting") label = "🤖 AI ทักทาย"; else if (type === "hint") label = "💡 คำแนะนำ"; var words = text.split(" "); var spans = words.map(function (w, i) { return '<span style="opacity:0;display:inline-block;transform:translateY(10px) scale(0.9);animation:sbFloatWord 0.5s cubic-bezier(0.34,1.56,0.64,1) ' + (0.08 + i * 0.06) + 's forwards;">' + w + '</span>'; }).join(' '); this._el.innerHTML = '<span class="sb-whisper-label">' + label + '</span>' + spans; this._el.className = "sb-whisper sb-whisper-" + (type || "info"); this._el.style.opacity = "1"; this._el.style.transform = "translateY(0) scale(1)"; this._visible = true; this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS); }, hide: function () { if (!this._el || !this._visible) return; this._visible = false; this._el.style.opacity = "0"; this._el.style.transform = "translateY(10px) scale(0.95)"; if (this._timer) { clearTimeout(this._timer); this._timer = null; } }, isVisible: function () { return this._visible; } };
+    var Whisper = { _el: null, _timer: null, _visible: false, init: function (shadow) { this._el = document.getElementById(WIDGET_ID + "-whisper"); }, show: function (text, type) { if (!this._el) return; if (_st && _st.open) return; if (this._timer) clearTimeout(this._timer); var label = "⚡ AI INSIGHT"; if (type === "proactive") label = "🔮 AI ตรวจจับ"; else if (type === "greeting") label = "🤖 AI ทักทาย"; else if (type === "hint") label = "💡 คำแนะนำ"; var words = text.split(" "); var spans = words.map(function (w, i) { return '<span style="opacity:0;display:inline-block;transform:translateY(10px) scale(0.9);animation:sbFloatWord 0.5s cubic-bezier(0.34,1.56,0.64,1) ' + (0.08 + i * 0.06) + 's forwards;">' + w + '</span>'; }).join(' '); this._el.innerHTML = '<span class="sb-whisper-label">' + label + '</span>' + spans; this._el.className = "sb-whisper sb-whisper-" + (type || "info"); this._el.style.opacity = "1"; this._el.style.transform = "translateY(0) scale(1)"; this._visible = true; this._timer = setTimeout(this.hide.bind(this), WHISPER_DISMISS_MS); }, hide: function () { if (!this._el || !this._visible) return; this._visible = false; this._el.style.opacity = "0"; this._el.style.transform = "translateY(10px) scale(0.95)"; if (this._timer) { clearTimeout(this._timer); this._timer = null; } }, isVisible: function () { return this._visible; } };
 
     Whisper.init = function () {
         this._el = document.getElementById(WIDGET_ID + "-whisper");
         if (this._el) this._el.style.pointerEvents = "none";
     };
 
+    function isDestinationAction(action) {
+        return Boolean(action && !action.searchAll && ["warp", "navigate", "warp_cross_page"].indexOf(action.type) !== -1);
+    }
+
+    function destinationFallback(action) {
+        return {
+            type: "destination_choices",
+            persist: true,
+            confidence: "high",
+            items: [{
+                id: "destination-" + hashText(action.targetText || action.url || action.type),
+                title: action.targetText || action.title || action.url || "Website destination",
+                subtitle: action.type === "warp" ? "Current page" : "Website page",
+                kind: action.type === "warp" ? "section" : "page",
+                url: action.url || location.href,
+                action: action
+            }]
+        };
+    }
+
+    function renderDestinationChoices(interactive, container, locale) {
+        if (!container || !interactive || !Array.isArray(interactive.items)) return;
+        var items = interactive.items.filter(function (item) {
+            return item && item.title && isDestinationAction(item.action);
+        }).slice(0, 6);
+        if (!items.length) return;
+
+        var thai = normLocale(locale) === "th";
+        var wrapper = document.createElement("section");
+        wrapper.className = "sb-destination-choices";
+        wrapper.setAttribute("aria-label", thai ? "ผลลัพธ์จากเว็บไซต์" : "Website results");
+
+        var heading = document.createElement("div");
+        heading.className = "sb-destination-heading";
+        heading.textContent = items.length > 1
+            ? (thai ? "เลือกและเปรียบเทียบผลลัพธ์" : "Choose and compare results")
+            : (thai ? "ตรวจสอบจุดหมายก่อนวาร์ป" : "Review the destination");
+        wrapper.appendChild(heading);
+
+        var hint = document.createElement("div");
+        hint.className = "sb-destination-hint";
+        hint.textContent = thai
+            ? "ตัวเลือกจะยังอยู่จนกว่าคุณจะยืนยัน"
+            : "Options stay visible until you confirm";
+        wrapper.appendChild(hint);
+
+        var grid = document.createElement("div");
+        grid.className = "sb-destination-grid";
+        wrapper.appendChild(grid);
+        var selected = null;
+        var buttons = [];
+
+        var footer = document.createElement("div");
+        footer.className = "sb-destination-footer";
+        var status = document.createElement("div");
+        status.className = "sb-destination-status";
+        status.textContent = thai ? "เลือกรายการที่ต้องการ" : "Select a destination";
+        var confirm = document.createElement("button");
+        confirm.type = "button";
+        confirm.className = "sb-destination-confirm";
+        confirm.textContent = thai ? "ยืนยันและวาร์ป" : "Confirm and warp";
+        confirm.disabled = true;
+        footer.appendChild(status);
+        footer.appendChild(confirm);
+
+        items.forEach(function (item, index) {
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "sb-destination-option";
+            button.setAttribute("aria-pressed", "false");
+            var badge = document.createElement("span");
+            badge.className = "sb-destination-kind";
+            badge.textContent = item.kind === "product" ? (thai ? "สินค้า" : "Product") : item.kind === "section" ? (thai ? "หัวข้อ" : "Section") : (thai ? "หน้าเว็บ" : "Page");
+            var title = document.createElement("strong");
+            title.className = "sb-destination-title";
+            title.textContent = String(item.title).slice(0, 180);
+            button.appendChild(badge);
+            button.appendChild(title);
+            if (item.subtitle) {
+                var subtitle = document.createElement("span");
+                subtitle.className = "sb-destination-subtitle";
+                subtitle.textContent = String(item.subtitle).slice(0, 240);
+                button.appendChild(subtitle);
+            }
+            button.addEventListener("click", function () {
+                selected = item;
+                for (var i = 0; i < buttons.length; i++) buttons[i].setAttribute("aria-pressed", i === index ? "true" : "false");
+                if (_st) _st.selectedText = String(item.title).slice(0, 1200);
+                status.textContent = (thai ? "เลือกแล้ว: " : "Selected: ") + String(item.title).slice(0, 100);
+                confirm.disabled = false;
+            });
+            buttons.push(button);
+            grid.appendChild(button);
+        });
+
+        confirm.addEventListener("click", function () {
+            if (!selected || !selected.action) return;
+            confirm.disabled = true;
+            status.textContent = thai ? "กำลังพาไปยังจุดที่ยืนยัน..." : "Opening the confirmed destination...";
+            var confirmedAction = Object.assign({}, selected.action, { confirmationRequired: false, userConfirmed: true });
+            execAction(confirmedAction);
+            setTimeout(function () {
+                if (!wrapper.isConnected) return;
+                confirm.disabled = false;
+                status.textContent = (thai ? "ยืนยันแล้ว: " : "Confirmed: ") + String(selected.title).slice(0, 100);
+            }, 1200);
+        });
+
+        wrapper.appendChild(footer);
+        container.appendChild(wrapper);
+        container.scrollTop = container.scrollHeight;
+    }
+
     Whisper.show = function (text, type) {
-        if (!this._el || AmbientUI.isExpanded()) return;
+        if (!this._el || _st && _st.open) return;
         if (type !== "hesitation") AmbientUI._pending = null;
         if (this._timer) clearTimeout(this._timer);
         var label = "คำแนะนำ";
@@ -1043,6 +1157,7 @@
                     AmbientUI.clearAura();
                     Whisper.hide();
                     AmbientUI._pending = null;
+                    if (Whisper._el) { Whisper._el.style.opacity = '0'; Whisper._el.style.pointerEvents = 'none'; Whisper._el.style.display = 'none'; Whisper._visible = false; }
                     InteractiveWhisper.hide();
                     InlineShelf.hide();
                     root.classList.add("sb-open");
@@ -1052,6 +1167,7 @@
                     AmbientUI.collapse();
                     root.classList.remove("sb-open");
                     Whisper.hide();
+                    if (Whisper._el) { Whisper._el.style.display = ''; Whisper._el.style.pointerEvents = 'none'; }
                     AmbientUI.setBrainPhase(null);
                 }
             }
@@ -1108,14 +1224,22 @@
 
                     if (data.cssCommand && safeCss(data.cssCommand)) { styleEl.textContent += "\n/* AI */\n" + data.cssCommand.trim() + "\n"; }
                     if (data.interactive) { InteractiveWhisper.render(data.interactive, state.locale); }
-                    if (data.action) { execAction(data.action); }
-                    else if (data.reply) { autoWarpCheck(data.reply); }
+                    if (data.action) {
+                        if (data.action.searchAll) {
+                            execAction(data.action);
+                        } else if (isDestinationAction(data.action)) {
+                            if (!data.interactive || data.interactive.type !== "destination_choices") {
+                                renderDestinationChoices(destinationFallback(data.action), messages, state.locale);
+                            }
+                        } else {
+                            execAction(data.action);
+                        }
+                    }
                 } catch (err) {
                     AmbientUI.setBrainPhase(null);
                     console.error("Chat:", err);
                     var fb = localReply(text, state.locale);
-                    var emsg = err && err.message && !/^HTTP/i.test(err.message) ? err.message : strs.connectError;
-                    updateMsg(load, cmd ? cmd.reply : (fb || emsg), true);
+                    updateMsg(load, cmd ? cmd.reply : (fb || strs.connectError), true);
                 } finally { state.busy = false; form.classList.remove("sb-busy"); try { input.focus(); } catch (e) { } }
             }
 
@@ -1180,12 +1304,6 @@
                 body: JSON.stringify({ apiKey: cfg.apiKey, siteKey: cfg.siteKey, conversationId: state.conversationId, prompt: maskPII(prompt), pageContent: maskPII(collectContent()), siteDNA: dna, selectedText: maskPII(state.selectedText), history: maskHist(state.history), url: location.href, title: document.title, locale: normLocale(locale), domSnapshot: snap }),
                 signal: ctrl.signal
             });
-            if (r.status === 404) {
-                var isRelative = cfg.backendUrl.indexOf(location.origin) === 0 || cfg.backendUrl.indexOf('/') === 0;
-                if (isRelative) {
-                    throw new Error("⚠️ การเชื่อมต่อ API ล้มเหลว (404) - หากเว็บนี้โฮสต์บน Netlify หรือแบบ Static กรุณานำระบบไปติดตั้งบน Vercel แล้วนำ Backend URL มาใส่ใน Embed Code");
-                }
-            }
             var d = await r.json().catch(function () { return {}; });
             if (!d || d.status === "silent_abort") return { reply: "", cssCommand: "", action: null, interactive: null };
             if (d.status === "blocked" && d.reply) return { reply: "⚠️ " + d.reply, cssCommand: "", action: d.action && d.action.type === "disable_widget" ? d.action : null, interactive: null };
@@ -1690,6 +1808,14 @@
                     requestHandoff(_st ? _st.locale : "en", "User requested human agent via chat.", act.priority);
                     break;
                 case "warp":
+                    if (act.searchAll && _st && _cfg && _msgs) {
+                        var siteKw = (act.keywords || []).length ? searchTokens("", act.keywords) : searchTokens(act.targetText || act.title || "", []);
+                        if (!siteKw.length) return;
+                        crossSearch(siteKw, _cfg, _msgs, _st.locale).then(function (results) {
+                            if (results && results.length) showCross(results, _msgs, siteKw, _st.locale);
+                        });
+                        break;
+                    }
                     if (act.exactHeading) { highlightExactHeading(act.exactHeading); break; }
                     if (act.exactText) { highlightExactPhrase(act.exactText); break; }
                     var warpTarget = resolveWarpTarget(act);
@@ -1700,11 +1826,8 @@
                         if (!warpKw.length) return;
                         crossSearch(warpKw, _cfg, _msgs, _st.locale).then(function (r) {
                             if (r && r.length) {
-                                var navKw = Array.from(new Set([act.targetText || act.title || ""].concat(warpKw))).filter(Boolean).join(",");
-                                if (r[0].score > 0) { navigate(r[0].url, navKw, _msgs, _st.locale); }
-                                else { showCross(r, _msgs, navKw, _st.locale); }
-                            } else {
-                                addMsg(_msgs, "assistant", "🔍 ไม่พบข้อมูลที่ต้องการในเว็บไซต์นี้");
+                                var navKw = Array.from(new Set([act.targetText || act.title || ""].concat(warpKw))).filter(Boolean);
+                                showCross(r, _msgs, navKw, _st.locale);
                             }
                         });
                     }
@@ -1772,8 +1895,8 @@
     function showConfirm(act, loc, onYes, onNo) { var ro = document.getElementById(WIDGET_ID); if (!ro || !ro.shadowRoot) return; var p = ro.shadowRoot.querySelector(".sb-panel"); if (!p) return; ensureConfirmStyle(ro.shadowRoot); var ex = p.querySelector(".sb-confirm-overlay"); if (ex) ex.remove(); var s = t(loc), desc = act.targetText || act.selector || act.type || ""; var ov = document.createElement("div"); ov.className = "sb-confirm-overlay"; ov.innerHTML = '<div class="sb-confirm-box"><div class="sb-confirm-title">⚠️ ' + s.confirmTitle + '</div><div class="sb-confirm-body"><p>' + s.confirmBody + '</p>' + (act.safetyReason ? '<p style="color:#dc2626;font-size:12px;margin-top:4px;">' + escHtml(act.safetyReason) + '</p>' : '') + '<p style="margin-top:6px;font-family:monospace;font-size:12px;background:#f8fafc;padding:8px;border-radius:8px;word-break:break-all;">' + escHtml(desc.slice(0, 200)) + '</p></div><div class="sb-confirm-actions"><button class="sb-confirm-btn sb-confirm-deny" data-action="deny">' + s.confirmDeny + '</button><button class="sb-confirm-btn sb-confirm-allow" data-action="allow">' + s.confirmAllow + '</button></div></div>'; p.appendChild(ov); ov.querySelector('[data-action="deny"]').addEventListener("click", function () { ov.remove(); if (onNo) onNo(); }); ov.querySelector('[data-action="allow"]').addEventListener("click", function () { ov.remove(); if (onYes) onYes(); }); }
     function ensureConfirmStyle(shadow) { var s = shadow.querySelector("#" + CONFIRM_STYLE_ID); if (s) return; var st = document.createElement("style"); st.id = CONFIRM_STYLE_ID; st.textContent = ".sb-confirm-overlay{position:absolute;inset:0;z-index:2147483001;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-radius:16px;animation:sbFadeIn 0.2s ease;}.sb-confirm-box{width:88%;max-width:320px;padding:20px;background:rgba(255,255,255,0.95);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;border:1px solid rgba(255,255,255,0.3);box-shadow:0 20px 60px rgba(0,0,0,0.25);animation:sbSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);}.sb-confirm-title{font:700 15px/1.2 Arial,sans-serif;margin-bottom:8px;color:#dc2626;}.sb-confirm-body{font:13px/1.5 Arial,sans-serif;color:#475569;margin-bottom:16px;}.sb-confirm-actions{display:flex;gap:10px;justify-content:flex-end;}.sb-confirm-btn{padding:9px 20px;border-radius:10px;border:0;font:600 14px/1 Arial,sans-serif;cursor:pointer;transition:transform 0.2s ease;}.sb-confirm-btn:hover{transform:scale(1.04);}.sb-confirm-allow{background:#dc2626;color:#fff;}.sb-confirm-deny{background:#f1f5f9;color:#475569;}@keyframes sbFadeIn{from{opacity:0}to{opacity:1}}@keyframes sbSlideUp{from{opacity:0;transform:translateY(20px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}}"; var firstStyle = shadow.querySelector("style"); if (firstStyle) firstStyle.insertAdjacentElement("afterend", st); else shadow.insertBefore(st, shadow.firstChild); }
 
-    function crossSearch(kw, cfg, m, loc) { var links = collectLinks(); var strs = t(loc); var ld = addMsg(m, "assistant", strs.searchingPages || "🔍 กำลังค้นหา...", true); return fetch(cfg.backendUrl.replace('/api/chat', '/api/crawl'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'omit', referrerPolicy: 'no-referrer', body: JSON.stringify({ apiKey: cfg.apiKey, keywords: kw, urls: links, rootUrl: location.origin }) }).then(function (r) { return r.json(); }).then(function (d) { updateMsg(ld, ''); return (d.results || []).slice(0, 5); }).catch(function () { updateMsg(ld, strs.connectError); return []; }); }
-    function showCross(r, m, kw, loc) { if (!r.length) return; var s = t(loc); var rm = document.createElement('div'); rm.className = 'sb-msg sb-assistant'; rm.innerHTML = '<strong>' + (s.foundOnOtherPages || '✨ เจอบนหน้าอื่น:') + '</strong>'; m.appendChild(rm); r.forEach(function (rr) { var b = document.createElement('button'); b.type = 'button'; b.style.cssText = 'display:block;width:100%;text-align:left;padding:10px 14px;margin:6px 0;border:1px solid var(--sb-border);border-radius:10px;background:var(--sb-bg);color:var(--sb-text);font-size:13px;cursor:pointer;transition:all 0.25s cubic-bezier(0.34,1.56,0.64,1);'; b.innerHTML = '<strong>\uD83D\uDCC4 ' + escHtml(rr.title) + '</strong><br><small style="color:var(--sb-muted)">' + escHtml(rr.snippet.slice(0, 120)) + '...</small>'; b.onmouseenter = function () { b.style.borderColor = 'var(--sb-primary)'; b.style.transform = 'translateX(4px) scale(1.01)'; }; b.onmouseleave = function () { b.style.borderColor = 'var(--sb-border)'; b.style.transform = 'none'; }; b.onclick = function () { navigate(rr.url, kw, m, loc); }; m.appendChild(b); }); m.scrollTop = m.scrollHeight; }
+    function crossSearch(kw, cfg, m, loc) { var links = collectLinks(); var strs = t(loc); var thai = normLocale(loc) === "th"; var ld = addMsg(m, "assistant", strs.searchingPages || "กำลังค้นหา...", true); return fetch(cfg.backendUrl.replace('/api/chat', '/api/crawl'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'omit', referrerPolicy: 'no-referrer', body: JSON.stringify({ apiKey: cfg.apiKey, keywords: kw, urls: links, rootUrl: location.origin }) }).then(function (r) { if (!r.ok) throw new Error("crawl unavailable"); return r.json(); }).then(function (d) { var results = (d.results || []).slice(0, 5); updateMsg(ld, results.length ? (thai ? "พบข้อมูลที่ใกล้เคียงจากเว็บไซต์ เลือกผลลัพธ์ด้านล่างครับ" : "I found related website results. Choose one below.") : (thai ? "ยังไม่พบข้อมูลที่ตรงกันในหน้าสาธารณะของเว็บไซต์นี้" : "No matching information was found on this site's public pages."), true); return results; }).catch(function () { updateMsg(ld, thai ? "ยังค้นหาหน้าอื่นไม่ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง" : "Site-wide search is temporarily unavailable. Please try again.", true); return []; }); }
+    function showCross(results, container, keywords, locale) { if (!results.length) return; var keywordList = Array.isArray(keywords) ? keywords : String(keywords || "").split(",").filter(Boolean); var items = results.map(function (result, index) { return { id: "crawl-result-" + index + "-" + hashText(result.url || result.title), title: result.title || result.url, subtitle: result.snippet || "Website page", kind: "page", score: result.score || 0, url: result.url, action: { type: "navigate", url: result.url, targetText: result.title || "", keywords: keywordList, confirmationRequired: true } }; }); renderDestinationChoices({ type: "destination_choices", persist: true, compare: items.length > 1, confidence: items.length > 1 ? "ranked" : "high", items: items }, container, locale); }
     function navigate(url, kw, m, loc, telekinesis) { var destination = safeNavigationUrl(url); if (!destination) { addMsg(m, "assistant", "ไม่สามารถพาไปยังหน้านี้ได้"); return; } addMsg(m, "assistant", telekinesis ? "กำลังพาวาร์ปไปหน้าเป้าหมาย..." : "กำลังพาวาร์ปไปที่: " + (destination.split('/').pop() || destination) + "..."); document.body.style.transition = telekinesis ? "transform 0.8s cubic-bezier(0.5,0,0.2,1), filter 0.8s ease" : "transform 0.8s cubic-bezier(0.5,0,0.2,1)"; document.body.style.transform = "scale(1.05)"; if (telekinesis) document.body.style.filter = "blur(10px) brightness(1.5)"; setTimeout(function () { var next = new URL(destination, location.href); next.searchParams.set('sb-warp', '1'); next.searchParams.set('sb-kw', kw || ''); window.location.assign(next.pathname + next.search + next.hash); }, 800); }
     function collectLinks() { var l = [], s = new Set(), c = location.origin; document.querySelectorAll('a[href]').forEach(function (a) { try { var u = new URL(a.href, document.baseURI); if (u.origin === c && u.pathname !== location.pathname && !u.hash && !s.has(u.pathname)) { if (!/(admin|login|password|secure|backend|dashboard|checkout|auth)/i.test(u.pathname)) { s.add(u.pathname); l.push(u.href); } } } catch (_) { } }); return l.slice(0, MAX_CRAWL_SEEDS); }
     function escHtml(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
@@ -1781,23 +1904,28 @@
         var p = new URLSearchParams(location.search), w = p.get("sb-warp");
         if (!w) return;
         var kw = (p.get("sb-kw") || "").split(",").filter(Boolean);
-        if (!kw.length) return;
+        var clearParams = function () {
+            try {
+                var clean = new URLSearchParams(location.search);
+                clean.delete("sb-warp");
+                clean.delete("sb-kw");
+                var query = clean.toString();
+                history.replaceState(null, "", location.pathname + (query ? "?" + query : "") + location.hash);
+            } catch (_) { }
+        };
+        if (!kw.length) { clearParams(); return; }
         var at = 0, ma = 18;
         var fn = function () {
             at++;
             try { indexPageEntities(true); } catch (_) { }
             var f = findEl(kw.join(" "), kw);
             if (f) {
-                try {
-                    var sp = new URLSearchParams(location.search);
-                    sp.delete("sb-warp");
-                    sp.delete("sb-kw");
-                    var qs = sp.toString();
-                    history.replaceState(null, "", location.pathname + (qs ? "?" + qs : "") + location.hash);
-                } catch (_) { }
+                clearParams();
                 warpEl(f);
             } else if (at < ma) {
                 setTimeout(fn, 500);
+            } else {
+                clearParams();
             }
         };
         fn();
@@ -1857,6 +1985,21 @@
             ".sb-assistant{align-self:flex-start;color:var(--ai-text);background:rgba(255,255,255,0.08);border:1px solid var(--ai-glass-b);border-bottom-left-radius:4px;animation:sbSlideInLeft 0.35s var(--ai-ease);box-shadow:var(--ai-neon);}",
             ".sb-loading::after{content:'.';display:inline-block;width:1.1em;text-align:left;animation:sbDots 1.4s steps(4,end) infinite;}",
             ".sb-loading{animation:sbLoadingBounce 0.6s ease-in-out infinite alternate!important;}",
+            ".sb-destination-choices{align-self:stretch;display:flex;flex-direction:column;gap:9px;padding:12px;border:1px solid var(--ai-border);border-radius:14px;background:color-mix(in srgb,var(--ai-primary) 5%,var(--ai-bg));box-shadow:0 8px 22px rgba(15,23,42,.08);}",
+            ".sb-destination-heading{font:700 14px/1.35 Arial,'Noto Sans Thai',sans-serif;color:var(--ai-text);}",
+            ".sb-destination-hint{font:11px/1.45 Arial,'Noto Sans Thai',sans-serif;color:var(--ai-muted);}",
+            ".sb-destination-grid{display:grid;gap:7px;max-height:260px;overflow:auto;padding:1px;}",
+            ".sb-destination-option{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 8px;align-items:center;width:100%;padding:10px;text-align:left;border:1px solid var(--ai-border);border-radius:10px;background:var(--ai-bg);color:var(--ai-text);cursor:pointer;transition:border-color .18s ease,background .18s ease,box-shadow .18s ease;}",
+            ".sb-destination-option:hover{border-color:var(--ai-primary);}",
+            ".sb-destination-option[aria-pressed='true']{border-color:var(--ai-primary);background:color-mix(in srgb,var(--ai-primary) 10%,var(--ai-bg));box-shadow:0 0 0 2px color-mix(in srgb,var(--ai-primary) 18%,transparent);}",
+            ".sb-destination-kind{grid-column:1;padding:3px 6px;border-radius:999px;background:color-mix(in srgb,var(--ai-primary) 12%,transparent);color:var(--ai-primary);font:700 9px/1 Arial,sans-serif;text-transform:uppercase;letter-spacing:.03em;}",
+            ".sb-destination-title{grid-column:2;min-width:0;font:700 12px/1.4 Arial,'Noto Sans Thai',sans-serif;overflow-wrap:anywhere;}",
+            ".sb-destination-subtitle{grid-column:2;font:10px/1.45 Arial,'Noto Sans Thai',sans-serif;color:var(--ai-muted);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}",
+            ".sb-destination-footer{display:grid;gap:8px;padding-top:2px;}",
+            ".sb-destination-status{min-height:16px;font:11px/1.4 Arial,'Noto Sans Thai',sans-serif;color:var(--ai-muted);overflow-wrap:anywhere;}",
+            ".sb-destination-confirm{min-height:40px;border:0;border-radius:9px;padding:9px 12px;background:var(--ai-primary);color:#fff;font:700 12px/1.2 Arial,'Noto Sans Thai',sans-serif;cursor:pointer;transition:opacity .18s ease,transform .18s ease;}",
+            ".sb-destination-confirm:hover:not(:disabled){transform:translateY(-1px);}",
+            ".sb-destination-confirm:disabled{opacity:.42;cursor:not-allowed;}",
             ".sb-handoff{max-width:100%!important;}",
             ".sb-quick{display:flex;gap:6px;padding:clamp(8px,1.2vw,12px) clamp(10px,1.5vw,14px);overflow-x:auto;border-top:1px solid var(--ai-glass-b);background:rgba(0,0,0,0.2);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);flex-shrink:0;}",
             ".sb-chip{flex:0 0 auto;border:1px solid var(--ai-glass-b);border-radius:999px;background:rgba(255,255,255,0.05);color:var(--ai-text);padding:clamp(6px,1vw,10px) clamp(10px,1.5vw,14px);font:clamp(12px,1.4vw,14px)/1 Arial,sans-serif;cursor:pointer;transition:all 0.25s ease;white-space:nowrap;}",
@@ -1899,6 +2042,7 @@
             "html.supreme-boost-small-text body>:not(#" + WIDGET_ID + "){font-size:94%!important;}",
             "@keyframes sbPulseRingHost{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.15);opacity:0.3}}",
             ".sb-whisper{position:fixed;bottom:clamp(72px,12vw,90px);" + (cfg.position === 'left' ? 'left' : 'right') + ":clamp(8px,2vw,24px);min-width:min(280px,82vw);max-width:min(400px,85vw);padding:clamp(14px,2vw,20px) clamp(16px,2.5vw,24px);background:rgba(8,6,24,0.88);-webkit-backdrop-filter:blur(28px) saturate(180%);backdrop-filter:blur(28px) saturate(180%);border:1px solid rgba(139,92,246,0.6);border-radius:18px;box-shadow:0 0 0 1px rgba(236,72,153,0.15),0 12px 40px rgba(0,0,0,0.6),0 0 40px rgba(139,92,246,0.35),inset 0 0 20px rgba(139,92,246,0.08);font:clamp(14px,1.6vw,16px)/1.7 'Prompt',Arial,'Noto Sans Thai',sans-serif;color:#f8fafc;opacity:0;transform:translateY(10px) scale(0.95);pointer-events:auto;cursor:pointer;z-index:2147483647;transition:opacity 0.45s ease,transform 0.45s cubic-bezier(0.34,1.56,0.64,1);word-break:break-word;text-align:left;border-width:0;outline:none;}",
+            "#" + WIDGET_ID + ".sb-open ~ .sb-whisper{opacity:0!important;pointer-events:none!important;}",
             ".sb-whisper-label{display:block;font:600 10px/1 Arial,sans-serif;letter-spacing:3px;text-transform:uppercase;color:rgba(180,140,255,0.9);margin-bottom:10px;}",
             "@keyframes sbFloatWord{to{opacity:1;transform:translateY(0) scale(1);text-shadow:0 0 14px rgba(200,180,255,0.9),0 0 30px rgba(139,92,246,0.6);color:#fff;}}",
             "@keyframes sbHoloBorder{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}"

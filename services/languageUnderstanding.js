@@ -76,10 +76,15 @@ function levenshtein(left, right, maxDistance) {
 }
 
 function closestDistance(query, phrase) {
-    const source = compact(query).slice(0, 220);
-    const target = compact(phrase);
-    if (target.length < 4 || source.length < target.length - 1) return Infinity;
-    if (source.includes(target)) return 0;
+    const queryText = compact(query).slice(0, 220);
+    const phraseText = compact(phrase).slice(0, 220);
+    if (queryText.length < 4 || phraseText.length < 4) return Infinity;
+    if (queryText.includes(phraseText) || phraseText.includes(queryText)) return 0;
+    // Compare the shorter phrase against windows in the longer phrase. This
+    // lets a typo such as "ราคคา" match the published heading "ราคาแพ็กเกจ"
+    // without expanding the search beyond text that exists on the website.
+    const source = queryText.length >= phraseText.length ? queryText : phraseText;
+    const target = queryText.length >= phraseText.length ? phraseText : queryText;
     const allowed = target.length >= 10 ? 2 : 1;
     let best = Infinity;
     for (let width = Math.max(4, target.length - allowed); width <= target.length + allowed; width++) {
@@ -89,7 +94,7 @@ function closestDistance(query, phrase) {
             if (best === 0) return 0;
         }
     }
-    return best;
+    return best <= allowed ? best : Infinity;
 }
 
 function fuzzyPhraseScore(query, phrases = []) {

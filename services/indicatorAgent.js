@@ -21,6 +21,7 @@ const MAX_PROMPT_CHARS = 1200;
 const MAX_CONTEXT_MESSAGES = 8;
 const MAX_RUNTIME_ENTITIES = 120;
 const MAX_LOCAL_CATALOG_ITEMS = 240;
+const MAX_DESTINATION_CHOICES = 5;
 const PRIVATE_CONTEXT_PREFIX = '__indicator_context_product__:';
 const PRODUCT_TERMS = ['กางเกง', 'รองเท้า', 'เสื้อ', 'กระเป๋า', 'หูฟัง', 'หนังสือ', 'นาฬิกา', 'โทรศัพท์', 'หมวก', 'ขวดน้ำ', 'เสื่อ', 'โต๊ะ', 'เก้าอี้', 'สินค้า', 'shoe', 'shoes', 'shirt', 'pants', 'shorts', 'bag', 'headphone', 'book', 'product'];
 const PRODUCT_CUES = ['กางเกง', 'เสื้อ', 'รองเท้า', 'กระเป๋า', 'หูฟัง', 'หนังสือ', 'นาฬิกา', 'โทรศัพท์', 'หมวก', 'ขวดน้ำ', 'เสื่อ', 'โต๊ะ', 'เก้าอี้', 'shoe', 'shirt', 'bag', 'headphone', 'book', 'watch', 'phone'];
@@ -354,12 +355,12 @@ function actionFor({ title, url, currentUrl, keywords = [], permissions = [], en
         if (destination.origin !== current.origin) return null;
         const safeUrl = `${destination.pathname}${destination.search}${destination.hash}`;
         if (destination.pathname === current.pathname) {
-            const action = { type: 'warp', targetText, keywords: keywords.slice(0, 10) };
+            const action = { type: 'warp', targetText, keywords: keywords.slice(0, 10), confirmationRequired: true };
             if (entityId) action.entityId = safeText(entityId, 160);
             if (selector) action.selector = safeText(selector, 260);
             return action;
         }
-        return { type: 'navigate', url: safeUrl, targetText, keywords: keywords.slice(0, 10) };
+        return { type: 'navigate', url: safeUrl, targetText, keywords: keywords.slice(0, 10), confirmationRequired: true };
     } catch (_) {
         return null;
     }
@@ -427,10 +428,12 @@ function livePageScore(querySubject, rawText) {
     if (!q || !t) return 0;
     if (t.includes(q)) return 100 + q.length;
     if (q.includes(t) && t.length > 2) return 80 + t.length;
-    // Word-level overlap
+    // Word-level overlap plus bounded typo tolerance against text the website
+    // actually publishes. This cannot invent a destination.
     const qWords = q.split(/\s+/).filter(w => w.length > 1);
     const hits = qWords.filter(w => t.includes(w));
-    return hits.length > 0 ? (hits.length / qWords.length) * 60 : 0;
+    const overlap = hits.length > 0 ? (hits.length / qWords.length) * 60 : 0;
+    return Math.max(overlap, fuzzyPhraseScore(q, [t]));
 }
 
 function headingLabel(value) {
@@ -468,6 +471,7 @@ function intentFor(prompt) {
     if (/(โมโห|ไม่พอใจ|แย่มาก|ห่วย|ช้ามาก|ร้องเรียน|complaint|angry|bad|terrible)/iu.test(text)) return 'complaint';
     if (RECOMMENDATION_REQUEST.test(text)) return 'recommend_products';
     if (availabilitySubject(text)) return 'find_product';
+    if (/(ติดต่อ|contact|support)/iu.test(text) && (LOCATION_REQUEST.test(text) || /(?:หน้า|page|where)/iu.test(text))) return 'search_unified';
     if (/(ติดต่อ|เบอร์โทร|อีเมล|เจ้าหน้าที่|พนักงาน|human|agent|contact|support)/iu.test(text)) return 'handoff';
     if (/(สรุป|summari[sz]e|ย่อ)/iu.test(text)) return 'summarize';
     if (/(คำศัพท์|คำว่า|หมายถึง|definition|meaning)/iu.test(text)) return 'define_term';
@@ -484,6 +488,95 @@ function bestMatch(items, prompt, textForItem, aliasesForItem = () => []) {
         .map(item => ({ item, score: score(prompt, textForItem(item), aliasesForItem(item)) }))
         .filter(result => result.score > 0)
         .sort((a, b) => b.score - a.score)[0]?.item || null;
+}
+
+function pageScore(prompt, page) {
+    const subject = extractQuerySubject(prompt) || prompt;
+    const title = safeText(page && page.title, 220);
+    const headings = Array.isArray(page && page.headings) ? page.headings.map(headingLabel).filter(Boolean) : [];
+    const keywords = Array.isArray(page && page.keywords) ? page.keywords : [];
+    const labels = [title, ...headings, ...keywords].filter(Boolean);
+    const normalizedSubject = normalize(subject);
+    if (!normalizedSubject || !labels.length) return 0;
+
+    const labelScores = labels.map(label => score(normalizedSubject, label));
+    const direct = labelScores.length ? Math.max(...labelScores) : 0;
+    const fuzzy = fuzzyPhraseScore(normalizedSubject, labels);
+    const queryWords = words(normalizedSubject).filter(word => word.length >= 3);
+    const labelText = normalize(labels.join(' '));
+    const labelHits = queryWords.filter(word => labelText.includes(word)).length;
+    const coverage = queryWords.length ? labelHits / queryWords.length : 0;
+    const content = normalize(safeText(page && page.content, 1600));
+    const contentHits = queryWords.filter(word => content.includes(word)).length;
+    let total = Math.max(direct, fuzzy);
+    total += Math.round(coverage * 70) + Math.min(24, contentHits * 6);
+    if (title && normalize(title) === normalizedSubject) total += 260;
+    else if (title && normalize(title).includes(normalizedSubject) && normalizedSubject.length >= 3) total += 150;
+    if (page && page.id === 'current-page' && direct < 90 && fuzzy < 50) total -= 35;
+    return Math.max(0, total);
+}
+
+function rankedPageMatches(items, prompt, limit = MAX_DESTINATION_CHOICES) {
+    const ranked = (items || [])
+        .map((item, index) => ({ item, index, score: pageScore(prompt, item) }))
+        .filter(result => result.score >= 48)
+        .sort((left, right) => right.score - left.score || left.index - right.index);
+    const seen = new Set();
+    return ranked.filter(result => {
+        const key = safeText(result.item && (result.item.url || result.item.id) || '/', 500);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    }).slice(0, limit);
+}
+
+function rankedLiveHeadingMatches(headings, subject, limit = MAX_DESTINATION_CHOICES) {
+    const seen = new Set();
+    return (headings || [])
+        .map((heading, index) => {
+            const title = headingLabel(heading);
+            return { item: { id: `heading-${index + 1}`, title }, index, score: livePageScore(subject, title) };
+        })
+        .filter(result => result.item.title && result.score >= 48 && !seen.has(normalize(result.item.title)) && seen.add(normalize(result.item.title)))
+        .sort((left, right) => right.score - left.score || left.index - right.index)
+        .slice(0, limit);
+}
+
+function resolutionState(ranked, strongScore = 220, minimumMargin = 55) {
+    const top = ranked && ranked[0];
+    const second = ranked && ranked[1];
+    if (!top) return { confidence: 'insufficient', ambiguous: false, margin: 0 };
+    const margin = second ? top.score - second.score : top.score;
+    const relativeMargin = second && top.score > 0 ? margin / top.score : 1;
+    const ambiguous = Boolean(second && margin < minimumMargin && relativeMargin < 0.24);
+    return {
+        confidence: ambiguous ? 'ambiguous' : top.score >= strongScore || margin >= minimumMargin ? 'high' : 'medium',
+        ambiguous,
+        margin: Math.round(margin)
+    };
+}
+
+function destinationItem({ id, title, subtitle, url, kind, score: matchScore, action }) {
+    return {
+        id: safeText(id || `${kind || 'destination'}-${normalize(title).slice(0, 80)}`, 160),
+        title: safeText(title, 220),
+        subtitle: safeText(subtitle, 320),
+        url: safeText(url, 500),
+        kind: safeText(kind || 'page', 40),
+        score: Math.max(0, Math.round(Number(matchScore) || 0)),
+        action: action || null
+    };
+}
+
+function destinationInteractive(query, items, confidence) {
+    return {
+        type: 'destination_choices',
+        query: safeText(query, 180),
+        persist: true,
+        compare: items.length > 1,
+        confidence,
+        items: items.filter(item => item && item.title && item.action).slice(0, MAX_DESTINATION_CHOICES)
+    };
 }
 
 function productScore(prompt, product) {
@@ -531,28 +624,102 @@ function productScore(prompt, product) {
     return total;
 }
 
-function rankedProductMatches(items, prompt, limit = 5) {
+function rankedProductCandidates(items, prompt, limit = MAX_DESTINATION_CHOICES) {
     const normalizedPrompt = normalize(prompt);
     const subject = extractQuerySubject(prompt);
     const hasSpecificBrandOrNumber = /[a-z][a-z0-9\-_]{1,}/i.test(subject) || /\d/.test(subject);
     const wantsList = PRODUCT_LIST_REQUEST.test(normalizedPrompt);
     const threshold = hasSpecificBrandOrNumber ? 42 : wantsList ? 45 : 50;
-    const ranked = items
+    const ranked = (items || [])
         .map((item, index) => ({ item, index, score: productScore(prompt, item) }))
         .filter(result => result.score >= threshold)
-        .sort((left, right) => right.score - left.score || left.index - right.index)
-        .map(result => result.item);
+        .sort((left, right) => right.score - left.score || left.index - right.index);
     const seen = new Set();
-    return ranked.filter(item => {
-        const key = normalize(item.name);
+    return ranked.filter(result => {
+        const key = normalize(result.item && result.item.name);
         if (!key || seen.has(key)) return false;
         seen.add(key);
         return true;
     }).slice(0, limit);
 }
 
+function rankedProductMatches(items, prompt, limit = MAX_DESTINATION_CHOICES) {
+    return rankedProductCandidates(items, prompt, limit).map(result => result.item);
+}
+
 function bestProductMatch(items, prompt) {
     return rankedProductMatches(items, prompt, 1)[0] || null;
+}
+
+function productAction(product, payload) {
+    return actionFor({
+        title: product.name,
+        url: product.url,
+        currentUrl: payload.url,
+        keywords: product.keywords || [],
+        permissions: payload.siteProfile && payload.siteProfile.permissions,
+        entityId: product.entityId,
+        selector: product.selector
+    });
+}
+
+function productDestination(product, payload, matchScore) {
+    const subtitle = Number.isFinite(product.price)
+        ? `ราคา ${product.price.toLocaleString('th-TH')} บาท`
+        : product.inStock === false ? 'สินค้าหมดชั่วคราว' : product.inStock === true ? 'มีสินค้า' : safeText(product.description || 'พบในเว็บไซต์', 160);
+    return destinationItem({
+        id: product.id,
+        title: product.name,
+        subtitle,
+        url: product.url,
+        kind: 'product',
+        score: matchScore,
+        action: productAction(product, payload)
+    });
+}
+
+function pageDestination(page, payload, matchScore) {
+    const destination = `${page.url || '/'}${page.anchor ? `#${String(page.anchor).replace(/^#/, '')}` : ''}`;
+    const title = safeText(page.title || headingLabel(page.headings && page.headings[0]) || 'หน้าที่เกี่ยวข้อง', 220);
+    return destinationItem({
+        id: page.id,
+        title,
+        subtitle: safeText((page.headings || []).map(headingLabel).filter(Boolean).slice(0, 3).join(' · ') || page.content || 'หน้าเว็บไซต์', 260),
+        url: destination,
+        kind: 'page',
+        score: matchScore,
+        action: actionFor({
+            title: headingLabel(page.headings && page.headings[0]) || title,
+            url: destination,
+            currentUrl: payload.url,
+            keywords: (page.headings || []).map(headingLabel).filter(Boolean),
+            permissions: payload.siteProfile && payload.siteProfile.permissions
+        })
+    });
+}
+
+function headingDestination(heading, payload, keywords, matchScore) {
+    const title = headingLabel(heading && heading.title || heading);
+    const action = actionFor({
+        title,
+        url: payload.url,
+        currentUrl: payload.url,
+        keywords: keywords && keywords.length ? keywords : [title],
+        permissions: payload.siteProfile && payload.siteProfile.permissions
+    });
+    if (action) {
+        action.exactHeading = title;
+        action.exactText = title;
+    }
+    return destinationItem({
+        id: heading && heading.id,
+        title,
+        subtitle: 'หัวข้อในหน้าปัจจุบัน',
+        url: payload.url,
+        kind: 'section',
+        score: matchScore,
+        action
+    });
 }
 
 // Server-side short-term memory to preserve context better than client payload alone
@@ -659,67 +826,51 @@ function explainProduct(product, payload) {
             } : null
         });
     }
-    return base(`${product.name} คือ ${description}${price}.${availability} ครับ`, {
-        action: actionFor({
-            title: product.name,
-            url: product.url,
-            currentUrl: payload.url,
-            keywords: product.keywords || [],
-            permissions: payload.siteProfile && payload.siteProfile.permissions,
-            entityId: product.entityId,
-            selector: product.selector
-        }),
-        interactive: {
-            type: 'carousel',
-            items: [{ title: product.name, subtitle: product.inStock === false ? 'สินค้าหมดชั่วคราว' : product.inStock === true ? 'มีสินค้า' : 'พบในเว็บไซต์', url: product.url }]
-        },
+    const item = productDestination(product, payload, productScore(product.name, product));
+    return base(`${product.name} คือ ${description}${price}.${availability} ครับ หากต้องการไปยังรายการนี้ให้เลือกแล้วยืนยัน`, {
+        action: item.action,
+        interactive: destinationInteractive(product.name, [item], 'high'),
         sources: [{ type: 'conversation_catalog', id: product.id, url: product.url }]
     });
 }
 
 function findProduct(knowledge, payload, prompt, preMatchedProducts = null) {
-    const products = preMatchedProducts || rankedProductMatches(knowledge.catalog, prompt);
-    if (!products.length) {
+    const ranked = preMatchedProducts
+        ? preMatchedProducts.map((result, index) => result && result.item
+            ? result
+            : { item: result, index, score: productScore(prompt, result) })
+        : rankedProductCandidates(knowledge.catalog, prompt);
+    if (!ranked.length) {
         // Redirect to unified search if called directly
         return searchUnified(knowledge, payload, prompt);
     }
 
+    const products = ranked.map(result => result.item);
     const product = products[0];
     const wantsList = PRODUCT_LIST_REQUEST.test(normalize(prompt));
-    const productItems = products.map(item => ({
-        title: item.name,
-        subtitle: Number.isFinite(item.price) ? `ราคา ${item.price.toLocaleString('th-TH')} บาท` : item.inStock === false ? 'สินค้าหมดชั่วคราว' : 'พบในหน้าร้าน',
-        url: item.url
-    }));
+    const resolution = resolutionState(ranked, 250, 70);
+    const productItems = ranked.map(result => productDestination(result.item, payload, result.score));
+    const interactive = destinationInteractive(extractQuerySubject(prompt) || prompt, productItems, resolution.confidence);
     if (wantsList) {
         const list = productItems.map(item => `${item.title}${item.subtitle.startsWith('ราคา') ? ` (${item.subtitle})` : ''}`).join(', ');
         return base(`ในร้านนี้พบ ${products.length} รายการ: ${list}`, {
-            interactive: { type: 'carousel', items: productItems },
+            interactive,
             sources: products.map(item => ({ type: 'catalog', id: item.id, url: item.url }))
         });
     }
 
-    const action = actionFor({
-        title: product.name,
-        url: product.url,
-        currentUrl: payload.url,
-        keywords: product.keywords || [],
-        permissions: payload.siteProfile && payload.siteProfile.permissions,
-        entityId: product.entityId,
-        selector: product.selector
-    });
     const price = Number.isFinite(product.price) ? ` ราคา ${product.price.toLocaleString('th-TH')} บาท` : '';
-    return base(`เจอ ${product.name}${price} ครับ ผมพาไปที่รายการนี้ให้แล้ว`, {
-        action,
-        interactive: {
-            type: 'carousel',
-            items: productItems
-        },
-        sources: [{ type: 'catalog', id: product.id, url: product.url }]
+    const reply = resolution.ambiguous
+        ? `พบหลายรายการที่ใกล้เคียงกับคำค้นของคุณ เลือกเปรียบเทียบแล้วกดยืนยันรายการที่ต้องการครับ`
+        : `เจอ ${product.name}${price} ครับ เลือกรายการแล้วกดยืนยันเพื่อวาร์ปไปยังข้อมูลจริง`;
+    return base(reply, {
+        action: resolution.ambiguous ? null : productItems[0].action,
+        interactive,
+        sources: products.map(item => ({ type: 'catalog', id: item.id, url: item.url }))
     });
 }
 
-function recommendProducts(knowledge) {
+function recommendProducts(knowledge, payload) {
     const seen = new Set();
     const products = knowledge.catalog.filter(product => {
         const key = normalize(product && product.name);
@@ -730,17 +881,11 @@ function recommendProducts(knowledge) {
     if (!products.length) {
         return base('ผมยังไม่พบรายการสินค้าที่แนะนำได้จากข้อมูลร้านนี้ครับ');
     }
-    const items = products.map(product => ({
-        title: product.name,
-        subtitle: Number.isFinite(product.price)
-            ? `ราคา ${product.price.toLocaleString('th-TH')} บาท`
-            : product.inStock === false ? 'สินค้าหมดชั่วคราว' : 'พบในหน้าร้าน',
-        url: product.url
-    }));
+    const items = products.map((product, index) => productDestination(product, payload, products.length - index));
     // A recommendation is a choice, not permission to navigate. Keep the
-    // visitor on the page and let them select an item from the carousel.
+    // visitor on the page until they select and confirm an item.
     return base(`ในร้านนี้มีรายการที่น่าสนใจ ${items.length} รายการ ลองเลือกดูได้เลยครับ`, {
-        interactive: { type: 'carousel', items },
+        interactive: destinationInteractive('สินค้าแนะนำ', items, 'browse'),
         sources: products.map(product => ({ type: 'catalog', id: product.id, url: product.url }))
     });
 }
@@ -767,13 +912,8 @@ function searchUnified(knowledge, payload, prompt) {
     // requests such as “พาไปหน้าสมัครใช้งาน AI Chat Widget”.
     const explicitPageIntent = /(?:พาไปหน้า|ไปหน้า|หน้าสมัคร|หน้าราคา|ราคา|แพ็กเกจ|pricing|page|section|หัวข้อ|บทความ|นโยบาย)/iu.test(normalize(prompt));
     if (explicitPageIntent && !locationRequest) {
-        const page = bestMatch(
-            knowledge.pages,
-            prompt,
-            item => `${item.title || ''} ${(item.headings || []).join(' ')} ${item.content || ''}`,
-            item => item.keywords || []
-        );
-        if (page) return findContent(knowledge, payload, prompt, page);
+        const pages = rankedPageMatches(knowledge.pages, prompt);
+        if (pages.length) return findContent(knowledge, payload, prompt, pages[0].item, pages);
     }
 
     const siteDNA = payload && payload.siteDNA || {};
@@ -782,28 +922,32 @@ function searchUnified(knowledge, payload, prompt) {
     const structuredEntities = Array.isArray(siteDNA.entityIndex) ? siteDNA.entityIndex : [];
     const liveContent = normalize(`${siteDNA.activeSectionText || ''} ${payload.pageContent || ''}`);
 
-    // An exact section heading is a stronger location signal than an article
-    // or card that merely mentions the same word in its body text.
-    const exactHeading = locationRequest && subject ? findExactLiveHeading(liveHeadings, subject) : '';
-    if (exactHeading) {
-        const action = actionFor({
-            title: exactHeading,
-            url: payload.url,
-            currentUrl: payload.url,
-            keywords: keywords.length ? keywords : [exactHeading],
-            permissions: payload.siteProfile && payload.siteProfile.permissions
-        });
-        if (action) {
-            action.exactHeading = exactHeading;
-            action.exactText = exactHeading;
+    // Rank every plausible live heading. Exact text remains strongest, while
+    // close alternatives survive so the visitor can resolve ambiguity.
+    if (locationRequest && subject) {
+        const exactHeading = findExactLiveHeading(liveHeadings, subject);
+        const headingMatches = rankedLiveHeadingMatches(liveHeadings, subject);
+        if (exactHeading) {
+            headingMatches.forEach(result => {
+                if (normalize(result.item.title) === normalize(exactHeading)) result.score += 500;
+            });
+            headingMatches.sort((left, right) => right.score - left.score || left.index - right.index);
         }
-        return base(action ? `พบหัวข้อ “${exactHeading}” บนหน้านี้แล้วครับ กำลังพาไปให้` : `พบหัวข้อ “${exactHeading}” บนหน้านี้แล้วครับ`, {
-            action,
-            sources: [{ type: 'heading', query: exactHeading }]
-        });
+        if (headingMatches.length) {
+            const resolution = resolutionState(headingMatches, 180, 45);
+            const items = headingMatches.map(result => headingDestination(result.item, payload, keywords, result.score));
+            const topTitle = items[0].title;
+            return base(resolution.ambiguous
+                ? 'พบหลายหัวข้อที่ใกล้เคียงกัน เลือกหัวข้อที่ต้องการแล้วกดยืนยันครับ'
+                : `พบหัวข้อ “${topTitle}” บนหน้านี้แล้วครับ เลือกแล้วยืนยันเพื่อวาร์ป`, {
+                action: resolution.ambiguous ? null : items[0].action,
+                interactive: destinationInteractive(subject, items, resolution.confidence),
+                sources: items.map(item => ({ type: 'heading', query: item.title }))
+            });
+        }
     }
 
-    const products = rankedProductMatches(knowledge.catalog, prompt);
+    const products = rankedProductCandidates(knowledge.catalog, prompt);
     if (products.length > 0) {
         return findProduct(knowledge, payload, prompt, products);
     }
@@ -846,13 +990,9 @@ function searchUnified(knowledge, payload, prompt) {
         }
     }
     if (bestStructured && bestStructuredScore >= 45) {
-        return findProduct({ ...knowledge, catalog: [bestStructured] }, payload, prompt, [bestStructured]);
+        return findProduct({ ...knowledge, catalog: [bestStructured] }, payload, prompt, [{ item: bestStructured, score: bestStructuredScore }]);
     } else if (bestStructured && bestStructuredScore >= 35) {
-        const warpKw = keywords.length > 0 ? keywords : [subject];
-        return base(`พบ “${bestStructured.name}” บนหน้านี้แล้วครับ กำลังพาไปให้`, {
-            action: { type: 'warp', targetText: bestStructured.name, selector: bestStructured.selector, keywords: warpKw, searchAll: false },
-            sources: [{ type: 'structured_entity', query: subject }]
-        });
+        return findProduct({ ...knowledge, catalog: [bestStructured] }, payload, prompt, [{ item: bestStructured, score: bestStructuredScore }]);
     }
 
     // Do not substitute a page heading for the phrase a visitor asked to find.
@@ -865,8 +1005,10 @@ function searchUnified(knowledge, payload, prompt) {
             permissions: payload.siteProfile && payload.siteProfile.permissions
         });
         if (action) action.exactText = subject;
-        return base(action ? `พบ “${subject}” บนหน้านี้แล้วครับ กำลังพาไปให้` : `พบ “${subject}” บนหน้านี้แล้วครับ`, {
+        const item = destinationItem({ id: 'live-page-exact', title: subject, subtitle: 'ข้อความในหน้าปัจจุบัน', url: payload.url, kind: 'section', score: 500, action });
+        return base(action ? `พบ “${subject}” บนหน้านี้แล้วครับ เลือกแล้วยืนยันเพื่อวาร์ป` : `พบ “${subject}” บนหน้านี้แล้วครับ`, {
             action,
+            interactive: destinationInteractive(subject, [item], 'high'),
             sources: [{ type: 'live_page', query: subject }]
         });
     }
@@ -883,49 +1025,43 @@ function searchUnified(knowledge, payload, prompt) {
     if (hasLiveMatch) {
         const cleanLive = bestLive ? String(bestLive).replace(/^h[1-6]:/i, '').replace(/\s*\([^)]*(?:฿|บาท|\d)[^)]*\)\s*$/u, '').trim() : subject;
         const warpKw = keywords.length > 0 ? keywords : [subject];
-        return base(`พบ “${cleanLive}” บนหน้านี้แล้วครับ กำลังพาไปให้`, {
-            action: { type: 'warp', targetText: cleanLive, keywords: warpKw, searchAll: false },
+        const action = actionFor({ title: cleanLive, url: payload.url, currentUrl: payload.url, keywords: warpKw, permissions: payload.siteProfile && payload.siteProfile.permissions });
+        const item = destinationItem({ id: 'live-page-match', title: cleanLive, subtitle: 'ข้อมูลในหน้าปัจจุบัน', url: payload.url, kind: 'section', score: bestLiveScore, action });
+        return base(`พบ “${cleanLive}” บนหน้านี้แล้วครับ เลือกแล้วยืนยันเพื่อวาร์ป`, {
+            action,
+            interactive: destinationInteractive(subject, [item], 'medium'),
             sources: [{ type: 'live_page', query: subject }]
         });
     }
 
-    const page = bestMatch(
-        knowledge.pages,
-        prompt,
-        item => `${item.title || ''} ${(item.headings || []).join(' ')} ${item.content || ''}`,
-        item => item.keywords || []
-    );
-    if (page) return findContent(knowledge, payload, prompt, page);
+    const pages = rankedPageMatches(knowledge.pages, prompt);
+    if (pages.length) return findContent(knowledge, payload, prompt, pages[0].item, pages);
 
     const wantsList = PRODUCT_LIST_REQUEST.test(normalize(prompt));
     return base(`กำลังค้นหา “${targetText}” ทั่วเว็บไซต์นี้ครับ`, {
-        action: { type: 'warp', targetText, keywords, searchAll: true, showResults: wantsList },
+        action: { type: 'warp', targetText, keywords, searchAll: true, showResults: true, wantsList },
         sources: [{ type: 'site_search', query: targetText }]
     });
 }
 
-function findContent(knowledge, payload, prompt, matchedPage = null) {
-    const page = matchedPage || bestMatch(
-        knowledge.pages,
-        prompt,
-        item => `${item.title || ''} ${(item.headings || []).join(' ')} ${item.content || ''}`,
-        item => item.keywords || []
-    );
+function findContent(knowledge, payload, prompt, matchedPage = null, preRankedPages = null) {
+    const ranked = preRankedPages || (matchedPage
+        ? [{ item: matchedPage, index: 0, score: pageScore(prompt, matchedPage) }]
+        : rankedPageMatches(knowledge.pages, prompt));
+    const page = ranked[0] && ranked[0].item;
     if (!page) {
         // Redirect to unified search fallback if called directly
         return searchUnified(knowledge, payload, prompt);
     }
-    const destination = `${page.url || '/'}${page.anchor ? `#${String(page.anchor).replace(/^#/, '')}` : ''}`;
-    const pageTitle = ((page.headings && page.headings[0]) || page.title || '').replace(/^h[1-6]:/i, '');
-    return base(`พบ "${pageTitle || page.title}" ครับ ผมพาไปยังจุดที่เกี่ยวข้องให้แล้ว`, {
-        action: actionFor({
-            title: pageTitle || page.title,
-            url: destination,
-            currentUrl: payload.url,
-            keywords: (page.headings || []).map(h => String(h).replace(/^h[1-6]:/i, '')),
-            permissions: payload.siteProfile && payload.siteProfile.permissions
-        }),
-        sources: [{ type: 'page', id: page.id, url: destination }]
+    const resolution = resolutionState(ranked, 210, 50);
+    const items = ranked.map(result => pageDestination(result.item, payload, result.score));
+    const top = items[0];
+    return base(resolution.ambiguous
+        ? 'พบหลายหน้าที่อาจตรงกับสิ่งที่ต้องการ เลือกเปรียบเทียบแล้วกดยืนยันหน้าที่ต้องการครับ'
+        : `พบ “${top.title}” ครับ เลือกแล้วยืนยันเพื่อไปยังข้อมูลจริง`, {
+        action: resolution.ambiguous ? null : top.action,
+        interactive: destinationInteractive(extractQuerySubject(prompt) || prompt, items, resolution.confidence),
+        sources: ranked.map(result => ({ type: 'page', id: result.item.id, url: result.item.url }))
     });
 }
 
@@ -1015,7 +1151,7 @@ function runIndicatorAgent(payload = {}) {
     if (contextualProduct && asksAboutPreviousProduct(prompt)) {
         result = explainProduct(contextualProduct, payload);
     } else switch (intent) {
-        case 'recommend_products': result = recommendProducts(knowledge); break;
+        case 'recommend_products': result = recommendProducts(knowledge, payload); break;
         case 'search_unified': result = searchUnified(knowledge, payload, prompt); break;
         case 'find_product': result = searchUnified(knowledge, payload, prompt); break;
         case 'find_content': result = searchUnified(knowledge, payload, prompt); break;
