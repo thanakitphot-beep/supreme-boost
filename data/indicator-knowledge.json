@@ -9,39 +9,13 @@
       "content": "หน้าแนะนำ INDICATOR WEB CHAT และฟีเจอร์ AI สำหรับเว็บไซต์ ฟีเจอร์ล้ำยุคระดับ God-Tier ได้แก่ Telekinesis Warp ระบบเลื่อนหน้าเว็บอัตโนมัติ Edge Breathing Glow ระบบแสดงผลแบบ AI และ AI แชทอัจฉริยะ"
     },
     {
-      "id": "pricing",
-      "title": "สมัครใช้งาน AI Chat Widget — แพ็กเกจ Starter, Pro Matrix, Enterprise",
-      "url": "/pricing.html",
-      "headings": ["ติดตั้ง AI ฉลาดลงเว็บคุณ", "แพ็กเกจการลงทุน", "Starter", "Pro Matrix", "Enterprise", "ราคา", "สมัคร"],
-      "keywords": ["ราคา", "แพ็กเกจ", "สมัคร", "pricing", "starter", "pro", "pro matrix", "enterprise", "ติดต่อ", "ติดต่อเรา", "ค่าบริการ", "ค่าใช้จ่าย", "subscription", "plan", "990", "2490", "990 บาท", "2490 บาท"],
+      "id": "plans",
+      "title": "แพ็กเกจและการสมัครใช้งาน INDICATOR",
+      "url": "/",
+      "anchor": "pricing",
+      "headings": ["แพ็กเกจการลงทุน", "Starter", "Pro", "Enterprise"],
+      "keywords": ["สมัครใช้งาน ai chat widget", "ai chat widget", "ติดตั้ง ai", "ราคา", "แพ็กเกจ", "สมัคร", "pricing", "starter", "pro", "pro matrix", "enterprise", "ติดต่อ", "ติดต่อเรา", "ค่าบริการ", "ค่าใช้จ่าย", "subscription", "plan", "990", "2490", "990 บาท", "2490 บาท"],
       "content": "เปรียบเทียบแพ็กเกจ INDICATOR และเริ่มสมัครใช้งาน แพ็กเกจ Starter ราคา 990 บาทต่อเดือน สำหรับเว็บไซต์ขนาดเล็ก แพ็กเกจ Pro Matrix ราคา 2490 บาทต่อเดือน ปลดล็อกพลัง Sci-Fi เต็มรูปแบบ แพ็กเกจ Enterprise ราคาติดต่อเรา สำหรับองค์กรที่ต้องการปรับแต่ง AI และไม่จำกัดข้อความ มี Custom Widget Design และ SLA Support 24/7"
-    },
-    {
-      "id": "pricing-enterprise",
-      "title": "แพ็กเกจ Enterprise — ติดต่อเรา",
-      "url": "/pricing.html",
-      "anchor": "enterprise",
-      "headings": ["Enterprise", "ติดต่อทีมขาย", "Custom Widget Design", "SLA Support 24/7"],
-      "keywords": ["enterprise", "ติดต่อ", "ติดต่อเรา", "ไม่จำกัดข้อความ", "custom", "sla", "องค์กร", "บริษัท", "enterprise plan", "ปรับแต่ง"],
-      "content": "แพ็กเกจ Enterprise สำหรับองค์กรที่ต้องการปรับแต่ง AI และไม่จำกัดข้อความ ไม่จำกัดข้อความต่อเดือน ป้อนข้อมูล Knowledge Base (RAG) ขั้นสูง Custom Widget Design SLA Support 24/7 ราคาติดต่อเรา"
-    },
-    {
-      "id": "pricing-starter",
-      "title": "แพ็กเกจ Starter — 990 บาท/เดือน",
-      "url": "/pricing.html",
-      "anchor": "starter",
-      "headings": ["Starter", "990 บาท/เดือน", "เริ่มต้นใช้งาน"],
-      "keywords": ["starter", "990", "เริ่มต้น", "ราคาถูก", "ขนาดเล็ก", "1000 ข้อความ"],
-      "content": "แพ็กเกจ Starter ราคา 990 บาทต่อเดือน เหมาะสำหรับเว็บไซต์ขนาดเล็กที่ต้องการผู้ช่วยตอบคำถาม AI แชทตอบคำถาม 1000 ข้อความต่อเดือน เรียนรู้ข้อมูลเว็บไซต์อัตโนมัติ"
-    },
-    {
-      "id": "pricing-pro",
-      "title": "แพ็กเกจ Pro Matrix — 2,490 บาท/เดือน",
-      "url": "/pricing.html",
-      "anchor": "pro",
-      "headings": ["Pro Matrix", "2490 บาท/เดือน", "เลือกแพ็กเกจนี้"],
-      "keywords": ["pro", "pro matrix", "2490", "ยอดนิยม", "sci-fi", "10000 ข้อความ", "telekinesis warp", "edge breathing glow"],
-      "content": "แพ็กเกจ Pro Matrix ราคา 2490 บาทต่อเดือน ยอดนิยม ปลดล็อกพลัง Sci-Fi เต็มรูปแบบ AI แชท 10000 ข้อความต่อเดือน ระบบ Edge Breathing Glow ระบบ Telekinesis Warp รองรับ 2 ภาษาหลัก TH/EN"
     },
     {
       "id": "megastore",
@@ -60,7 +34,7 @@
       "description": "เหมาะสำหรับเว็บไซต์ขนาดเล็ก แชท 1,000 ข้อความ/เดือน",
       "price": 990,
       "inStock": true,
-      "url": "/pricing.html#starter",
+      "url": "/#plan-starter",
       "keywords": ["starter", "เริ่มต้น", "ราคาถูก", "ขนาดเล็ก"]
     },
     {
@@ -69,7 +43,7 @@
       "description": "ยอดนิยม ปลดล็อกพลัง Sci-Fi เต็มรูปแบบ แชท 10,000 ข้อความ",
       "price": 2490,
       "inStock": true,
-      "url": "/pricing.html#pro",
+      "url": "/#plan-pro",
       "keywords": ["pro", "matrix", "ยอดนิยม", "sci-fi"]
     },
     {
@@ -78,7 +52,7 @@
       "description": "สำหรับองค์กร ไม่จำกัดข้อความ และ Custom RAG",
       "price": "ติดต่อเรา",
       "inStock": true,
-      "url": "/pricing.html#enterprise",
+      "url": "/#plan-enterprise",
       "keywords": ["enterprise", "องค์กร", "ไม่จำกัด"]
     }
   ],

@@ -4,7 +4,6 @@
   "rewrites": [
     { "source": "/admin", "destination": "/admin-dashboard.html" },
     { "source": "/login", "destination": "/admin-login.html" },
-    { "source": "/pricing", "destination": "/pricing.html" },
     { "source": "/customer-login", "destination": "/customer-login.html" },
     { "source": "/dashboard", "destination": "/customer-dashboard.html" },
     { "source": "/customer-dashboard", "destination": "/customer-dashboard.html" },

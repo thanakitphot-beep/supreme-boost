@@ -111,8 +111,6 @@ function serveStatic(req, res, pathname) {
         filePath = path.join(__dirname, 'admin-dashboard.html');
     } else if (pathname === '/login') {
         filePath = path.join(__dirname, 'admin-login.html');
-    } else if (pathname === '/pricing') {
-        filePath = path.join(__dirname, 'pricing.html');
     } else if (pathname === '/customer-login') {
         filePath = path.join(__dirname, 'customer-login.html');
     } else if (pathname === '/dashboard' || pathname === '/customer-dashboard') {
@@ -241,7 +239,7 @@ function handleRequest(req, res) {
     }
 
     // --- Serve static files and extensionless routes for local testing ---
-    if (pathname === '/' || pathname === '/admin' || pathname === '/login' || pathname === '/pricing' || pathname === '/customer-login' || pathname === '/dashboard' || pathname === '/customer-dashboard') {
+    if (pathname === '/' || pathname === '/admin' || pathname === '/login' || pathname === '/customer-login' || pathname === '/dashboard' || pathname === '/customer-dashboard') {
         return serveStatic(req, res, pathname);
     }
     // Direct .html access

@@ -1,7 +1,6 @@
 const { runIndicatorAgent } = require('../../services/indicatorAgent');
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
 const { resolveSiteProfile, originIsAllowed, inferSiteIdentity } = require('../../services/siteProfiles');
 
 describe('INDICATOR owned agent — contract', () => {
@@ -112,14 +111,14 @@ describe('INDICATOR owned agent — contract', () => {
         expect(result.action).toMatchObject({ type: 'warp', targetText: 'กางเกงวอร์ม 3 ส่วน' });
     });
 
-    test('navigates to a known same-origin page', () => {
+    test('warps to the pricing section instead of a duplicate page', () => {
         const result = runIndicatorAgent({
             prompt: 'พาไปหน้าสมัครใช้งาน AI Chat Widget',
             url: 'http://localhost:3000/',
             locale: 'th',
             siteProfile: resolveSiteProfile('INDICATOR_TEST')
         });
-        expect(result.action).toMatchObject({ type: 'navigate', url: '/pricing.html', confirmationRequired: true });
+        expect(result.action).toMatchObject({ type: 'warp', targetText: 'แพ็กเกจการลงทุน', confirmationRequired: true });
         expect(result.interactive.type).toBe('destination_choices');
     });
 
@@ -432,10 +431,15 @@ describe('INDICATOR owned agent — contract', () => {
         expect(source).not.toContain('if (r[0].score > 0) { navigate');
     });
 
-    test('the pricing page inline script compiles', () => {
-        const html = fs.readFileSync(path.resolve(__dirname, '../../pricing.html'), 'utf8');
-        const inlineScript = html.match(/<script>\s*([\s\S]*?)<\/script>/i);
-        expect(inlineScript).not.toBeNull();
-        expect(() => new vm.Script(inlineScript[1])).not.toThrow();
+    test('removes the duplicate pricing destination from routes and knowledge', () => {
+        const server = fs.readFileSync(path.resolve(__dirname, '../../server.js'), 'utf8');
+        const vercel = fs.readFileSync(path.resolve(__dirname, '../../vercel.json'), 'utf8');
+        const knowledge = fs.readFileSync(path.resolve(__dirname, '../../data/indicator-knowledge.json'), 'utf8');
+
+        expect(fs.existsSync(path.resolve(__dirname, '../../pricing.html'))).toBe(false);
+        expect(server).not.toContain("pathname === '/pricing'");
+        expect(vercel).not.toContain('"source": "/pricing"');
+        expect(knowledge).not.toContain('/pricing.html');
+        expect(knowledge).toContain('/#plan-pro');
     });
 });

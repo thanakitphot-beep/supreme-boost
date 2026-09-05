@@ -5,7 +5,6 @@ const vm = require('vm');
 describe('Shared product visual system', () => {
     const pages = [
         'index.html',
-        'pricing.html',
         'customer-login.html',
         'admin-login.html',
         'customer-dashboard.html',
