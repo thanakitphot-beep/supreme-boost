@@ -13,11 +13,13 @@ class GroqProvider extends BaseProvider {
             ...messages
         ];
 
+        const configuredTokens = Number.parseInt(process.env.AI_GROQ_MAX_TOKENS, 10);
+        const maxTokens = options.maxTokens ?? (Number.isFinite(configuredTokens) ? Math.max(64, Math.min(configuredTokens, 4096)) : 512);
         const body = {
             model,
             messages: payloadMessages,
-            temperature: options.temperature || 0.7,
-            max_tokens: options.maxTokens || 1024,
+            temperature: options.temperature ?? 0.3,
+            max_tokens: maxTokens,
             response_format: { type: "json_object" }
         };
 
@@ -38,6 +40,8 @@ class GroqProvider extends BaseProvider {
             const err = new Error(errorMsg);
             err.status = res.status;
             err.isRateLimit = isRateLimit;
+            const retryAfter = res.headers?.get('retry-after');
+            if (retryAfter) err.retryAfterMs = /^\d+(?:\.\d+)?$/.test(retryAfter) ? Number(retryAfter) * 1000 : Math.max(0, Date.parse(retryAfter) - Date.now());
             throw err;
         }
 

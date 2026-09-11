@@ -7,6 +7,7 @@
     "check": "node --check api/chat.js && node --check src/widget/main.js",
     "test": "jest --testPathPatterns=tests/contracts --runInBand --forceExit --detectOpenHandles",
     "test:watch": "jest --testPathPatterns=tests/contracts --runInBand --watch",
+    "eval:thai:live": "node evals/run-thai-assistant.js --live",
     "dev": "nodemon server.js",
     "start": "node server.js",
     "prod": "pm2 start server.js --name supreme-boost --watch --ignore-watch=\"node_modules\"",

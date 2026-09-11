@@ -26,9 +26,9 @@ function defaultProvider() {
 function modelMatchesProvider(provider, model) {
     const value = String(model || '').toLowerCase();
     if (!value) return false;
-    if (provider === 'openai') return value.startsWith('gpt-') || value.startsWith('o');
+    if (provider === 'openai') return value.startsWith('gpt-') || value.startsWith('o') || value.startsWith('ft:gpt-');
     if (provider === 'gemini') return value.startsWith('gemini-');
-    if (provider === 'groq') return /^(llama|mixtral|qwen|deepseek)/.test(value);
+    if (provider === 'groq') return /^(llama|mixtral|qwen|deepseek|meta-llama\/|openai\/gpt-oss-|groq\/)/.test(value);
     return provider === 'local';
 }
 
@@ -64,10 +64,15 @@ class CircuitBreaker {
         state.probeInFlight = false;
     }
 
-    recordFailure(providerName) {
+    recordFailure(providerName, error) {
         const state = this.getState(providerName);
         state.probeInFlight = false;
         state.failures++;
+        if (error?.status === 429) {
+            state.status = 'OPEN';
+            state.nextTry = Date.now() + Math.max(1000, Math.min(Number(error.retryAfterMs) || 60000, 300000));
+            return;
+        }
         if (state.failures >= this.maxFailures) {
             state.status = 'OPEN';
             state.nextTry = Date.now() + Math.min(this.resetTimeout * Math.pow(2, state.failures - this.maxFailures), 300000);
@@ -126,7 +131,8 @@ class ModelRouter {
         const fallback = this.getProvider(process.env.AI_FALLBACK_PROVIDER || 'groq');
         const candidates = [primary, fallback]
             .concat(['gemini', 'groq', 'openai', 'local'].map(name => this.getProvider(name)))
-            .filter((provider, index, list) => list.findIndex(item => item.name === provider.name) === index);
+            .filter((provider, index, list) => list.findIndex(item => item.name === provider.name) === index)
+            .filter(provider => providerHasCredentials(provider.name));
         let lastError = null;
 
         for (const currentProvider of candidates) {
@@ -136,21 +142,31 @@ class ModelRouter {
             }
 
             for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                const remaining = deadlineAt - Date.now();
+                if (remaining < 1000) throw new Error('AI request deadline exceeded');
                 if (!this.circuitBreaker.canAttempt(currentProvider.name)) {
                     lastError = new Error(`${currentProvider.name} circuit is open`);
                     break;
                 }
-                const remaining = deadlineAt - Date.now();
-                if (remaining < 1000) throw new Error('AI request deadline exceeded');
-
                 const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), Math.min(perAttemptTimeout, remaining));
+                const hasFallback = candidates.indexOf(currentProvider) < candidates.length - 1;
+                const attemptBudget = Math.min(perAttemptTimeout, hasFallback ? Math.max(1000, Math.floor(remaining / 2)) : remaining);
+                let timeout;
+                const timedOut = new Promise((_, reject) => {
+                    timeout = setTimeout(() => {
+                        controller.abort();
+                        const error = new Error('AI provider timed out');
+                        error.name = 'AbortError';
+                        reject(error);
+                    }, attemptBudget);
+                });
                 const startedAt = Date.now();
                 try {
                     logEvent('info', 'Calling provider', { provider: currentProvider.name, attempt: attempt + 1, requestId });
                     const providerOptions = { ...options, signal: controller.signal };
                     if (!modelMatchesProvider(currentProvider.name, providerOptions.model)) delete providerOptions.model;
-                    const response = await currentProvider.instance.generate(payload, providerOptions);
+                    const response = await Promise.race([currentProvider.instance.generate(payload, providerOptions), timedOut]);
+                    if (typeof response !== 'string' || !response.trim()) throw new Error('AI provider returned an empty response');
                     clearTimeout(timeout);
                     this.circuitBreaker.recordSuccess(currentProvider.name);
                     return {
@@ -160,7 +176,7 @@ class ModelRouter {
                 } catch (error) {
                     clearTimeout(timeout);
                     lastError = error;
-                    this.circuitBreaker.recordFailure(currentProvider.name);
+                    this.circuitBreaker.recordFailure(currentProvider.name, error);
                     logEvent('warn', 'Provider failed', {
                         provider: currentProvider.name,
                         attempt: attempt + 1,
@@ -168,6 +184,10 @@ class ModelRouter {
                         status: error && error.status,
                         aborted: error && error.name === 'AbortError'
                     });
+                    // Permanent client errors cannot improve on retry. On timeout,
+                    // reserve the remaining request budget for another provider.
+                    if ((error.status >= 400 && error.status < 500 && ![408, 429].includes(error.status)) ||
+                        error.status === 429 || (hasFallback && error.name === 'AbortError')) break;
                     if (attempt < maxRetries && deadlineAt - Date.now() > 1500) {
                         await new Promise(resolve => setTimeout(resolve, Math.min(500 * (attempt + 1), 1000)));
                     }

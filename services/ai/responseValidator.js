@@ -7,7 +7,8 @@ const RESPONSE_SCHEMA = {
         action: { 
             type: ["object", "null"],
             properties: {
-                type: { type: "string" }
+                type: { type: "string" },
+                target_keyword: { type: "string" }
             }
         },
         cssCommand: { type: ["string", "null"] },
@@ -39,7 +40,7 @@ function validateResponse(rawResponse, requestId) {
     const parsed = safeParseJson(rawResponse);
     
     if (!parsed) {
-        logEvent('warn', 'Failed to parse JSON', { requestId, rawResponse: rawResponse.slice(0, 100) });
+        logEvent('warn', 'Failed to parse JSON', { requestId });
         return {
             isValid: false,
             error: 'Invalid JSON format',
@@ -48,7 +49,7 @@ function validateResponse(rawResponse, requestId) {
     }
 
     // Basic schema validation
-    if (typeof parsed.reply !== 'string') {
+    if (typeof parsed !== 'object' || Array.isArray(parsed) || typeof parsed.reply !== 'string' || !parsed.reply.trim()) {
         logEvent('warn', 'Response missing required reply string', { requestId });
         return {
             isValid: false,
@@ -57,8 +58,13 @@ function validateResponse(rawResponse, requestId) {
         };
     }
 
-    // Ensure metadata exists
-    parsed.metadata = parsed.metadata || {};
+    const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+    if ((parsed.action != null && (!isObject(parsed.action) || typeof parsed.action.type !== 'string' || !parsed.action.type.trim())) ||
+        (parsed.cssCommand != null && typeof parsed.cssCommand !== 'string') ||
+        (parsed.interactive != null && !isObject(parsed.interactive))) {
+        return { isValid: false, error: 'Invalid action, cssCommand, or interactive field', parsed: null };
+    }
+    parsed.metadata = isObject(parsed.metadata) ? parsed.metadata : {};
 
     return {
         isValid: true,

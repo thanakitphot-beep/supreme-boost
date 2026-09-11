@@ -1,6 +1,7 @@
 (function () {
     "use strict";
     var VisitorIntent = require("./intentEngine");
+    var SessionStorage = require("./sessionStore");
     var _cs = document.currentScript;
     console.log("[INDICATOR] Website assistant ready");
 
@@ -86,7 +87,8 @@
     window.SupremeBoost = window.SupremeBoost || {};
     window.SupremeBoost.plugins = window.SupremeBoost.plugins || {};
     window.SupremeBoost.registerPlugin = function (name, pluginObj) {
-        if (!name || !pluginObj) return false;
+        if (typeof name !== "string" || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(name) || !pluginObj || typeof pluginObj.execute !== "function") return false;
+        if (["constructor", "prototype", "__proto__"].indexOf(name) !== -1) return false;
         window.SupremeBoost.plugins[name] = pluginObj;
         console.log("[SupremeBoost] Plugin registered:", name);
         if (typeof pluginObj.onInit === 'function') {
@@ -94,6 +96,20 @@
         }
         return true;
     };
+    function clientCapabilities() {
+        var plugins = Object.keys(window.SupremeBoost.plugins).slice(0, 20).filter(function (name) {
+            return /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(name) && typeof window.SupremeBoost.plugins[name].execute === "function";
+        }).map(function (name) {
+            var plugin = window.SupremeBoost.plugins[name];
+            var parameters = null;
+            try { var json = JSON.stringify(plugin.parameters || {}); if (json.length <= 4000) parameters = JSON.parse(json); } catch (_) { }
+            return { name: name, description: String(plugin.description || "").slice(0, 300), parameters: parameters || {}, requiresConfirmation: plugin.requiresConfirmation !== false };
+        });
+        var actions = ["warp", "navigate", "warp_cross_page", "highlight", "handoff", "confetti"];
+        if (window.speechSynthesis) actions.push("speech");
+        if (plugins.length) actions.push("plugin_action");
+        return { version: 1, actions: actions, plugins: plugins };
+    }
     // --------------------------------
 
     function ready(cb) { if (document.readyState !== "loading") { cb(); return; } document.addEventListener("DOMContentLoaded", cb, { once: true }); setTimeout(cb, 2000); }
@@ -475,18 +491,7 @@
         });
     }
 
-    var SessionDB = {
-        _db: null, _ready: false, _queue: [],
-        init: function () { if (this._ready || this._initializing) return; this._initializing = true; try { var req = indexedDB.open("SupremeBoost", 1); req.onupgradeneeded = function (e) { var db = e.target.result; if (!db.objectStoreNames.contains("mem")) db.createObjectStore("mem", { keyPath: "key" }); if (!db.objectStoreNames.contains("cart")) db.createObjectStore("cart", { keyPath: "id" }); if (!db.objectStoreNames.contains("prefs")) db.createObjectStore("prefs", { keyPath: "k" }); }; var self = this; req.onsuccess = function (e) { self._db = e.target.result; self._ready = true; self._drain(); }; req.onerror = function () { self._ready = false; }; } catch (_) { this._ready = false; } },
-        _drain: function () { var q = this._queue; this._queue = []; for (var i = 0; i < q.length; i++) { var item = q[i]; if (item.op === "get") this.get(item.store, item.key).then(item.resolve); else if (item.op === "set") this.set(item.store, item.key, item.value); } },
-        _tx: function (store, mode) { if (!this._db) return null; try { return this._db.transaction(store, mode).objectStore(store); } catch (_) { return null; } },
-        get: function (store, key) { return new Promise(function (resolve) { var self = this; if (!self._db || !self._ready) { self._queue.push({ op: "get", store: store, key: key, resolve: resolve }); return; } try { var tx = self._tx(store, "readonly"); if (!tx) return resolve(null); var req = tx.get(key); req.onsuccess = function () { resolve(req.result ? req.result.value : null); }; req.onerror = function () { resolve(null); }; } catch (_) { resolve(null); } }.bind(this)); },
-        set: function (store, key, value) { var self = this; if (!self._db || !self._ready) { self._queue.push({ op: "set", store: store, key: key, value: value }); return; } try { var tx = self._tx(store, "readwrite"); if (tx) tx.put({ key: key, value: value, ts: Date.now() }); } catch (_) { } },
-        getCart: function () { return this.get("cart", "current").then(function (v) { return v || []; }); },
-        setCart: function (items) { this.set("cart", "current", items); },
-        getPref: function (k) { return this.get("prefs", k); },
-        setPref: function (k, v) { this.set("prefs", k, v); }
-    };
+    var SessionDB = SessionStorage.createSessionStore(window.indexedDB);
 
     // ─── Behavioral Observer ──────────────────────────────────────
 

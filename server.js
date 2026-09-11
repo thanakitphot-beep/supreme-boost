@@ -4,6 +4,7 @@ const path = require('path');
 const socketIo = require('socket.io');
 const keepAlive = require('./services/keepAlive');
 const { isOriginAllowed, setCorsHeaders } = require('./services/cors');
+const { isPublicAsset } = require('./services/publicAssets');
 
 // ─── Global System Logs Interceptor ───
 global.systemLogs = [];
@@ -258,9 +259,9 @@ function handleRequest(req, res) {
         '.json': 'application/json'
     };
     const ext = path.extname(pathname).toLowerCase();
-    if (ext && extmap[ext]) {
+    if (ext && extmap[ext] && isPublicAsset(pathname)) {
         const filePath = path.join(__dirname, pathname);
-        if (fs.existsSync(filePath)) {
+        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
             res.writeHead(200, { 'Content-Type': extmap[ext] });
             return res.end(fs.readFileSync(filePath));
         }
