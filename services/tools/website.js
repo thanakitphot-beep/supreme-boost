@@ -3,9 +3,9 @@ const ok = data => ({ success: true, status: 'completed', data });
 const fail = message => ({ success: false, status: 'error', error: { code: 'INSUFFICIENT_EVIDENCE', message } });
 const str = (v, n = 600) => typeof v === 'string' ? v.slice(0, n) : '';
 function records(payload = {}) {
-    const catalog = payload.siteProfile?.knowledge?.catalog || [];
-    const entities = payload.siteDNA?.entityIndex || [];
-    const rows = [...entities, ...catalog].slice(0, 240).map((item, index) => ({
+    const catalog = Array.isArray(payload.siteProfile?.knowledge?.catalog) ? payload.siteProfile.knowledge.catalog : [];
+    const entities = Array.isArray(payload.siteDNA?.entityIndex) ? payload.siteDNA.entityIndex : [];
+    const rows = [...entities, ...catalog].filter(item => item && typeof item === 'object').slice(0, 240).map((item, index) => ({
         id: str(item.id || item.entityId, 160) || 'product-' + index,
         title: str(item.title || item.name, 220), description: str(item.description),
         price: typeof item.price === 'number' && Number.isFinite(item.price) ? item.price : null,

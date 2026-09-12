@@ -21,7 +21,7 @@ function providerHasCredentials(name) {
 }
 
 function defaultProvider() {
-    return ['openai', 'gemini', 'groq', 'local'].find(providerHasCredentials) || 'groq';
+    return ['gemini', 'groq', 'openai', 'local'].find(providerHasCredentials) || 'groq';
 }
 
 function modelMatchesProvider(provider, model) {
@@ -69,6 +69,11 @@ class CircuitBreaker {
         const state = this.getState(providerName);
         state.probeInFlight = false;
         state.failures++;
+        if ([401, 403, 404].includes(error?.status)) {
+            state.status = 'OPEN';
+            state.nextTry = Date.now() + 300000;
+            return;
+        }
         if (error?.status === 429) {
             state.status = 'OPEN';
             state.nextTry = Date.now() + Math.max(1000, Math.min(Number(error.retryAfterMs) || 60000, 300000));
@@ -171,7 +176,11 @@ class ModelRouter {
                     logEvent('info', 'Calling provider', { provider: currentProvider.name, attempt: attempt + 1, requestId });
                     const providerOptions = { ...options, maxTokens, signal: controller.signal };
                     delete providerOptions.tokenBudget;
-                    if (!modelMatchesProvider(currentProvider.name, providerOptions.model)) delete providerOptions.model;
+                    if (!modelMatchesProvider(currentProvider.name, providerOptions.model)) {
+                        const configured = process.env['AI_' + currentProvider.name.toUpperCase() + '_MODEL'];
+                        const shared = [process.env.AI_NORMAL_MODEL, process.env.AI_FALLBACK_MODEL].find(model => modelMatchesProvider(currentProvider.name, model));
+                        providerOptions.model = configured || shared || { openai: 'gpt-4o-mini', gemini: 'gemini-2.5-flash', groq: 'qwen/qwen3.8-27b', local: process.env.LOCAL_AI_MODEL || 'local-model' }[currentProvider.name];
+                    }
                     const response = await Promise.race([currentProvider.instance.generate(payload, providerOptions), timedOut]);
                     if (typeof response !== 'string' || !response.trim()) throw new Error('AI provider returned an empty response');
                     clearTimeout(timeout);

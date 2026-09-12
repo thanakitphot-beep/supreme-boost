@@ -28,4 +28,14 @@ describe('request token limits', () => {
         expect(selectTools(tools, 'compare these products').map(t => t.name)).toEqual(['search_website', 'compare_products']);
         expect(selectTools(tools, 'hello')).toEqual([]);
     });
+    test('fallback uses a model belonging to the selected provider', async () => {
+        process.env.AI_NORMAL_MODEL = 'gpt-4o-mini';
+        process.env.GEMINI_API_KEY = 'test';
+        process.env.AI_FALLBACK_PROVIDER = 'gemini';
+        const router = new ModelRouter();
+        router.providers.openai.generate = jest.fn().mockRejectedValue(Object.assign(new Error('quota'), { status: 429 }));
+        router.providers.gemini.generate = jest.fn().mockResolvedValue('{"reply":"ok"}');
+        await router.generateWithRetry({ system: 'test', messages: [] });
+        expect(router.providers.gemini.generate.mock.calls[0][1].model).toBe('gemini-2.5-flash');
+    });
 });
