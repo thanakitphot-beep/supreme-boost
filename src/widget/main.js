@@ -1,6 +1,7 @@
 (function () {
     "use strict";
     var VisitorIntent = require("./intentEngine");
+    var SessionStorage = require("./sessionStore");
     var _cs = document.currentScript;
     console.log("[INDICATOR] Website assistant ready");
 
@@ -86,7 +87,8 @@
     window.SupremeBoost = window.SupremeBoost || {};
     window.SupremeBoost.plugins = window.SupremeBoost.plugins || {};
     window.SupremeBoost.registerPlugin = function (name, pluginObj) {
-        if (!name || !pluginObj) return false;
+        if (typeof name !== "string" || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(name) || !pluginObj || typeof pluginObj.execute !== "function") return false;
+        if (["constructor", "prototype", "__proto__"].indexOf(name) !== -1) return false;
         window.SupremeBoost.plugins[name] = pluginObj;
         console.log("[SupremeBoost] Plugin registered:", name);
         if (typeof pluginObj.onInit === 'function') {
@@ -94,6 +96,20 @@
         }
         return true;
     };
+    function clientCapabilities() {
+        var plugins = Object.keys(window.SupremeBoost.plugins).slice(0, 20).filter(function (name) {
+            return /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(name) && typeof window.SupremeBoost.plugins[name].execute === "function";
+        }).map(function (name) {
+            var plugin = window.SupremeBoost.plugins[name];
+            var parameters = null;
+            try { var json = JSON.stringify(plugin.parameters || {}); if (json.length <= 4000) parameters = JSON.parse(json); } catch (_) { }
+            return { name: name, description: String(plugin.description || "").slice(0, 300), parameters: parameters || {}, requiresConfirmation: plugin.requiresConfirmation !== false };
+        });
+        var actions = ["warp", "navigate", "warp_cross_page", "highlight", "handoff", "confetti"];
+        if (window.speechSynthesis) actions.push("speech");
+        if (plugins.length) actions.push("plugin_action");
+        return { version: 1, actions: actions, plugins: plugins };
+    }
     // --------------------------------
 
     function ready(cb) { if (document.readyState !== "loading") { cb(); return; } document.addEventListener("DOMContentLoaded", cb, { once: true }); setTimeout(cb, 2000); }
@@ -475,18 +491,7 @@
         });
     }
 
-    var SessionDB = {
-        _db: null, _ready: false, _queue: [],
-        init: function () { if (this._ready || this._initializing) return; this._initializing = true; try { var req = indexedDB.open("SupremeBoost", 1); req.onupgradeneeded = function (e) { var db = e.target.result; if (!db.objectStoreNames.contains("mem")) db.createObjectStore("mem", { keyPath: "key" }); if (!db.objectStoreNames.contains("cart")) db.createObjectStore("cart", { keyPath: "id" }); if (!db.objectStoreNames.contains("prefs")) db.createObjectStore("prefs", { keyPath: "k" }); }; var self = this; req.onsuccess = function (e) { self._db = e.target.result; self._ready = true; self._drain(); }; req.onerror = function () { self._ready = false; }; } catch (_) { this._ready = false; } },
-        _drain: function () { var q = this._queue; this._queue = []; for (var i = 0; i < q.length; i++) { var item = q[i]; if (item.op === "get") this.get(item.store, item.key).then(item.resolve); else if (item.op === "set") this.set(item.store, item.key, item.value); } },
-        _tx: function (store, mode) { if (!this._db) return null; try { return this._db.transaction(store, mode).objectStore(store); } catch (_) { return null; } },
-        get: function (store, key) { return new Promise(function (resolve) { var self = this; if (!self._db || !self._ready) { self._queue.push({ op: "get", store: store, key: key, resolve: resolve }); return; } try { var tx = self._tx(store, "readonly"); if (!tx) return resolve(null); var req = tx.get(key); req.onsuccess = function () { resolve(req.result ? req.result.value : null); }; req.onerror = function () { resolve(null); }; } catch (_) { resolve(null); } }.bind(this)); },
-        set: function (store, key, value) { var self = this; if (!self._db || !self._ready) { self._queue.push({ op: "set", store: store, key: key, value: value }); return; } try { var tx = self._tx(store, "readwrite"); if (tx) tx.put({ key: key, value: value, ts: Date.now() }); } catch (_) { } },
-        getCart: function () { return this.get("cart", "current").then(function (v) { return v || []; }); },
-        setCart: function (items) { this.set("cart", "current", items); },
-        getPref: function (k) { return this.get("prefs", k); },
-        setPref: function (k, v) { this.set("prefs", k, v); }
-    };
+    var SessionDB = SessionStorage.createSessionStore(window.indexedDB);
 
     // ─── Behavioral Observer ──────────────────────────────────────
 
@@ -626,7 +631,28 @@
     var InteractiveWhisper = {
         _el: null, _container: null, _shadow: null,
         init: function (shadow) { this._shadow = shadow; this._el = shadow.querySelector(".sb-interactive"); this._container = shadow.querySelector(".sb-whisper-container"); },
-        render: function (interactive, locale) { if (!interactive || !interactive.type || !this._container) return; var strings = t(locale); switch (interactive.type) { case "destination_choices": if (_msgs) renderDestinationChoices(interactive, _msgs, locale); return; case "carousel": if (interactive.items && interactive.items.length) { InlineShelf.show(interactive.items, locale); } return; default: break; }this._container.innerHTML = ""; var wrapper = document.createElement("div"); wrapper.className = "sb-i-wrap"; switch (interactive.type) { case "action_slider": this._renderActionSlider(wrapper, interactive, strings); break; case "options": this._renderOptions(wrapper, interactive, strings, locale); break; default: return; }this._container.appendChild(wrapper); this._container.style.display = "block"; var ro = document.getElementById(WIDGET_ID); if (ro) ro.classList.add("sb-iw-open"); },
+        render: function (interactive, locale) {
+            if (!interactive || !interactive.type || !_msgs) return;
+            if (interactive.type === "destination_choices") { renderDestinationChoices(interactive, _msgs, locale); return; }
+            if (interactive.type === "carousel") { if (interactive.items && interactive.items.length) InlineShelf.show(interactive.items, locale); return; }
+            if (["options", "action_slider"].indexOf(interactive.type) === -1) return;
+            var wrapper = document.createElement("div"); wrapper.className = "sb-msg sb-assistant";
+            var title = document.createElement("p"); title.textContent = String(interactive.title || t(locale).quickTitle || "Choose an option"); wrapper.appendChild(title);
+            var options = interactive.type === "action_slider" ? [{ label: interactive.label || (locale === "th" ? "ยืนยัน" : "Confirm"), action: interactive.action }] : (interactive.options || interactive.items || []);
+            if (!Array.isArray(options)) return;
+            options.slice(0, 8).forEach(function (option) {
+                var label = typeof option === "string" ? option : option && (option.label || option.title);
+                if (typeof label !== "string" || !label.trim()) return;
+                var button = document.createElement("button"); button.type = "button"; button.className = "sb-chip"; button.textContent = label.slice(0, 150);
+                button.addEventListener("click", function () {
+                    if (_st && _st.busy) return;
+                    button.disabled = true;
+                    if (option.action && ["warp", "navigate", "warp_cross_page", "handoff", "plugin_action"].indexOf(option.action.type) !== -1) execAction(option.action);
+                    else if (window.__sendMsgRef) Promise.resolve(window.__sendMsgRef(typeof option.value === "string" ? option.value : label)).finally(function () { button.disabled = false; });
+                }); wrapper.appendChild(button);
+            });
+            _msgs.appendChild(wrapper); _msgs.scrollTop = _msgs.scrollHeight;
+        },
         hide: function () { if (this._container) { this._container.style.display = "none"; this._container.innerHTML = ""; var ro = document.getElementById(WIDGET_ID); if (ro) ro.classList.remove("sb-iw-open"); } }
     };
 
@@ -1172,17 +1198,14 @@
                 }
             }
 
+            var outbox = SessionStorage.createOutbox(SessionDB, function () { return navigator.onLine !== false && !state.busy; }, sendMsg);
             window.__sendMsgRef = sendMsg;
             async function sendMsg(raw) {
                 var text = String(raw || "").trim();
-                if (!text || state.busy) return;
+                if (!text || state.busy) return false;
 
                 if (navigator.onLine === false) {
-                    SessionDB.getPref("offline_queue").then(function (q) {
-                        var queue = q || [];
-                        queue.push({ text: text, ts: Date.now() });
-                        SessionDB.setPref("offline_queue", queue);
-                    });
+                    await outbox.enqueue(text);
                     addMsg(messages, "user", text);
                     addMsg(messages, "assistant", "⚠️ " + (t(state.locale, "offlineQueued") || "You are offline. Message queued and will be sent when connection is restored."));
                     input.value = ""; autoGrow(input);
@@ -1199,19 +1222,8 @@
                 pushHist(state, "user", text);
                 var load = addMsg(messages, "assistant", cmd ? cmd.reply + "\n" + strs.askingMore : strs.thinking, true);
                 try {
-                    // Phase indicator: Groq → Cohere → Gemini sequence
-                    AmbientUI.setBrainPhase("groq");
-                    updateMsg(load, strs.brainGroq);
-                    await sleep(200);
-
-                    AmbientUI.setBrainPhase("cohere");
-                    updateMsg(load, strs.brainCohere);
-                    await sleep(200);
-
                     AmbientUI.setBrainPhase("gemini");
-                    updateMsg(load, strs.brainGemini);
-                    await sleep(200);
-
+                    updateMsg(load, strs.thinking);
                     var data = await askAI(cfg, state, text, rl);
                     AmbientUI.setBrainPhase(null);
                     var reply = mergeCmd(cmd, data.reply || "");
@@ -1240,21 +1252,12 @@
                     console.error("Chat:", err);
                     var fb = localReply(text, state.locale);
                     updateMsg(load, cmd ? cmd.reply : (fb || strs.connectError), true);
+                    return false;
                 } finally { state.busy = false; form.classList.remove("sb-busy"); try { input.focus(); } catch (e) { } }
             }
 
-            window.addEventListener("online", function () {
-                SessionDB.getPref("offline_queue").then(function (q) {
-                    if (q && q.length > 0) {
-                        SessionDB.setPref("offline_queue", []);
-                        q.forEach(function (item, index) {
-                            setTimeout(function () {
-                                if (window.__sendMsgRef) window.__sendMsgRef(item.text);
-                            }, 1000 * (index + 1));
-                        });
-                    }
-                });
-            });
+            window.addEventListener("online", function () { outbox.drain().catch(function () {}); });
+            outbox.drain().catch(function () {});
 
             return true;
         } catch (e) { console.error("[SB] Init error:", e); return false; }
@@ -1301,14 +1304,14 @@
             var r = await fetch(cfg.backendUrl, {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 credentials: "omit", referrerPolicy: "no-referrer",
-                body: JSON.stringify({ apiKey: cfg.apiKey, siteKey: cfg.siteKey, conversationId: state.conversationId, prompt: maskPII(prompt), pageContent: maskPII(collectContent()), siteDNA: dna, selectedText: maskPII(state.selectedText), history: maskHist(state.history), url: location.href, title: document.title, locale: normLocale(locale), domSnapshot: snap }),
+                body: JSON.stringify({ apiKey: cfg.apiKey, siteKey: cfg.siteKey, conversationId: state.conversationId, clientCapabilities: clientCapabilities(), prompt: maskPII(prompt), pageContent: maskPII(collectContent()), siteDNA: dna, selectedText: maskPII(state.selectedText), history: maskHist(state.history), url: location.href, title: document.title, locale: normLocale(locale), domSnapshot: snap }),
                 signal: ctrl.signal
             });
             var d = await r.json().catch(function () { return {}; });
             if (!d || d.status === "silent_abort") return { reply: "", cssCommand: "", action: null, interactive: null };
             if (d.status === "blocked" && d.reply) return { reply: "⚠️ " + d.reply, cssCommand: "", action: d.action && d.action.type === "disable_widget" ? d.action : null, interactive: null };
             if (!r.ok) throw new Error("HTTP " + r.status);
-            return { reply: d.reply || "", cssCommand: d.cssCommand || "", action: d.action || null, interactive: d.interactive || null };
+            return { status: d.status || "ok", reply: d.reply || "", cssCommand: d.cssCommand || "", action: d.action || null, interactive: d.interactive || null };
         } finally { clearTimeout(to); }
     }
 
@@ -1799,7 +1802,7 @@
                     if (!act.pluginName) return;
                     var plugin = window.SupremeBoost.plugins[act.pluginName];
                     if (plugin && typeof plugin.execute === 'function') {
-                        plugin.execute(act.payload || {}, { locale: _st ? _st.locale : "en", addMessage: function (msg) { addMsg(_msgs, "assistant", msg); } });
+                        Promise.resolve().then(function () { return plugin.execute(act.payload || {}, { locale: _st ? _st.locale : "en", addMessage: function (msg) { addMsg(_msgs, "assistant", String(msg)); } }); }).catch(function () { var message = _st && _st.locale === "th" ? "ฟังก์ชันนี้ทำงานไม่สำเร็จ กรุณาลองใหม่" : "The requested function failed. Please try again."; if (_msgs) addMsg(_msgs, "assistant", message); if (_st) pushHist(_st, "assistant", message); });
                     } else {
                         console.warn("[SupremeBoost] Plugin not found or not executable:", act.pluginName);
                     }

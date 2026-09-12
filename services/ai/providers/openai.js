@@ -16,7 +16,7 @@ class OpenAIProvider extends BaseProvider {
         const body = {
             model,
             messages: payloadMessages,
-            temperature: options.temperature || 0.7,
+            temperature: options.temperature ?? 0.7,
             max_tokens: options.maxTokens || 1024,
             response_format: { type: "json_object" }
         };

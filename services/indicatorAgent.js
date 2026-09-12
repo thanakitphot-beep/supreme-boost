@@ -1169,6 +1169,7 @@ function runIndicatorAgent(payload = {}) {
                     result = base(conv);
                 } else {
                     result = base(`ขออภัยครับ ผมอาจจะยังไม่เข้าใจความหมาย หากต้องการให้ผมช่วยหาสินค้า บทความ หรือนโยบายต่างๆ ลองพิมพ์คำสำคัญสั้นๆ มาได้เลยครับ`);
+                    result.metadata = { ...result.metadata, needsReasoning: true };
                 }
             }
             break;

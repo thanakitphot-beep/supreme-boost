@@ -19,9 +19,10 @@ class GeminiProvider extends BaseProvider {
             system_instruction: { parts: [{ text: system }] },
             contents,
             generationConfig: { 
-                temperature: options.temperature || 0.7, 
+                temperature: options.temperature ?? 0.3,
                 maxOutputTokens: options.maxTokens || 1024,
-                responseMimeType: "application/json"
+                responseMimeType: "application/json",
+                ...(schema ? { responseJsonSchema: schema } : {})
             }
         };
 
@@ -42,6 +43,8 @@ class GeminiProvider extends BaseProvider {
             const err = new Error(errorMsg);
             err.status = res.status;
             err.isRateLimit = isRateLimit;
+            const retryAfter = res.headers?.get('retry-after');
+            if (retryAfter) err.retryAfterMs = /^\d+(?:\.\d+)?$/.test(retryAfter) ? Number(retryAfter) * 1000 : Math.max(0, Date.parse(retryAfter) - Date.now());
             throw err;
         }
 

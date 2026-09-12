@@ -5,8 +5,9 @@ class LocalProvider extends BaseProvider {
         const baseUrl = this.config.baseUrl || process.env.LOCAL_AI_BASE_URL;
         if (!baseUrl) throw new Error('LOCAL_AI_BASE_URL is not configured');
 
-        const model = this.config.model || process.env.LOCAL_AI_MODEL || 'local-model';
-        const url = `${baseUrl}/v1/chat/completions`; // Assuming OpenAI compatible API
+        const model = options.model || this.config.model || process.env.LOCAL_AI_MODEL || 'local-model';
+        const normalizedUrl = baseUrl.replace(/\/+$/, '');
+        const url = `${normalizedUrl.endsWith('/v1') ? normalizedUrl : normalizedUrl + '/v1'}/chat/completions`;
         
         const payloadMessages = [
             { role: 'system', content: system },
@@ -16,7 +17,7 @@ class LocalProvider extends BaseProvider {
         const body = {
             model,
             messages: payloadMessages,
-            temperature: options.temperature || 0.7,
+            temperature: options.temperature ?? 0.3,
             max_tokens: options.maxTokens || 1024,
             response_format: { type: "json_object" }
         };

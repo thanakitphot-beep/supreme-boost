@@ -7,8 +7,10 @@ const { createClient } = require('@supabase/supabase-js');
 const { semanticCache } = require('../services/cache');
 const { getRagContext } = require('../services/rag');
 const indicatorAI = require('../services/ai/gateway');
+const { needsAnswerReasoning } = require('../services/ai/answerRouting');
+const { sanitizeCapabilities, safeClientAction } = require('../services/ai/clientCapabilities');
 const memoryManager = require('../services/memory');
-const toolRegistry = require('../services/tools/registry');
+const toolRegistry = require('../services/tools');
 const { generateRequestId, logEvent } = require('../services/ai/logger');
 const { runIndicatorAgent, intentFor } = require('../services/indicatorAgent');
 const { resolveSiteProfile, originIsAllowed } = require('../services/siteProfiles');
@@ -347,6 +349,9 @@ function brainActionTarget(aiResponse, originalPrompt) {
         action.targetText ||
         action.title ||
         action.query ||
+        action.target_keyword ||
+        action.parameters?.target_keyword ||
+        action.params?.target_keyword ||
         action.label ||
         originalPrompt,
         MAX_PROMPT_CHARS
@@ -357,7 +362,7 @@ function actionNeedsResolver(aiResponse) {
     const action = aiResponse && aiResponse.action;
     if (!action || typeof action !== 'object') return false;
     if (action.actionTrigger) return true;
-    return ['warp', 'warp_cross_page', 'navigate', 'highlight'].includes(String(action.type || '').toLowerCase());
+    return ['trigger_scroller', 'warp', 'warp_cross_page', 'navigate', 'highlight'].includes(String(action.type || '').toLowerCase());
 }
 
 function safeBrainOnlyAction(action) {
@@ -390,6 +395,7 @@ async function askBrain(payload, mergedHistory, requestId) {
         userMessage: payload.prompt,
         pageContent: payload.pageContent,
         siteDNA: payload.siteDNA,
+        toolContext: { tenantId: payload.tenantId, payload },
         metadata: { requestId },
         runtimeOptions: { model: tenantSettings.model, temperature: tenantSettings.temperature }
     });
@@ -416,19 +422,24 @@ async function runOwnedPipeline(payload, mergedHistory, requestId) {
     // truth for products, pages, prices, navigation and Warp targets.
     const intent = intentFor(payload.prompt);
     const deterministic = await runAgentWithResearch(payload);
+    const answerOnly = needsAnswerReasoning(payload.prompt, intent, deterministic);
+    const reasoningUnavailable = () => ({
+        reply: 'ขณะนี้ยังวิเคราะห์คำถามนี้ไม่ได้ กรุณาลองอีกครั้งในอีกสักครู่ครับ',
+        action: null, interactive: null, cssCommand: '', status: 'error',
+        metadata: { requestId, error: true, needsReasoning: true }
+    });
 
     // If deterministic search couldn't find a specific target (searchAll is true),
     // let it fall through to the AI Brain so RAG (Semantic Search) can try to answer.
     const isGenericSearch = deterministic && deterministic.action && deterministic.action.searchAll;
 
-    if (!isGenericSearch && (isGroundedIntent(intent) || resultIsGrounded(deterministic))) {
+    if (!answerOnly && !isGenericSearch && (isGroundedIntent(intent) || resultIsGrounded(deterministic))) {
         return deterministic;
     }
 
-    // If the deterministic agent already produced a meaningful reply
-    // (e.g. greetings, fallback), skip the Brain call entirely to avoid
-    // showing AI error messages when provider keys are missing/overloaded.
-    if (deterministic.reply && deterministic.status === 'ok') {
+    // Keep resolved answers and greetings fast. Unknown questions and unresolved
+    // searches must reach the Brain instead of getting stuck on a canned reply.
+    if (!answerOnly && !isGenericSearch && deterministic.reply && deterministic.status === 'ok' && !deterministic.metadata?.needsReasoning) {
         return deterministic;
     }
 
@@ -440,6 +451,7 @@ async function runOwnedPipeline(payload, mergedHistory, requestId) {
             const intelligent = await answerWithIntelligence(payload);
             if (intelligent && intelligent.reply) {
                 const normalized = normalizeResult(intelligent);
+                if (answerOnly && normalized.status !== 'error') return { ...normalized, action: null, interactive: null, cssCommand: '' };
                 if (actionNeedsResolver(normalized)) {
                     const target = brainActionTarget(normalized, payload.prompt);
                     const resolved = await runAgentWithResearch({ ...payload, prompt: target });
@@ -465,7 +477,12 @@ async function runOwnedPipeline(payload, mergedHistory, requestId) {
             requestId,
             error: error && error.message ? error.message : String(error)
         });
-        return deterministic;
+        return answerOnly ? reasoningUnavailable() : deterministic;
+    }
+
+    if (answerOnly) {
+        if (aiResponse.status === 'error' || !aiResponse.reply) return reasoningUnavailable();
+        return { ...aiResponse, action: null, interactive: null, cssCommand: '' };
     }
 
     if (actionNeedsResolver(aiResponse)) {
@@ -563,6 +580,7 @@ async function handler(req, res) {
             locale: normalizeLocale(body.locale),
             conversationId: cleanText(body.conversationId, 120),
             tenantId,
+            clientCapabilities: sanitizeCapabilities(body.clientCapabilities),
             tenantSettings,
             siteProfile
         };
@@ -628,13 +646,16 @@ async function handler(req, res) {
             }
         }
 
+        const cachePayload = { ...payload, history: mergedHistory };
         const allowCache = cacheEligible(payload);
         if (allowCache) {
-            const cached = semanticCache.get(payload);
+            const cached = semanticCache.get(cachePayload);
             if (cached) {
                 console.log('[Cache] HIT — returning cached response');
+                await memoryManager.addMessage(conversationId, 'assistant', cached.reply);
                 return res.status(200).json({
                     ...cached,
+                    metadata: { ...cached.metadata, requestId, cacheHit: true },
                     expertise: payload.expertiseStatus,
                     learning: payload.learningStatus
                 });
@@ -662,11 +683,13 @@ async function handler(req, res) {
                 userMessage: payload.prompt,
                 pageContent: payload.pageContent,
                 siteDNA: payload.siteDNA,
+                toolContext: { tenantId: payload.tenantId, payload },
                 metadata: { requestId }
             }));
         }
 
         result = normalizeResult(result);
+        result.action = safeClientAction(result.action, payload.clientCapabilities);
 
         if (result.reply && result.status !== 'error' && result.status !== 'silent_abort') {
             await memoryManager.addMessage(conversationId, 'assistant', result.reply);
@@ -685,7 +708,7 @@ async function handler(req, res) {
             };
 
             if (allowCache) {
-                semanticCache.set(payload, result);
+                semanticCache.set(cachePayload, result);
             }
         }
 
@@ -714,3 +737,4 @@ module.exports.cacheStats = function cacheStats(req, res) {
 // public API routes.
 module.exports.__sanitizeDNA = sanitizeDNA;
 module.exports.__cacheEligible = cacheEligible;
+module.exports.__runOwnedPipeline = runOwnedPipeline;

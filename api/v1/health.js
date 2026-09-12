@@ -69,7 +69,9 @@ module.exports = async function handler(req, res) {
 
         return res.status(allOk ? 200 : 206).json({
             status: allOk ? 'healthy' : 'degraded',
-            version: '3.1.0',
+            version: '3.2.0-agent-tools',
+            revision: process.env.RENDER_GIT_COMMIT || null,
+            agent: { protocol: 'bounded-json-tools-v1', tools: require('../../services/tools').getAvailableTools().map(tool => tool.name) },
             project: 'INDICATOR',
             timestamp: new Date().toISOString(),
             uptime: uptime.formatted,

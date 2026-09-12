@@ -7,11 +7,16 @@ const RESPONSE_SCHEMA = {
         action: { 
             type: ["object", "null"],
             properties: {
-                type: { type: "string" }
+                type: { type: "string" },
+                target_keyword: { type: "string" }
             }
         },
         cssCommand: { type: ["string", "null"] },
-        interactive: { type: ["object", "null"] }
+        interactive: { type: ["object", "null"] },
+        toolCalls: { type: 'array', maxItems: 3, items: {
+            type: 'object', required: ['name', 'arguments'],
+            properties: { id: { type: 'string' }, name: { type: 'string' }, arguments: { type: 'object' } }
+        } }
     },
     required: ["reply"]
 };
@@ -39,7 +44,7 @@ function validateResponse(rawResponse, requestId) {
     const parsed = safeParseJson(rawResponse);
     
     if (!parsed) {
-        logEvent('warn', 'Failed to parse JSON', { requestId, rawResponse: rawResponse.slice(0, 100) });
+        logEvent('warn', 'Failed to parse JSON', { requestId });
         return {
             isValid: false,
             error: 'Invalid JSON format',
@@ -48,7 +53,7 @@ function validateResponse(rawResponse, requestId) {
     }
 
     // Basic schema validation
-    if (typeof parsed.reply !== 'string') {
+    if (typeof parsed !== 'object' || Array.isArray(parsed) || typeof parsed.reply !== 'string' || !parsed.reply.trim()) {
         logEvent('warn', 'Response missing required reply string', { requestId });
         return {
             isValid: false,
@@ -57,8 +62,20 @@ function validateResponse(rawResponse, requestId) {
         };
     }
 
-    // Ensure metadata exists
-    parsed.metadata = parsed.metadata || {};
+    const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+    if ((parsed.action != null && (!isObject(parsed.action) || typeof parsed.action.type !== 'string' || !parsed.action.type.trim())) ||
+        (parsed.cssCommand != null && typeof parsed.cssCommand !== 'string') ||
+        (parsed.interactive != null && !isObject(parsed.interactive))) {
+        return { isValid: false, error: 'Invalid action, cssCommand, or interactive field', parsed: null };
+    }
+    parsed.metadata = isObject(parsed.metadata) ? parsed.metadata : {};
+    if (parsed.toolCalls !== undefined && (!Array.isArray(parsed.toolCalls) || parsed.toolCalls.length > 3 ||
+        parsed.toolCalls.some(call => !isObject(call) || !/^[a-z][a-z0-9_]{0,63}$/.test(call.name || '') ||
+            !isObject(call.arguments) || JSON.stringify(call.arguments).length > 16000 ||
+            (call.id !== undefined && (typeof call.id !== 'string' || call.id.length > 80))))) {
+        return { isValid: false, error: 'Invalid toolCalls', parsed: null };
+    }
+    if (parsed.toolCalls?.length && parsed.action) return { isValid: false, error: 'Tool turns cannot also propose client actions', parsed: null };
 
     return {
         isValid: true,

@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "indicator-local": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/tools/indicator-mcp/server.js"]
+    }
+  }
+}
