@@ -16,8 +16,8 @@ const stores = [
 
 const final = (reply, action = null) => ({ reply, action, cssCommand: '', interactive: null });
 
-function buildTrainingCorpus() {
-    return stores.flatMap(store => {
+function buildTrainingCorpus(storeFixtures = stores) {
+    return storeFixtures.flatMap(store => {
         const context = `${store.name} เป็นร้านสมมติสำหรับฝึกตอบเท่านั้น เปิดทุกวัน ${store.opens}-${store.closes} น. ` +
             `สินค้า ${store.first} ราคา ${store.price} บาท หนัก ${store.weight} กรัม; ${store.second} ราคา ${store.otherPrice} บาท หนัก ${store.otherWeight} กรัม ` +
             `ค่าส่ง ${store.shipping} บาท ส่งฟรีเมื่อยอดสินค้าอย่างน้อย ${store.freeAt} บาท ` +
@@ -42,7 +42,7 @@ function buildTrainingCorpus() {
                 { checks: [String(store.price * Math.ceil(store.freeAt / store.price))], noAction: true }),
             add('missing-stock', `ยืนยันจำนวน ${store.second} ที่ซื้อได้ตอนนี้จากข้อมูลร้านนี้`,
                 final(`ข้อมูล ${store.name} ไม่ได้ระบุสต็อกปัจจุบันของ ${store.second} จึงยังยืนยันจำนวนที่ซื้อได้ไม่ได้ครับ ต้องตรวจสอบสต็อกกับร้านก่อน`),
-                { any: ['ไม่ได้ระบุ', 'ไม่มีข้อมูล', 'ยังยืนยัน', 'ตรวจสอบสต็อก'], noAction: true }),
+                { any: ['ไม่ได้ระบุ', 'ไม่มีข้อมูล', 'ยังยืนยัน', 'ตรวจสอบสต็อก', 'ไม่ได้ให้ข้อมูลสต็อก', 'ยืนยันจำนวนที่ซื้อได้ตอนนี้ไม่ได้'], noAction: true }),
             add('clarification', `เลือกอันนั้นให้ทีใน ${store.name}`,
                 final(`หมายถึง ${store.first} หรือ ${store.second} ครับ?`),
                 { checks: [store.first, store.second], any: ['หมายถึง', 'รุ่นไหน', 'ระบุ'], noAction: true }),

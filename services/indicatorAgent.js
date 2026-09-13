@@ -471,7 +471,7 @@ function intentFor(prompt) {
     if (/(โมโห|ไม่พอใจ|แย่มาก|ห่วย|ช้ามาก|ร้องเรียน|complaint|angry|bad|terrible)/iu.test(text)) return 'complaint';
     if (RECOMMENDATION_REQUEST.test(text)) return 'recommend_products';
     if (availabilitySubject(text)) return 'find_product';
-    if (/(ติดต่อ|contact|support)/iu.test(text) && (LOCATION_REQUEST.test(text) || /(?:หน้า|page|where)/iu.test(text))) return 'search_unified';
+    if (/(ติดต่อ|contact|support)/iu.test(text) && (LOCATION_REQUEST.test(text) || /(?:ไปหน้า|เปิดหน้า|หน้าติดต่อ|\bpage\b|\bwhere\b)/iu.test(text))) return 'search_unified';
     if (/(ติดต่อ|เบอร์โทร|อีเมล|เจ้าหน้าที่|พนักงาน|human|agent|contact|support)/iu.test(text)) return 'handoff';
     if (/(สรุป|summari[sz]e|ย่อ)/iu.test(text)) return 'summarize';
     if (/(คำศัพท์|คำว่า|หมายถึง|definition|meaning)/iu.test(text)) return 'define_term';

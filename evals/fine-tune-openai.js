@@ -3,12 +3,13 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { validateArtifacts } = require('./prepare-agent-training');
-const directory = path.join(__dirname, 'generated');
-const statePath = path.join(__dirname, 'results', 'fine-tune-job.json');
+const large = process.argv.includes('--large');
+const directory = path.join(__dirname, large ? 'generated-large' : 'generated');
+const statePath = path.join(__dirname, 'results', large ? 'fine-tune-large-job.json' : 'fine-tune-job.json');
 const model = 'gpt-4.1-mini-2025-04-14';
 async function main() {
     const action = process.argv[2];
-    const manifest = validateArtifacts(directory);
+    const manifest = validateArtifacts(directory, large ? require('./large-curriculum').buildLargeCorpus() : undefined);
     const plan = { model, epochs: 1, examples: manifest.examples, trainBytes: fs.statSync(path.join(directory, 'train.jsonl')).size, corpusHash: manifest.corpusHash };
     if (!['start', 'status'].includes(action)) return console.log(JSON.stringify(plan, null, 2));
     const env = require('dotenv').parse(fs.readFileSync(path.join(__dirname, '../.env')));

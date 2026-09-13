@@ -99,9 +99,9 @@ function writeArtifacts(directory, corpus) {
     return artifacts.manifest;
 }
 
-function validateArtifacts(directory) {
+function validateArtifacts(directory, corpus = buildTrainingCorpus()) {
     const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8'));
-    const expected = buildArtifacts();
+    const expected = buildArtifacts(corpus);
     if (JSON.stringify(manifest) !== JSON.stringify(expected.manifest)) throw new Error('Manifest does not match the current curriculum; regenerate or use the matching source revision');
     for (const [name, details] of Object.entries(manifest.files)) {
         const contents = fs.readFileSync(path.join(directory, name), 'utf8');
