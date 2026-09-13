@@ -15,9 +15,10 @@ function selectTools(tools, message) {
 function createTokenBudget(options = {}) {
     return { remainingOutput: bounded(process.env.AI_MAX_OUTPUT_TOKENS_PER_REQUEST, 1800, 256, 8192),
         perCall: bounded(options.maxTokens ?? process.env.AI_MAX_OUTPUT_TOKENS, 600, 128, 2048),
-        reservedOutput: 0, estimatedInput: 0, calls: 0 };
+        reservedOutput: 0, estimatedInput: 0, calls: 0, maxCalls: 6, rejectedCalls: 0 };
 }
 function reserveCall(budget, payload) {
+    if (budget.calls >= budget.maxCalls) throw new Error('Agent provider attempt limit reached');
     if (budget.remainingOutput < 128) throw new Error('Agent output token budget exhausted');
     const maxTokens = Math.min(budget.perCall, budget.remainingOutput);
     budget.remainingOutput -= maxTokens; budget.reservedOutput += maxTokens; budget.calls++;
@@ -25,4 +26,12 @@ function reserveCall(budget, payload) {
     budget.estimatedInput += Math.ceil(Buffer.byteLength(JSON.stringify({ system: payload.system, messages: payload.messages }), 'utf8') / 3);
     return maxTokens;
 }
-module.exports = { selectTools, createTokenBudget, reserveCall };
+function releaseRejectedCall(budget, maxTokens, error) {
+    // These HTTP responses reject generation. Keep attempts/input estimates,
+    // but do not let an empty quota rejection consume the next provider's output.
+    if (![400, 401, 403, 404, 429].includes(error?.status)) return;
+    budget.remainingOutput += maxTokens;
+    budget.reservedOutput -= maxTokens;
+    budget.rejectedCalls++;
+}
+module.exports = { selectTools, createTokenBudget, reserveCall, releaseRejectedCall };

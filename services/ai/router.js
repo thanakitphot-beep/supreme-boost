@@ -3,7 +3,7 @@ const OpenAIProvider = require('./providers/openai');
 const GeminiProvider = require('./providers/gemini');
 const GroqProvider = require('./providers/groq');
 const LocalProvider = require('./providers/local');
-const { createTokenBudget, reserveCall } = require('./tokenBudget');
+const { createTokenBudget, reserveCall, releaseRejectedCall } = require('./tokenBudget');
 
 const PROVIDER_NAMES = new Set(['openai', 'gemini', 'groq', 'local']);
 
@@ -152,12 +152,13 @@ class ModelRouter {
                 const remaining = deadlineAt - Date.now();
                 if (remaining < 1000) throw new Error('AI request deadline exceeded');
                 if (tokenBudget.remainingOutput < 128) throw new Error('Agent output token budget exhausted');
+                if (tokenBudget.calls >= tokenBudget.maxCalls) throw new Error('Agent provider attempt limit reached');
                 if (!this.circuitBreaker.canAttempt(currentProvider.name)) {
                     lastError = new Error(`${currentProvider.name} circuit is open`);
                     break;
                 }
                 // Reserve every actual provider attempt, including retries and fallback.
-                // Failed/timed-out calls retain their reservation: billing is uncertain.
+                // Timeouts retain their reservation; explicit rejections release it.
                 const maxTokens = reserveCall(tokenBudget, payload);
                 const controller = new AbortController();
                 const hasFallback = candidates.indexOf(currentProvider) < candidates.length - 1;
@@ -191,6 +192,7 @@ class ModelRouter {
                     };
                 } catch (error) {
                     clearTimeout(timeout);
+                    releaseRejectedCall(tokenBudget, maxTokens, error);
                     lastError = error;
                     this.circuitBreaker.recordFailure(currentProvider.name, error);
                     logEvent('warn', 'Provider failed', {
