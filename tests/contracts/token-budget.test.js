@@ -40,6 +40,13 @@ describe('request token limits', () => {
         expect(budget.remainingOutput).toBe(400);
         expect(budget.reservedOutput).toBe(600);
     });
+    test.each(['ตัวไหนคุ้ม', 'งบพันนึงเอาไหนดี', 'แนะนำหน่อย', 'which is better'])('offers evidence tools for conversational recommendation: %s', message => {
+        const tools = ['search_website', 'compare_products', 'calculate', 'trigger_scroller', 'handoff_to_human'].map(name => ({ name }));
+        expect(selectTools(tools, message).map(t => t.name)).toEqual(['search_website', 'compare_products', 'calculate']);
+    });
+    test.each(['มีของไหม', 'พร้อมส่งมั้ย', 'สต๊อกเหลือมั้ย'])('keeps lookup for short stock questions: %s', message => {
+        expect(selectTools([{ name: 'search_website' }], message)).toEqual([{ name: 'search_website' }]);
+    });
     test('quota releases cannot cause unlimited provider attempts', () => {
         const { reserveCall, releaseRejectedCall } = require('../../services/ai/tokenBudget');
         const budget = createTokenBudget();
