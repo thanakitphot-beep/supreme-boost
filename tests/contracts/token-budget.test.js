@@ -40,7 +40,7 @@ describe('request token limits', () => {
         expect(budget.remainingOutput).toBe(400);
         expect(budget.reservedOutput).toBe(600);
     });
-    test.each(['ตัวไหนคุ้ม', 'งบพันนึงเอาไหนดี', 'แนะนำหน่อย', 'which is better'])('offers evidence tools for conversational recommendation: %s', message => {
+    test.each(['ตัวไหนคุ้ม', 'งบพันนึงเอาไหนดี', 'แนะนำหน่อย', 'which is better', 'Pro ถูกกว่า Starter หรือเปล่า', 'Pro แพงกว่า Starter แค่ไหน'])('offers evidence tools for conversational recommendation: %s', message => {
         const tools = ['search_website', 'compare_products', 'calculate', 'trigger_scroller', 'handoff_to_human'].map(name => ({ name }));
         expect(selectTools(tools, message).map(t => t.name)).toEqual(['search_website', 'compare_products', 'calculate']);
     });

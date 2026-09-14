@@ -7,7 +7,7 @@ function selectTools(tools, message) {
     if (/(เจ้าหน้าที่|พนักงาน|คนจริง|ร้องเรียน|staff|human|complaint)/u.test(text)) names.add('handoff_to_human');
     if (/(คำนวณ|รวม|เท่า|ราคา|ต่าง|ลด|กี่|calculate|total|price|cost|discount|difference|\d\s*[+*/-])/u.test(text)) names.add('calculate');
     if (/(สินค้า|ราคา|เปรียบ|รุ่น|หา|ค้น|stock|product|search|compare|find|price)/u.test(text)) names.add('search_website');
-    if (/(เปรียบ|ต่าง|เทียบ|compare|difference|versus|\bvs\b)/u.test(text)) { names.add('search_website'); names.add('compare_products'); }
+    if (/(เปรียบ|ต่าง|เทียบ|ถูกกว่า|แพงกว่า|compare|difference|versus|\bvs\b)/u.test(text)) { names.add('search_website'); names.add('compare_products'); }
     // Conversational Thai often asks for a recommendation without saying
     // "compare" or "price". Offer read-only tools, not navigation or handoff.
     if (/(อันไหน|ตัวไหน|รุ่นไหน|แบบไหน|คุ้ม|แนะนำ|งบ|น่าใช้|ไหนดี|เหมาะ|which|recommend|budget|worth|better)/u.test(text)) {
