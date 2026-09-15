@@ -1,0 +1,286 @@
+{
+  "version": 1,
+  "scope": "indicator-public-site-only",
+  "sources": [
+    {
+      "file": "index.html",
+      "sha256": "92689d66aff73911046b7241839ae19244a82edcee1dff4a2c8ecc665a7064f7"
+    },
+    {
+      "file": "knowledge-guide.html",
+      "sha256": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b"
+    }
+  ],
+  "chunks": [
+    {
+      "id": "index.html:section-0:0",
+      "title": "การนำทางตามบริบท",
+      "url": "/#features",
+      "content": "การนำทางตามบริบท\n\n                    พาผู้ใช้ไปยังสินค้า บริการ หรือหน้าที่เกี่ยวข้องจากคำถามบนเว็บไซต์",
+      "source_hash": "92689d66aff73911046b7241839ae19244a82edcee1dff4a2c8ecc665a7064f7",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "index.html:section-1:0",
+      "title": "รองรับภาษาไทยและอังกฤษ",
+      "url": "/#features",
+      "content": "รองรับภาษาไทยและอังกฤษ\n\n                    ตอบคำถามได้ทั้งภาษาไทยและอังกฤษ โดยใช้ข้อมูลที่ธุรกิจกำหนด",
+      "source_hash": "92689d66aff73911046b7241839ae19244a82edcee1dff4a2c8ecc665a7064f7",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "index.html:section-2:0",
+      "title": "ศูนย์จัดการ SaaS",
+      "url": "/#features",
+      "content": "ศูนย์จัดการ SaaS\n\n                    จัดการลูกค้า แพ็กเกจ โดเมนที่อนุญาต และแหล่งข้อมูลตอบคำถามในระบบเดียว",
+      "source_hash": "92689d66aff73911046b7241839ae19244a82edcee1dff4a2c8ecc665a7064f7",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "index.html:plan-starter:0",
+      "title": "Starter",
+      "url": "/#plan-starter",
+      "content": "Starter\n\n                    ฿990/เดือน\n                    เหมาะสำหรับเว็บไซต์ขนาดเล็กที่ต้องการผู้ช่วยตอบคำถาม\n\n                    \n                         AI แชทตอบคำถาม 1,000 ข้อความ/เดือน\n\n                         เรียนรู้ข้อมูลเว็บอัตโนมัติ\n\n                         ไม่มีการนำทางข้ามหน้า",
+      "source_hash": "92689d66aff73911046b7241839ae19244a82edcee1dff4a2c8ecc665a7064f7",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "index.html:plan-pro:0",
+      "title": "Pro",
+      "url": "/#plan-pro",
+      "content": "ยอดนิยม\n                    Pro\n\n                    ฿2,490/เดือน\n                    สำหรับธุรกิจที่ต้องการรองรับปริมาณบทสนทนาและการนำทางมากขึ้น\n\n                    \n                         AI แชท 10,000 ข้อความ/เดือน\n\n                         การนำทางตามบริบท\n\n                         แหล่งข้อมูลเว็บไซต์หลายหน้า\n\n                         รองรับ 2 ภาษาหลัก (TH/EN)",
+      "source_hash": "92689d66aff73911046b7241839ae19244a82edcee1dff4a2c8ecc665a7064f7",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "index.html:plan-enterprise:0",
+      "title": "Enterprise",
+      "url": "/#plan-enterprise",
+      "content": "Enterprise\n\n                    ติดต่อเรา\n                    สำหรับองค์กรที่ต้องการการกำกับดูแล การปรับแต่ง และการสนับสนุนเฉพาะทาง\n\n                    \n                         ไม่จำกัดข้อความ/เดือน\n\n                         ป้อนข้อมูล Knowledge Base (RAG) ขั้นสูง\n\n                         Custom Widget Design\n\n                         SLA Support 24/7",
+      "source_hash": "92689d66aff73911046b7241839ae19244a82edcee1dff4a2c8ecc665a7064f7",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:knowledge-purpose:0",
+      "title": "คลังความรู้ช่วยอะไร?",
+      "url": "/knowledge-guide.html#knowledge-purpose",
+      "content": "คลังความรู้ช่วยอะไร?\nคลังความรู้เก็บข้อความเกี่ยวกับธุรกิจ เช่น รายละเอียดบริการ วิธีใช้งาน และนโยบายที่เจ้าของบัญชีเพิ่มไว้ เมื่อมีคำถาม ระบบค้นข้อความที่เกี่ยวข้องแล้วส่งให้ AI ประกอบคำตอบ",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:knowledge-vs-training:0",
+      "title": "เพิ่มความรู้กับฝึกโมเดลต่างกันอย่างไร?",
+      "url": "/knowledge-guide.html#knowledge-vs-training",
+      "content": "เพิ่มความรู้กับฝึกโมเดลต่างกันอย่างไร?\nเพิ่มความรู้คือเก็บเอกสารให้ AI ค้นอ่านตอนตอบ ส่วนการฝึกโมเดลคือปรับน้ำหนักของโมเดล การเพิ่มเอกสารใน INDICATOR ไม่ได้ฝึกน้ำหนักโมเดลและไม่รับรองว่าระบบฉลาดเทียบเท่าโมเดลใด",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:source-types:0",
+      "title": "เพิ่มข้อมูลแบบไหนได้บ้าง?",
+      "url": "/knowledge-guide.html#source-types",
+      "content": "เพิ่มข้อมูลแบบไหนได้บ้าง?\nเจ้าของบัญชีที่ได้รับอนุญาตเพิ่มข้อความโดยตรง หรือให้ระบบอ่านหน้าเว็บไซต์สาธารณะได้ ข้อความจากบทสนทนาของผู้เยี่ยมชมไม่ถือเป็นเอกสารที่เจ้าของบัญชีรับรอง",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:source-quality:0",
+      "title": "ควรเตรียมข้อมูลอย่างไร?",
+      "url": "/knowledge-guide.html#source-quality",
+      "content": "ควรเตรียมข้อมูลอย่างไร?\nแยกข้อมูลตามหัวข้อ ระบุชื่อสินค้า หน่วยราคา เงื่อนไข ข้อยกเว้น และวันที่ที่ข้อมูลมีผลให้ชัดเจน ควรใช้เอกสารต้นทางของธุรกิจและตรวจความถูกต้องก่อนเพิ่มลงคลัง",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:text-limit:0",
+      "title": "เพิ่มข้อความครั้งละได้เท่าไหร่?",
+      "url": "/knowledge-guide.html#text-limit",
+      "content": "เพิ่มข้อความครั้งละได้เท่าไหร่?\nการเพิ่มข้อความรองรับไม่เกิน 60,000 ตัวอักษรต่อคำขอ ระบบแบ่งข้อความเป็นส่วนย่อยโดยคงข้อความต้นฉบับไว้ เอกสารที่ยาวกว่านี้ควรแยกเป็นหัวข้อก่อนเพิ่ม",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:crawl-limit:0",
+      "title": "อ่านเว็บไซต์หลายหน้าได้ไหม?",
+      "url": "/knowledge-guide.html#crawl-limit",
+      "content": "อ่านเว็บไซต์หลายหน้าได้ไหม?\nการอ่านเว็บไซต์หนึ่งครั้งอ่านได้สูงสุด 8 หน้าในเว็บไซต์ต้นทางเดียวกัน และรวมไม่เกิน 100 ส่วนข้อความ การอ่านอาจได้เพียงบางส่วนหากหน้าไม่พร้อมหรือใช้เวลาเกินกำหนด",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:public-only:0",
+      "title": "อ่านหน้าเข้าสู่ระบบหรือหน้าบัญชีได้ไหม?",
+      "url": "/knowledge-guide.html#public-only",
+      "content": "อ่านหน้าเข้าสู่ระบบหรือหน้าบัญชีได้ไหม?\nเครื่องมือเพิ่มความรู้จากเว็บไซต์ไม่ใช้การเข้าสู่ระบบ และปฏิเสธเส้นทางส่วนตัวที่ตรวจพบ เช่น หน้าบัญชี การชำระเงิน และแอดมิน ผู้ดูแลควรเลือกเฉพาะหน้าที่ตั้งใจเผยแพร่ให้สาธารณะอ่านได้",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:dynamic-pages:0",
+      "title": "เว็บที่แสดงข้อมูลด้วย JavaScript อ่านได้ทั้งหมดไหม?",
+      "url": "/knowledge-guide.html#dynamic-pages",
+      "content": "เว็บที่แสดงข้อมูลด้วย JavaScript อ่านได้ทั้งหมดไหม?\nเครื่องมืออ่าน HTML จากเว็บไซต์โดยไม่เปิดรัน JavaScript ของหน้านั้น ข้อมูลที่แสดงเฉพาะหลังล็อกอินหรือหลังสคริปต์ทำงานอาจไม่ถูกอ่าน เจ้าของบัญชีสามารถเพิ่มข้อความต้นฉบับเองได้",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:data-separation:0",
+      "title": "ข้อมูลต่างบัญชีปะปนกันไหม?",
+      "url": "/knowledge-guide.html#data-separation",
+      "content": "ข้อมูลต่างบัญชีปะปนกันไหม?\nการเก็บและค้นเอกสารของเจ้าของบัญชีกรองตามบัญชีที่ยืนยันแล้ว การเพิ่ม ดู และลบความรู้ต้องผ่านการตรวจสิทธิ์ ข้อมูลร้านตัวอย่างไม่ใช่ข้อมูลสินค้าของเว็บไซต์ลูกค้า",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:persistence:0",
+      "title": "ปิดคอมแล้วความรู้หายไหม?",
+      "url": "/knowledge-guide.html#persistence",
+      "content": "ปิดคอมแล้วความรู้หายไหม?\nเอกสารที่บันทึกสำเร็จผ่านระบบจัดการความรู้อยู่ในฐานข้อมูลบนเซิร์ฟเวอร์ จึงไม่ต้องเปิดคอมของผู้ดูแลค้างไว้ การบันทึกยังต้องอาศัยการเชื่อมต่อฐานข้อมูลที่ทำงานอยู่",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:thai-search:0",
+      "title": "ถามภาษาไทยไม่เว้นวรรคได้ไหม?",
+      "url": "/knowledge-guide.html#thai-search",
+      "content": "ถามภาษาไทยไม่เว้นวรรคได้ไหม?\nการค้นความรู้แยกคำไทยและเชื่อมคำที่ใช้ถามใกล้เคียงกัน เช่น ค่าส่งกับการจัดส่ง จึงไม่จำเป็นต้องพิมพ์ตรงกับข้อความทุกคำ แต่ยังอาจค้นไม่เจอเมื่อคำถามกำกวมหรือแหล่งข้อมูลไม่เพียงพอ",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:retrieval-limit:0",
+      "title": "ระบบอ่านเอกสารทั้งหมดทุกครั้งไหม?",
+      "url": "/knowledge-guide.html#retrieval-limit",
+      "content": "ระบบอ่านเอกสารทั้งหมดทุกครั้งไหม?\nระบบจัดอันดับจากเอกสารของบัญชีสูงสุด 1,000 ส่วนล่าสุดต่อการค้น และคัดข้อความที่เกี่ยวข้องสูงสุด 5 ส่วนในงบ 6,000 ตัวอักษร ข้อมูลที่เก่ากว่าขอบเขตนี้อาจต้องจัดระเบียบหรือเพิ่มระบบค้นขนาดใหญ่เพิ่มเติม",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:token-saving:0",
+      "title": "คลังความรู้ช่วยประหยัดโทเค็นอย่างไร?",
+      "url": "/knowledge-guide.html#token-saving",
+      "content": "คลังความรู้ช่วยประหยัดโทเค็นอย่างไร?\nการเพิ่มข้อความและค้นคลังในระบบนี้ไม่จำเป็นต้องเรียกโมเดลสร้างเวกเตอร์ ระบบส่งเฉพาะข้อความที่เกี่ยวข้องให้ AI แทนการส่งเอกสารทั้งหมด แต่ขั้นตอนสร้างคำตอบด้วยโมเดลยังใช้โทเค็นและมีโควตาของผู้ให้บริการ",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:unknown-facts:0",
+      "title": "ถ้าไม่มีข้อมูลที่ถามจะทำอย่างไร?",
+      "url": "/knowledge-guide.html#unknown-facts",
+      "content": "ถ้าไม่มีข้อมูลที่ถามจะทำอย่างไร?\nผู้ช่วยควรตอบส่วนที่มีข้อมูลรองรับและระบุส่วนที่ยังยืนยันไม่ได้ เช่น ตอบราคาที่ประกาศได้ แต่ไม่เดาจำนวนสต็อกที่ไม่มีในเอกสาร ผู้ดูแลเพิ่มหลักฐานที่ขาดได้ภายหลัง",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:conflicting-facts:0",
+      "title": "ข้อมูลขัดแย้งกันต้องทำอย่างไร?",
+      "url": "/knowledge-guide.html#conflicting-facts",
+      "content": "ข้อมูลขัดแย้งกันต้องทำอย่างไร?\nผู้ดูแลควรตรวจเอกสารที่ให้ตัวเลขหรือเงื่อนไขต่างกันและแก้แหล่งข้อมูลให้ตรงกัน เอกสารที่ถูกทำเครื่องหมายว่าขัดแย้งหรือรอตรวจจะไม่ถูกเลือกโดยการค้นคลังใหม่ แต่ระบบไม่ได้ตรวจจับความขัดแย้งทุกแบบโดยอัตโนมัติ",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:updated-facts:0",
+      "title": "ราคาและข้อมูลล่าสุดจะอัปเดตเองเสมอไหม?",
+      "url": "/knowledge-guide.html#updated-facts",
+      "content": "ราคาและข้อมูลล่าสุดจะอัปเดตเองเสมอไหม?\nเอกสารคือข้อมูลที่บันทึกไว้ ไม่ใช่การเชื่อมสต็อกหรือราคาแบบสด การเปลี่ยนข้อมูลต้นทางต้องนำเข้าข้อมูลใหม่และตรวจรายการเดิม การอ่านเว็บบางส่วนล้มเหลวไม่ควรถูกตีความว่าอัปเดตครบแล้ว",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:source-attribution:0",
+      "title": "ดูที่มาของข้อมูลได้ไหม?",
+      "url": "/knowledge-guide.html#source-attribution",
+      "content": "ดูที่มาของข้อมูลได้ไหม?\nส่วนข้อความที่ค้นได้แนบชื่อเอกสาร และ URL สาธารณะเมื่อมี เพื่อช่วยตรวจสอบคำตอบ ข้อความที่เจ้าของบัญชีเพิ่มเองอาจไม่มี URL จึงควรตั้งชื่อเอกสารให้ชัดเจน",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:personal-data:0",
+      "title": "ควรนำข้อมูลส่วนตัวหรือรหัสลับเข้าคลังไหม?",
+      "url": "/knowledge-guide.html#personal-data",
+      "content": "ควรนำข้อมูลส่วนตัวหรือรหัสลับเข้าคลังไหม?\nควรนำเข้าเฉพาะข้อมูลที่ต้องการใช้ตอบผู้เยี่ยมชม ไม่ควรใส่รหัสผ่าน API key ข้อมูลบัตร หรือข้อมูลลูกค้าส่วนตัว ระบบปกปิดรูปแบบข้อมูลสำคัญที่ตรวจพบได้บางชนิด แต่ไม่ได้รับรองว่าจะพบข้อมูลส่วนตัวทุกแบบ",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:untrusted-instructions:0",
+      "title": "ถ้าเอกสารมีคำสั่งให้ AI เปลี่ยนกฎล่ะ?",
+      "url": "/knowledge-guide.html#untrusted-instructions",
+      "content": "ถ้าเอกสารมีคำสั่งให้ AI เปลี่ยนกฎล่ะ?\nเอกสารที่ค้นได้ใช้เป็นข้อมูล ไม่ใช่คำสั่งควบคุมผู้ช่วย การเพิ่มข้อความที่บอกให้เปิดเผยรหัสลับหรือข้ามสิทธิ์ไม่ได้ให้สิทธิ์แก่ระบบ ผู้ดูแลยังควรตรวจแหล่งข้อมูลก่อนใช้",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:safe-actions:0",
+      "title": "คำตอบของ AI ทำรายการสำคัญทันทีไหม?",
+      "url": "/knowledge-guide.html#safe-actions",
+      "content": "คำตอบของ AI ทำรายการสำคัญทันทีไหม?\nผู้ช่วยแยกข้อเสนอการกระทำออกจากผลการทำงานจริง การนำทางต้องมีเป้าหมายที่ระบบตรวจได้ ส่วนการกระทำของปลั๊กอินขึ้นกับความสามารถและการยืนยันที่ตั้งไว้ ไม่ควรตีความข้อความว่าจะส่งต่อเป็นการยืนยันว่าเจ้าหน้าที่รับเรื่องแล้ว",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:arithmetic:0",
+      "title": "ผู้ช่วยคำนวณราคาได้ไหม?",
+      "url": "/knowledge-guide.html#arithmetic",
+      "content": "ผู้ช่วยคำนวณราคาได้ไหม?\nมีเครื่องมือคำนวณบวก ลบ คูณ หาร วงเล็บ และเปอร์เซ็นต์ เครื่องมือนี้คำนวณจากตัวเลขที่ได้รับ แต่ไม่ได้ยืนยันราคาหรือส่วนลดของร้าน จึงต้องใช้ร่วมกับข้อมูลราคาที่ตรวจสอบได้",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:quota-recovery:0",
+      "title": "ถ้าโมเดลหนึ่งติดโควตาจะเป็นอย่างไร?",
+      "url": "/knowledge-guide.html#quota-recovery",
+      "content": "ถ้าโมเดลหนึ่งติดโควตาจะเป็นอย่างไร?\nระบบลองใช้ผู้ให้บริการสำรองที่ตั้งค่าไว้ภายใต้งบเวลาและจำนวนครั้งที่กำหนด หากผู้ให้บริการทั้งหมดไม่พร้อม อาจยังตอบไม่ได้ คลังความรู้ไม่ได้ทำให้ API ใช้ได้อย่างไม่จำกัด",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:learning-quality:0",
+      "title": "เพิ่มเอกสารเยอะขึ้นแปลว่าถูกต้องขึ้นเสมอไหม?",
+      "url": "/knowledge-guide.html#learning-quality",
+      "content": "เพิ่มเอกสารเยอะขึ้นแปลว่าถูกต้องขึ้นเสมอไหม?\nไม่เสมอไป เอกสารซ้ำ ล้าสมัย หรือผิดอาจทำให้ค้นและตอบแย่ลง ควรเพิ่มเนื้อหาที่ขาดจริง พร้อมทดสอบคำถามที่ใช้งานบ่อยและคำถามที่ควรตอบว่ายังยืนยันไม่ได้",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    },
+    {
+      "id": "knowledge-guide.html:all-questions:0",
+      "title": "ระบบตอบได้ทุกคำถามหรือรับรอง 98.9% ไหม?",
+      "url": "/knowledge-guide.html#all-questions",
+      "content": "ระบบตอบได้ทุกคำถามหรือรับรอง 98.9% ไหม?\nยังไม่มีผลทดสอบเพียงพอรองรับคำรับรองนั้น ความสามารถขึ้นอยู่กับโมเดล เครื่องมือ แหล่งข้อมูล และงานที่ถาม ผลทดสอบชุดเล็กหรือจำนวนเอกสารไม่ใช่หลักฐานความแม่นยำในทุกสถานการณ์",
+      "source_hash": "583348bebcf9eef6d9a36dd37ff28b5c2e8a77cb772f98abc5ac40186468468b",
+      "status": "published",
+      "source_kind": "bundled_public_page"
+    }
+  ]
+}

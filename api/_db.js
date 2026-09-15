@@ -92,11 +92,38 @@ module.exports = {
         return await db.collection('knowledge_chunks').find({ tenant_id: tenantId }).sort({ created_at: -1 }).toArray();
     },
 
-    deleteKnowledge: async (id) => {
+    getKnowledgeById: async (id) => {
         const db = await connectToDatabase();
-        if (!db) return false;
-        await db.collection('knowledge_chunks').deleteOne({ id });
+        if (!db || typeof id !== 'string') return null;
+        return db.collection('knowledge_chunks').findOne({ id });
+    },
+
+    upsertKnowledge: async (chunk) => {
+        const db = await connectToDatabase();
+        if (!db || typeof chunk.tenantId !== 'string' || typeof chunk.url !== 'string' ||
+            !Number.isInteger(chunk.chunkIndex) || chunk.chunkIndex < 0) return null;
+        const filter = { tenant_id: chunk.tenantId, url: chunk.url, chunk_index: chunk.chunkIndex };
+        const now = new Date().toISOString();
+        const values = { title: chunk.title, content: chunk.content, embedding: chunk.embedding || null,
+            source_kind: chunk.sourceType || 'tenant_supplied', source_hash: chunk.sourceHash || null, updated_at: now };
+        await db.collection('knowledge_chunks').updateOne(filter, {
+            $set: values, $setOnInsert: { id: crypto.randomUUID(), created_at: now }
+        }, { upsert: true });
+        return db.collection('knowledge_chunks').findOne(filter);
+    },
+
+    retireKnowledgeAfterIndex: async (tenantId, url, chunkCount) => {
+        const db = await connectToDatabase();
+        if (!db || typeof tenantId !== 'string' || typeof url !== 'string' || !Number.isInteger(chunkCount) || chunkCount < 1) return false;
+        await db.collection('knowledge_chunks').deleteMany({ tenant_id: tenantId, url, chunk_index: { $gte: chunkCount } });
         return true;
+    },
+
+    deleteKnowledge: async (id, tenantId) => {
+        const db = await connectToDatabase();
+        if (!db || typeof id !== 'string' || typeof tenantId !== 'string') return false;
+        const result = await db.collection('knowledge_chunks').deleteOne({ id, tenant_id: tenantId });
+        return result.deletedCount === 1;
     },
 
     deleteKnowledgeByUrl: async (tenantId, url) => {

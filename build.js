@@ -3,6 +3,9 @@ const fs = require('fs');
 
 async function build() {
     try {
+        const library = require('./scripts/build-knowledge-library').buildLibrary();
+        fs.writeFileSync('data/knowledge-library.json', JSON.stringify(library, null, 2) + '\n');
+        console.log(`Knowledge library: ${library.chunks.length} sections from published pages.`);
         await esbuild.build({
             entryPoints: ['src/widget/main.js'],
             bundle: true,

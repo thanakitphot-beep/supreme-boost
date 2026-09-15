@@ -4,6 +4,7 @@ const tenantApi = require('../../api/tenant');
 jest.mock('../../api/_mongodb.js', () => ({ connectToDatabase: jest.fn() }));
 jest.mock('../../services/cors', () => ({ setCorsHeaders: jest.fn(() => true) }));
 jest.mock('../../services/rateLimit', () => ({ checkRateLimit: jest.fn(() => true) }));
+jest.mock('../../api/_db', () => ({ upsertKnowledge: jest.fn().mockResolvedValue({ id: 'saved' }), retireKnowledgeAfterIndex: jest.fn().mockResolvedValue(true) }));
 
 function mockReq(overrides = {}) {
     return {
@@ -68,5 +69,16 @@ describe('Tenant allowed origins', () => {
         expect(res._statusCode).toBe(400);
         expect(res._body.error).toBe('Add valid HTTPS origins without paths');
         expect(updateOne).toHaveBeenCalledTimes(1);
+    });
+    test('customer dashboard stores masked chunks under authenticated identity', async () => {
+        const res = mockRes();
+        await tenantApi(mockReq({ url: '/api/tenant?action=add_knowledge', body: { tenantId: 'other', text: 'วิธีจัดส่ง ติดต่อ test@example.com' } }), res);
+        expect(res._statusCode).toBe(200);
+        expect(require('../../api/_db').upsertKnowledge).toHaveBeenCalledWith(expect.objectContaining({ tenantId: tenant.id, content: 'วิธีจัดส่ง ติดต่อ [REDACTED_EMAIL]', embedding: null }));
+    });
+    test('rejects a URL-only entry instead of claiming it has read a page', async () => {
+        const res = mockRes();
+        await tenantApi(mockReq({ url: '/api/tenant?action=add_knowledge', body: { url: 'https://shop.example/faq' } }), res);
+        expect(res._statusCode).toBe(400);
     });
 });

@@ -1,8 +1,9 @@
-const crypto = require('crypto');
 const { connectToDatabase } = require('./_mongodb.js');
 const { setCorsHeaders } = require('../services/cors');
 const { checkRateLimit } = require('../services/rateLimit');
 const { normalizeAllowedOrigins, tenantIsActive } = require('../services/tenantAccess');
+const knowledgeStore = require('./_db');
+const { cleanSource, digest, storeSource } = require('../services/knowledgeIngestion');
 
 // Very basic authentication: For tenants, they pass `Bearer api_key_here`
 // In a real app we'd use JWT, but since they have their api_key in localStorage, we verify that.
@@ -97,31 +98,21 @@ module.exports = async function handler(req, res) {
             }
 
             if (action === 'add_knowledge') {
-                if (!body.text && !body.url) return res.status(400).json({ error: "No content provided" });
-                const newId = crypto.randomUUID();
-                
-                // If it's a URL, we'd ideally trigger crawl.js, but since this is direct API, 
-                // we'll just save it as a text chunk for simplicity unless we implement full scrape here.
-                const chunk = {
-                    id: newId,
-                    tenant_id: tenant.id,
-                    type: body.url ? 'url' : 'text',
-                    source: body.url || 'Manual Entry',
-                    content: body.text || `Reference: ${body.url}`,
-                    created_at: new Date().toISOString()
-                };
-                await db.collection('knowledge_chunks').insertOne(chunk);
-                return res.status(200).json({ success: true, chunk });
+                if (typeof body.text !== 'string' || !body.text.trim() || body.text.length > 60000) return res.status(400).json({ error: 'เพิ่มข้อความต้นฉบับ 1–60,000 ตัวอักษร; URL อย่างเดียวไม่ใช่เนื้อหาเอกสาร' });
+                const content = cleanSource(body.text);
+                const chunksCount = await storeSource(knowledgeStore, { tenantId: tenant.id, url: 'text:' + digest(content),
+                    title: body.title || 'Owner supplied knowledge', content, sourceType: 'tenant_text' });
+                return res.status(200).json({ success: true, chunksCount });
             }
 
             if (action === 'delete_knowledge') {
                 const { id } = body;
-                if (!id) return res.status(400).json({ error: 'Knowledge ID required' });
+                if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,120}$/.test(id)) return res.status(400).json({ error: 'Knowledge ID required' });
                 // Ensure the tenant owns this knowledge
                 const existing = await db.collection('knowledge_chunks').findOne({ id, tenant_id: tenant.id });
                 if (!existing) return res.status(403).json({ error: 'Forbidden or not found' });
                 
-                await db.collection('knowledge_chunks').deleteOne({ id });
+                await db.collection('knowledge_chunks').deleteOne({ id, tenant_id: tenant.id });
                 return res.status(200).json({ success: true });
             }
         }

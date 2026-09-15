@@ -6,6 +6,8 @@
 const { createClient } = require('@supabase/supabase-js');
 const { semanticCache } = require('../services/cache');
 const { getRagContext } = require('../services/rag');
+const { getPublicKnowledge } = require('../services/publicKnowledge');
+const { retrieveTenantKnowledge } = require('../services/knowledgeRetrieval');
 const indicatorAI = require('../services/ai/gateway');
 const { needsAnswerReasoning } = require('../services/ai/answerRouting');
 const { verifiedAnswer } = require('../services/ai/verifiedAnswer');
@@ -76,24 +78,11 @@ function cleanOptionalText(value, maxLength) {
     return cleanText(typeof value === 'string' ? value : '', maxLength);
 }
 
-function knowledgeScore(query, chunk) {
-    const terms = cleanText(query, 300).toLowerCase().split(/\s+/).filter(term => term.length > 2);
-    const haystack = `${chunk.title || ''} ${chunk.source || ''} ${chunk.content || ''}`.toLowerCase();
-    return terms.reduce((score, term) => score + (haystack.includes(term) ? 1 : 0), 0);
-}
-
 async function getTenantKnowledgeContext(tenantId, query) {
     if (!tenantId || tenantId === 'demo' || !query) return '';
     const db = await connectToDatabase();
     if (!db) return '';
-    const chunks = await db.collection('knowledge_chunks').find({ tenant_id: tenantId }).sort({ created_at: -1 }).limit(50).toArray();
-    return chunks
-        .map(chunk => ({ chunk, score: knowledgeScore(query, chunk) }))
-        .filter(item => item.score > 0)
-        .sort((left, right) => right.score - left.score)
-        .slice(0, 5)
-        .map(item => `[Source: ${item.chunk.title || item.chunk.source || 'Tenant knowledge'}]\n${cleanText(item.chunk.content, 1600)}`)
-        .join('\n\n');
+    return retrieveTenantKnowledge(db, tenantId, query);
 }
 
 async function logTenantEvent(tenantId, type, message, metadata = {}) {
@@ -631,7 +620,8 @@ async function handler(req, res) {
         }
 
         payload.ragContext = await getTenantKnowledgeContext(tenantId, rawPrompt).catch(() => '');
-        if (!payload.ragContext && rawPrompt && supabase) {
+        if (!payload.ragContext) payload.ragContext = getPublicKnowledge(tenantId, req.headers.origin, payload.url, rawPrompt);
+        if (!payload.ragContext && tenantId !== 'demo' && rawPrompt && supabase) {
             const ragTenantId = tenantId;
             try {
                 payload.ragContext = await getRagContext(
